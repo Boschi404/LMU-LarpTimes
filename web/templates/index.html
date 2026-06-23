@@ -530,6 +530,12 @@ function showPage(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('btn-' + name).classList.add('active');
+  if (name === 'archivio') {
+    loadLaps(true);
+    startLapAutoRefresh();
+  } else {
+    stopLapAutoRefresh();
+  }
 }
 
 let _overlayInGameOnly = false;
@@ -708,11 +714,28 @@ async function loadProfile() {
 }
 
 /* ─── ARCHIVIO GIRI ──────────────────────────────────────────────── */
+let _lapsAutoTimer = null;
+
+function startLapAutoRefresh() {
+  stopLapAutoRefresh();
+  if (!document.getElementById('page-archivio').classList.contains('active')) return;
+  _lapsAutoTimer = setInterval(() => {
+    if (document.getElementById('page-archivio').classList.contains('active')) {
+      loadLaps(true);
+    }
+  }, 3000);
+}
+
+function stopLapAutoRefresh() {
+  if (_lapsAutoTimer) clearInterval(_lapsAutoTimer);
+  _lapsAutoTimer = null;
+}
+
 let _lapsData = [];
 let _sortKey = 'lap_number';
 let _sortAsc = true;
 
-async function loadLaps() {
+async function loadLaps(silent = false) {
   const car  = document.getElementById('arch-car').value.trim();
   const track = document.getElementById('arch-track').value.trim();
   const comp = document.getElementById('arch-compound').value.trim();
@@ -724,14 +747,18 @@ async function loadLaps() {
   if (comp) url += `&compound=${encodeURIComponent(comp)}`;
 
   const tbody = document.getElementById('laps-tbody');
-  tbody.innerHTML = '<tr><td colspan="11" class="text-mono" style="color:var(--ink-muted); text-align:center;">Fetching...</td></tr>';
+  if (!silent) {
+    tbody.innerHTML = '<tr><td colspan="11" class="text-mono" style="color:var(--ink-muted); text-align:center;">Fetching...</td></tr>';
+  }
 
   try {
     const res = await fetch(url);
     _lapsData = await res.json();
     renderLapsTable();
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="11" class="text-mono" style="color:var(--status-invalid); text-align:center;">Error: ${e.message}</td></tr>`;
+    if (!silent) {
+      tbody.innerHTML = `<tr><td colspan="11" class="text-mono" style="color:var(--status-invalid); text-align:center;">Error: ${e.message}</td></tr>`;
+    }
   }
 }
 
