@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="LMU Pit Strategist — Analisi dati e strategia pit stop per Le Mans Ultimate" />
+  <title>LMU Pit Strategist</title>
+  <!-- Fonts will be imported from shadcn preset -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- HEADER / NAVIGATION -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">🏎 LMU Pit Strategist</div>
+  <nav>
+    <button class="nav-btn active" id="btn-profilo" onclick="showPage('profilo')">Profilo</button>
+    <button class="nav-btn" id="btn-archivio" onclick="showPage('archivio')">Archivio Giri</button>
+    <button class="nav-btn" id="btn-strategia" onclick="showPage('strategia')">Strategia</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="status-dot" title="Server attivo"></div>
+</header>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PAGE: PROFILO (Session Profile) -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="page active" id="page-profilo">
+  <h2>📊 Profilo Sessioni</h2>
+
+  <!-- Filter Card -->
+  <div class="card">
+    <div class="card-title">Filtri</div>
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label>Auto</label>
+        <input type="text" id="prof-car" placeholder="es. Ferrari 499P" />
+      </div>
+      <div class="filter-group">
+        <label>Pista</label>
+        <input type="text" id="prof-track" placeholder="es. Le Mans" />
+      </div>
+      <div class="filter-group">
+        <label>Mescola (opz.)</label>
+        <input type="text" id="prof-compound" placeholder="es. Soft" />
+      </div>
+      <div class="filter-group">
+        <button class="btn btn-primary" onclick="loadProfile()">Aggiorna</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warning Banner -->
+  <div id="prof-warning" class="warning-banner" style="display:none">
+    <span>⚠️</span>
+    <span id="prof-warning-text"></span>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid" id="prof-stats">
+    <div class="stat-card">
+      <div class="stat-label">Giri validi</div>
+      <div class="stat-value" id="prof-n-laps">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Passo medio</div>
+      <div class="stat-value" id="prof-avg-lap">—</div>
+      <div class="stat-sub" id="prof-std-lap"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Consumo medio</div>
+      <div class="stat-value" id="prof-avg-fuel">—</div>
+      <div class="stat-sub" id="prof-std-fuel"></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Cliff degrado al giro</div>
+      <div class="stat-value" id="prof-cliff">—</div>
+      <div class="stat-sub" id="prof-beta2"></div>
+    </div>
+  </div>
+
+  <!-- Two-Column: Chart + Model Detail -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Curva di degrado gomme</div>
+      <div class="chart-wrapper">
+        <canvas id="chart-degradation"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Dettaglio Modello</div>
+      <table>
+        <tbody id="model-detail-tbody">
+          <tr><td colspan="2">Nessun dato disponibile.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PAGE: ARCHIVIO (Lap Archive) -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="page" id="page-archivio">
+  <h2>📋 Archivio Giri</h2>
+
+  <!-- Filter Card -->
+  <div class="card">
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label>Auto</label>
+        <input type="text" id="arch-car" placeholder="Filtra auto" />
+      </div>
+      <div class="filter-group">
+        <label>Pista</label>
+        <input type="text" id="arch-track" placeholder="Filtra pista" />
+      </div>
+      <div class="filter-group">
+        <label>Mescola</label>
+        <input type="text" id="arch-compound" placeholder="Filtra mescola" />
+      </div>
+      <div class="filter-group">
+        <label>Mostra eliminati</label>
+        <select id="arch-deleted">
+          <option value="0">Solo attivi</option>
+          <option value="1">Tutti</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <button class="btn btn-primary" onclick="loadLaps()">Aggiorna</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Laps Table -->
+  <div class="card">
+    <div class="table-scroll">
+      <table id="laps-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('lap_number')">Giro ↕</th>
+            <th onclick="sortTable('lap_time')">Tempo ↕</th>
+            <th onclick="sortTable('sector_1')">S1</th>
+            <th onclick="sortTable('sector_2')">S2</th>
+            <th onclick="sortTable('sector_3')">S3</th>
+            <th onclick="sortTable('fuel_start_l')">Carb.</th>
+            <th onclick="sortTable('tyre_age_laps')">Età G.</th>
+            <th>Mescola</th>
+            <th onclick="sortTable('track_temp')">T.Pista</th>
+            <th>Stato</th>
+            <th>Anomalia</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody id="laps-tbody">
+          <tr><td colspan="12">Caricamento...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PAGE: STRATEGIA (Strategy Calculator) -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="page" id="page-strategia">
+  <h2>🎯 Calcolo Strategia</h2>
+
+  <!-- Parameters Card -->
+  <div class="card">
+    <div class="card-title">Parametri gara</div>
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label>Auto</label>
+        <input type="text" id="strat-car" placeholder="es. Ferrari 499P" />
+      </div>
+      <div class="filter-group">
+        <label>Pista</label>
+        <input type="text" id="strat-track" placeholder="es. Le Mans" />
+      </div>
+      <div class="filter-group">
+        <label>Giri rimanenti</label>
+        <input type="number" id="strat-laps" value="40" min="1" max="500" />
+      </div>
+      <div class="filter-group">
+        <label>Carburante attuale (L)</label>
+        <input type="number" id="strat-fuel" value="100" min="1" max="200" />
+      </div>
+      <div class="filter-group">
+        <label>Capacità serbatoio (L)</label>
+        <input type="number" id="strat-capacity" value="100" min="1" max="200" />
+      </div>
+      <div class="filter-group">
+        <label>Max soste</label>
+        <input type="number" id="strat-maxstops" value="3" min="0" max="10" />
+      </div>
+      <div class="filter-group">
+        <button class="btn btn-primary" onclick="calculateStrategy()">Calcola</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Banner -->
+  <div id="strat-error" class="warning-banner" style="display:none">
+    <span>⚠️</span>
+    <span id="strat-error-text"></span>
+  </div>
+
+  <!-- Results Section -->
+  <div id="strat-results" style="display:none">
+    <!-- Strategy Cards Grid -->
+    <div class="card">
+      <div class="card-title">Risultati</div>
+      <div class="strat-grid" id="strat-cards"></div>
+    </div>
+    
+    <!-- Optimal Strategy Detail -->
+    <div class="card">
+      <div class="card-title">Dettaglio strategia ottimale</div>
+      <div id="strat-detail"></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+// Navigation
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('btn-' + name).classList.add('active');
+}
+
+// Chart instance
+let degradChart = null;
+
+// Profilo Functions
+async function loadProfile() {
+  const car   = document.getElementById('prof-car').value.trim();
+  const track = document.getElementById('prof-track').value.trim();
+  const comp  = document.getElementById('prof-compound').value.trim();
+  if (!car || !track) { alert('Inserisci auto e pista.'); return; }
+
+  let url = `/api/profile?car=${encodeURIComponent(car)}&track=${encodeURIComponent(track)}`;
+  if (comp) url += `&compound=${encodeURIComponent(comp)}`;
+
+  try {
+    const res = await fetch(url);
+    const d   = await res.json();
+
+    // Update warning
+    const warnDiv = document.getElementById('prof-warning');
+    if (d.warning) {
+      document.getElementById('prof-warning-text').textContent = d.warning;
+      warnDiv.style.display = 'flex';
+    } else {
+      warnDiv.style.display = 'none';
+    }
+
+    // Update stats
+    document.getElementById('prof-n-laps').textContent = d.n_valid_laps ?? '—';
+    document.getElementById('prof-avg-lap').textContent = d.avg_lap_time != null ? fmtTime(d.avg_lap_time) : '—';
+    document.getElementById('prof-std-lap').textContent = d.std_lap_time != null ? `± ${d.std_lap_time.toFixed(3)} s` : '';
+    document.getElementById('prof-avg-fuel').textContent = d.avg_fuel_consumption != null ? `${d.avg_fuel_consumption.toFixed(2)} L/g` : '—';
+    document.getElementById('prof-std-fuel').textContent = d.std_fuel_consumption != null ? `± ${d.std_fuel_consumption.toFixed(2)} L` : '';
+
+    const m = d.degradation_model;
+    document.getElementById('prof-cliff').textContent = m && m.cliff_lap < 990 ? `${m.cliff_lap}` : 'N/D';
+    document.getElementById('prof-beta2').textContent = m && m.beta_2 > 0.01 ? `+${(m.beta_2).toFixed(3)} s/g post-cliff` : '';
+
+    // Update model detail table
+    const tbody = document.getElementById('model-detail-tbody');
+    if (m) {
+      tbody.innerHTML = `
+        <tr><td>Tempo base</td><td>${fmtTime(m.base_time)}</td></tr>
+        <tr><td>Effetto carburante (α)</td><td>${m.alpha.toFixed(4)} s/L</td></tr>
+        <tr><td>Degrado lineare (β₁)</td><td>${m.beta_1.toFixed(4)} s/giro</td></tr>
+        <tr><td>Degrado post-cliff (β₂)</td><td>${m.beta_2.toFixed(4)} s/giro</td></tr>
+        <tr><td>Giro cliff</td><td>${m.cliff_lap < 990 ? m.cliff_lap : 'N/D'}</td></tr>
+      `;
+    } else {
+      tbody.innerHTML = '<tr><td colspan="2">Dati insufficienti per il modello.</td></tr>';
+    }
+
+    // Build chart
+    if (d.degradation_curve && d.raw_points) {
+      buildDegradChart(d.degradation_curve, d.raw_points);
+    }
+  } catch (e) {
+    alert('Errore nel caricamento del profilo: ' + e.message);
+  }
+}
+
+function buildDegradChart(curve, rawPoints) {
+  const ctx = document.getElementById('chart-degradation').getContext('2d');
+  if (degradChart) degradChart.destroy();
+
+  const labels = curve.map(p => p.age);
+  const predicted = curve.map(p => p.predicted_time);
+  const scatterData = rawPoints.map(p => ({ x: p.tyre_age, y: p.lap_time }));
+
+  degradChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Modello (Huber)',
+          data: predicted,
+          borderColor: 'rgb(29, 209, 161)',
+          backgroundColor: 'rgba(29, 209, 161, 0.08)',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: 'Giri reali',
+          data: scatterData,
+          type: 'scatter',
+          backgroundColor: 'rgba(74, 158, 255, 0.8)',
+          borderColor: 'rgba(74, 158, 255, 1)',
+          borderWidth: 1.5,
+          pointRadius: 5.5,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: 'rgb(155, 163, 175)' } },
+        tooltip: { backgroundColor: 'rgba(17, 21, 31, 0.9)', borderColor: 'rgb(37, 47, 61)' }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Età gomma (giri)' }, grid: { color: 'rgba(37, 47, 61, 0.5)' } },
+        y: { title: { display: true, text: 'Tempo sul giro (s)' }, grid: { color: 'rgba(37, 47, 61, 0.5)' } }
+      }
+    }
+  });
+}
+
+// Archivio Functions
+let _lapsData = [];
+let _sortKey = 'lap_number';
+let _sortAsc = true;
+
+async function loadLaps() {
+  const car  = document.getElementById('arch-car').value.trim();
+  const track = document.getElementById('arch-track').value.trim();
+  const comp = document.getElementById('arch-compound').value.trim();
+  const incDel = document.getElementById('arch-deleted').value === '1';
+
+  let url = `/api/laps?include_deleted=${incDel}`;
+  if (car)  url += `&car=${encodeURIComponent(car)}`;
+  if (track) url += `&track=${encodeURIComponent(track)}`;
+  if (comp) url += `&compound=${encodeURIComponent(comp)}`;
+
+  try {
+    const res = await fetch(url);
+    _lapsData = await res.json();
+    renderLapsTable();
+  } catch (e) {
+    document.getElementById('laps-tbody').innerHTML = `<tr><td colspan="12">Errore: ${e.message}</td></tr>`;
+  }
+}
+
+function sortTable(key) {
+  if (_sortKey === key) _sortAsc = !_sortAsc;
+  else { _sortKey = key; _sortAsc = true; }
+  renderLapsTable();
+}
+
+function renderLapsTable() {
+  const data = [..._lapsData].sort((a, b) => {
+    const av = a[_sortKey], bv = b[_sortKey];
+    if (av == null) return 1; if (bv == null) return -1;
+    return _sortAsc ? (av < bv ? -1 : 1) : (av > bv ? -1 : 1);
+  });
+
+  const tbody = document.getElementById('laps-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="12">Nessun giro trovato.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(l => `
+    <tr>
+      <td>${l.lap_number}</td>
+      <td>${fmtTime(l.lap_time)}</td>
+      <td>${l.sector_1 ? l.sector_1.toFixed(3) : '—'}</td>
+      <td>${l.sector_2 ? l.sector_2.toFixed(3) : '—'}</td>
+      <td>${l.sector_3 ? l.sector_3.toFixed(3) : '—'}</td>
+      <td>${l.fuel_start_l != null ? l.fuel_start_l.toFixed(1) : '—'}</td>
+      <td>${l.tyre_age_laps ?? '—'}</td>
+      <td>${l.compound_front || '—'}</td>
+      <td>${l.track_temp != null ? l.track_temp.toFixed(1) : '—'}</td>
+      <td>${l.is_valid_lap ? '✓' : '✗'}</td>
+      <td>${l.anomaly_flag ? '⚠️' : '—'}</td>
+      <td>
+        ${l.is_deleted ? 
+          `<button class="btn btn-restore" onclick="restoreLap(${l.id})">Ripristina</button>` :
+          `<button class="btn btn-danger" onclick="deleteLap(${l.id})">Elimina</button>`
+        }
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deleteLap(id) {
+  if (!confirm('Eliminare questo giro?')) return;
+  await fetch(`/api/laps/${id}/delete`, { method: 'POST' });
+  loadLaps();
+}
+
+async function restoreLap(id) {
+  await fetch(`/api/laps/${id}/restore`, { method: 'POST' });
+  loadLaps();
+}
+
+// Strategia Functions
+async function calculateStrategy() {
+  const car      = document.getElementById('strat-car').value.trim();
+  const track    = document.getElementById('strat-track').value.trim();
+  const laps     = document.getElementById('strat-laps').value;
+  const fuel     = document.getElementById('strat-fuel').value;
+  const capacity = document.getElementById('strat-capacity').value;
+  const maxstops = document.getElementById('strat-maxstops').value;
+
+  if (!car || !track) { alert('Inserisci auto e pista.'); return; }
+
+  document.getElementById('strat-error').style.display = 'none';
+  document.getElementById('strat-results').style.display = 'none';
+
+  const url = `/api/strategy?car=${encodeURIComponent(car)}&track=${encodeURIComponent(track)}`
+    + `&laps_remaining=${laps}&current_fuel=${fuel}&fuel_capacity=${capacity}&max_stops=${maxstops}`;
+
+  try {
+    const res = await fetch(url);
+    const d   = await res.json();
+
+    if (!res.ok) {
+      document.getElementById('strat-error-text').textContent = d.error || 'Errore sconosciuto.';
+      document.getElementById('strat-error').style.display = 'flex';
+      return;
+    }
+
+    const r = d.result;
+    const optStops = r.optimal ? r.optimal.stops : null;
+    const cards = Object.values(r.alternatives || {}).sort((a, b) => a.stops - b.stops);
+
+    document.getElementById('strat-cards').innerHTML = cards.map(s => {
+      const isOpt = s.stops === optStops;
+      const timeMin = Math.floor(s.total_time / 60);
+      const timeSec = (s.total_time % 60).toFixed(1);
+      const pitLapsStr = s.pit_laps.length ? s.pit_laps.join(', ') : '(no-stop)';
+
+      return `<div class="strat-card ${isOpt ? 'optimal' : ''}">
+        ${isOpt ? '<div class="badge-optimal">★ OTTIMALE</div>' : ''}
+        <div class="strat-stops">${s.stops}</div>
+        <div class="strat-label">Sost${s.stops === 1 ? 'a' : 'e'}</div>
+        <div class="strat-laps">Box ai giri: ${pitLapsStr}</div>
+        <div class="strat-time">⏱ ${timeMin}m ${timeSec}s</div>
+      </div>`;
+    }).join('');
+
+    if (r.optimal) {
+      const opt = r.optimal;
+      document.getElementById('strat-detail').innerHTML = `
+        <div class="strat-summary">
+          <div>Consumo medio: <strong>${opt.mean_fuel_consumption} L/g</strong></div>
+          <div>Pit loss: <strong>${opt.pit_loss_seconds} s</strong></div>
+          <div>Decisioni giro per giro: ${(opt.decisions || []).map(d => d === 'pit' ? '🔴' : '●').join(' ')}</div>
+        </div>
+      `;
+    }
+
+    document.getElementById('strat-results').style.display = 'block';
+  } catch (e) {
+    document.getElementById('strat-error-text').textContent = 'Errore: ' + e.message;
+    document.getElementById('strat-error').style.display = 'flex';
+  }
+}
+
+// Utilities
+function fmtTime(secs) {
+  if (secs == null) return '—';
+  const m = Math.floor(secs / 60);
+  const s = (secs % 60).toFixed(3).padStart(6, '0');
+  return m > 0 ? `${m}:${s}` : `${s} s`;
+}
+
+// Init
+window.onload = () => {
+  loadLaps();
+};
+</script>
+</body>
+</html>

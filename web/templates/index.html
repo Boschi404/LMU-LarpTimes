@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Race Strategy & Telemetry Analytics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <style>
+    /* ─── DESIGN SYSTEM & TOKENS (Impeccable Dark Theme) ─────────────────── */
+    :root {
+      --bg-main: #0b0d10;
+      --surface-base: #12161a;
+      --surface-elevated: #1a1f26;
+      --border-subtle: #262c35;
+      --border-focus: #4a9eff;
+      
+      --ink-primary: #f0f4f8;
+      --ink-secondary: #99a3af;
+      --ink-muted: #636e7b;
+      
+      --status-valid: #1dd1a1;
+      --status-invalid: #ff6b6b;
+      --status-warn: #feca57;
+      
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      
+      --radius-sm: 4px;
+    }
+
+    /* ─── BASE RESET ─────────────────────────────────────────────────── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-main);
+      color: var(--ink-primary);
+      font-family: var(--font-sans);
+      padding: var(--space-xl);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: var(--space-lg);
+      letter-spacing: -0.02em;
+    }
+
+    /* ─── NAVIGATION NAVIGATION ──────────────────────────────────────── */
+    nav {
+      display: flex;
+      gap: var(--space-md);
+      margin-bottom: var(--space-xl);
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: var(--space-sm);
+    }
+    
+    .nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: var(--space-sm) var(--space-md);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s ease;
+    }
+    
+    .nav-btn:hover {
+      color: var(--ink-primary);
+    }
+    
+    .nav-btn.active {
+      color: var(--ink-primary);
+      background: var(--surface-elevated);
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ─── LAYOUT & UTILITIES ─────────────────────────────────────────── */
+    .grid-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--space-md);
+      margin-bottom: var(--space-xl);
+    }
+    
+    .stat-card {
+      background: var(--surface-base);
+      border: 1px solid var(--border-subtle);
+      padding: var(--space-md) var(--space-lg);
+      border-radius: var(--radius-sm);
+    }
+    
+    .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--ink-secondary);
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-xs);
+    }
+    
+    .stat-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    .section-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--ink-secondary);
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-md);
+    }
+
+    /* ─── FILTERS & INPUTS ───────────────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      background: var(--surface-base);
+      border: 1px solid var(--border-subtle);
+      padding: var(--space-md);
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-xl);
+      align-items: flex-end;
+    }
+    
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+    
+    .filter-group label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink-secondary);
+      text-transform: uppercase;
+    }
+    
+    .filter-bar input, .filter-bar select {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--ink-primary);
+      padding: var(--space-sm) var(--space-md);
+      font-family: var(--font-sans);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+    }
+    
+    .filter-bar input:focus, .filter-bar select:focus {
+      border-color: var(--border-focus);
+      outline: none;
+    }
+
+    /* ─── BUTTONS & BADGES ───────────────────────────────────────────── */
+    .btn {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--ink-primary);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    
+    .btn:hover {
+      background: var(--border-subtle);
+    }
+    
+    .btn-primary {
+      background: var(--border-focus);
+      color: #0b0d10;
+      border: 1px solid var(--border-focus);
+    }
+    
+    .btn-primary:hover {
+      opacity: 0.9;
+      background: var(--border-focus);
+    }
+    
+    .btn-danger {
+      background: transparent;
+      color: var(--status-invalid);
+      border: 1px solid color-mix(in srgb, var(--status-invalid) 25%, transparent);
+    }
+    
+    .btn-restore {
+      background: transparent;
+      color: var(--status-valid);
+      border: 1px solid color-mix(in srgb, var(--status-valid) 25%, transparent);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      font-family: var(--font-sans);
+      border-radius: 2px;
+      letter-spacing: 0.02em;
+    }
+    
+    .badge-valid { background: color-mix(in srgb, var(--status-valid) 15%, transparent); color: var(--status-valid); }
+    .badge-invalid { background: color-mix(in srgb, var(--status-invalid) 15%, transparent); color: var(--status-invalid); }
+    .badge-pit { background: var(--surface-elevated); color: var(--ink-primary); border: 1px solid var(--border-subtle); margin-right: var(--space-xs); }
+
+    /* ─── TABLES ─────────────────────────────────────────────────────── */
+    .table-container {
+      background: var(--surface-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+      margin-bottom: var(--space-xl);
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    
+    th {
+      background: var(--surface-elevated);
+      padding: var(--space-md);
+      font-weight: 600;
+      color: var(--ink-secondary);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    td {
+      padding: var(--space-md);
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--ink-primary);
+    }
+    
+    tr:hover td {
+      background: color-mix(in srgb, var(--surface-elevated) 40%, transparent);
+    }
+    
+    tr.deleted td {
+      opacity: 0.35;
+      text-decoration: line-through;
+    }
+    
+    .num-col { font-family: var(--font-mono); text-align: right; }
+    .text-right { text-align: right; }
+
+    /* ─── CHART & MODEL LAYOUT ──────────────────────────────────────── */
+    .chart-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+    
+    @media (max-width: 992px) {
+      .chart-layout { grid-template-columns: 1fr; }
+    }
+    
+    .chart-wrapper {
+      background: var(--surface-base);
+      border: 1px solid var(--border-subtle);
+      padding: var(--space-md);
+      border-radius: var(--radius-sm);
+      height: 380px;
+      position: relative;
+    }
+
+    /* ─── STRATEGIA UI COMPONENTS ────────────────────────────────────── */
+    .strategy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-lg);
+      margin-top: var(--space-md);
+    }
+    
+    .strat-variant {
+      padding: var(--space-md) var(--space-lg);
+      background: var(--surface-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      display: flex; flex-direction: column; gap: var(--space-sm);
+    }
+    
+    .strat-variant.optimal {
+      border-left: 3px solid var(--status-valid);
+      background: linear-gradient(90deg, color-mix(in srgb, var(--status-valid) 5%, transparent), transparent);
+    }
+
+    .timeline-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+      gap: 2px; margin-top: var(--space-sm);
+    }
+    
+    .lap-cell {
+      padding: var(--space-xs) 0;
+      text-align: center;
+      font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500;
+      background: var(--surface-elevated);
+      color: var(--ink-secondary);
+      border-bottom: 2px solid transparent;
+    }
+    
+    .lap-cell.pit {
+      background: color-mix(in srgb, var(--status-invalid) 15%, transparent);
+      color: var(--status-invalid);
+      border-bottom-color: var(--status-invalid);
+    }
+
+    .alert {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: color-mix(in srgb, var(--status-invalid) 10%, transparent);
+      border: 1px solid var(--status-invalid);
+      color: var(--status-invalid);
+      padding: var(--space-md);
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-xl);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <nav>
+    <button class="nav-btn active" id="btn-profilo" onclick="showPage('profilo')">Tyre Profile Model</button>
+    <button class="nav-btn" id="btn-archivio" onclick="showPage('archivio')">Lap Archive</button>
+    <button class="nav-btn" id="btn-strategia" onclick="showPage('strategia')">Strategy Calculation</button>
+    <div style="margin-left:auto; display:flex; align-items:center; gap: var(--space-sm);">
+      <label style="font-size:0.8rem; color:var(--ink-secondary); cursor:pointer;" for="overlay-in-game-toggle">Overlay in-game only</label>
+      <button class="btn" id="overlay-in-game-toggle" onclick="toggleOverlayMode()" style="padding: var(--space-xs) var(--space-sm); font-size:0.8rem;">OFF</button>
+    </div>
+  </nav>
+</header>
+
+<main>
+  
+  <section class="page active" id="page-profilo">
+    <h2>Tyre Degradation Analysis</h2>
+    
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label for="prof-car">Chassis</label>
+        <input type="text" id="prof-car" value="Ferrari 499P" placeholder="Es. Ferrari 499P"/>
+      </div>
+      <div class="filter-group">
+        <label for="prof-track">Circuit</label>
+        <input type="text" id="prof-track" value="Le Mans" placeholder="Es. Le Mans"/>
+      </div>
+      <div class="filter-group">
+        <label for="prof-compound">Compound (Opt)</label>
+        <input type="text" id="prof-compound" placeholder="Es. Medium"/>
+      </div>
+      <div class="filter-group">
+        <button class="btn btn-primary" onclick="loadProfile()">Load Profile</button>
+      </div>
+    </div>
+
+    <div id="prof-warning" class="alert" style="display:none">
+      <span id="prof-warning-text"></span>
+    </div>
+
+    <div class="grid-stats">
+      <div class="stat-card">
+        <div class="stat-label">Valid Laps Analyzed</div>
+        <div class="stat-value" id="prof-n-laps">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Lap Time</div>
+        <div class="stat-value" id="prof-avg-lap">—</div>
+        <div style="font-size: 0.75rem; color: var(--ink-secondary);" id="prof-std-lap"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Fuel Consumption</div>
+        <div class="stat-value" id="prof-avg-fuel">—</div>
+        <div style="font-size: 0.75rem; color: var(--ink-secondary);" id="prof-std-fuel"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Estimated Cliff Lap</div>
+        <div class="stat-value" style="color:var(--status-invalid)" id="prof-cliff">—</div>
+        <div style="font-size: 0.75rem; color: var(--ink-secondary);" id="prof-beta2"></div>
+      </div>
+    </div>
+
+    <div class="chart-layout">
+      <div class="chart-wrapper">
+        <canvas id="chart-degradation"></canvas>
+      </div>
+      <div class="table-container">
+        <div style="padding: var(--space-md); font-weight: 700; font-size: 0.75rem; uppercase; background: var(--surface-elevated); border-bottom: 1px solid var(--border-subtle); color: var(--ink-secondary);">
+          Mathematical Model Coefficients
+        </div>
+        <table style="border-top: none;">
+          <tbody id="model-detail-tbody">
+            <tr><td colspan="2" class="text-mono" style="color:var(--ink-muted); text-align:center;">Carica un profilo per inizializzare il modello.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-archivio">
+    <h2>Telemetry Lap Archive</h2>
+
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label for="arch-car">Chassis</label>
+        <input type="text" id="arch-car" placeholder="Filtra auto..."/>
+      </div>
+      <div class="filter-group">
+        <label for="arch-track">Circuit</label>
+        <input type="text" id="arch-track" placeholder="Filtra pista..."/>
+      </div>
+      <div class="filter-group">
+        <label for="arch-compound">Compound</label>
+        <input type="text" id="arch-compound" placeholder="Filtra mescola..."/>
+      </div>
+      <div class="filter-group">
+        <label for="arch-deleted">Dropped Laps</label>
+        <select id="arch-deleted" onchange="loadLaps()">
+          <option value="0">Escludi eliminati</option>
+          <option value="1">Includi eliminati</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <button class="btn btn-primary" onclick="loadLaps()">Filter</button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortTable('lap_number')">Lap</th>
+            <th onclick="sortTable('lap_time')" class="text-right">Time</th>
+            <th onclick="sortTable('sector_1')" class="text-right">S1</th>
+            <th onclick="sortTable('sector_2')" class="text-right">S2</th>
+            <th onclick="sortTable('sector_3')" class="text-right">S3</th>
+            <th onclick="sortTable('fuel_start_l')" class="text-right">Fuel (L)</th>
+            <th onclick="sortTable('tyre_age_laps')" class="text-right">Tyre Age</th>
+            <th onclick="sortTable('compound_front')">Compound</th>
+            <th onclick="sortTable('track_temp')" class="text-right">T. Track</th>
+            <th>Flags</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="laps-tbody">
+          <tr><td colspan="11" class="text-mono" style="color:var(--ink-muted); text-align:center;">Nessun dato caricato. Usa i filtri sopra.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="page" id="page-strategia">
+    <h2>Strategy Calculation</h2>
+
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label for="strat-car">Chassis</label>
+        <input type="text" id="strat-car" value="Ferrari 499P" placeholder="e.g. Ferrari 499P" style="width:200px"/>
+      </div>
+      <div class="filter-group">
+        <label for="strat-track">Circuit</label>
+        <input type="text" id="strat-track" value="Le Mans" placeholder="e.g. Le Mans" style="width:180px"/>
+      </div>
+      <div class="filter-group">
+        <label for="strat-laps">Laps Rem.</label>
+        <input type="number" id="strat-laps" value="40" min="1" max="500" class="text-right" style="width:90px"/>
+      </div>
+      <div class="filter-group">
+        <label for="strat-fuel">Current Fuel (L)</label>
+        <input type="number" id="strat-fuel" value="100" min="1" max="200" class="text-right" style="width:120px"/>
+      </div>
+      <div class="filter-group">
+        <label for="strat-capacity">Capacity (L)</label>
+        <input type="number" id="strat-capacity" value="100" min="1" max="200" class="text-right" style="width:120px"/>
+      </div>
+      <div class="filter-group">
+        <label for="strat-maxstops">Max Stops</label>
+        <input type="number" id="strat-maxstops" value="3" min="0" max="10" class="text-right" style="width:80px"/>
+      </div>
+      <div class="filter-group">
+        <button class="btn btn-primary" onclick="calculateStrategy()">Calculate</button>
+      </div>
+    </div>
+
+    <div id="strat-error" class="alert" style="display:none">
+      <span id="strat-error-text"></span>
+    </div>
+
+    <div id="strat-results" style="display:none">
+      <div class="section-label">Optimal & Alternative Strategies</div>
+      <div class="strategy-grid" id="strat-cards"></div>
+
+      <div class="section-label" style="margin-top: var(--space-xl)">Execution Telemetry</div>
+      <div id="strat-detail" class="table-container" style="padding: var(--space-lg)"></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ─── Navigation ─────────────────────────────────────────────────── */
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('btn-' + name).classList.add('active');
+}
+
+let _overlayInGameOnly = false;
+
+async function loadOverlaySettings() {
+  try {
+    const res = await fetch('/api/overlay/settings');
+    const d = await res.json();
+    _overlayInGameOnly = d.in_game_only || false;
+    updateOverlayToggleUI();
+  } catch (e) {
+    console.error('Failed to load overlay settings:', e);
+  }
+}
+
+async function toggleOverlayMode() {
+  _overlayInGameOnly = !_overlayInGameOnly;
+  try {
+    const res = await fetch('/api/overlay/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({in_game_only: _overlayInGameOnly})
+    });
+    const d = await res.json();
+    _overlayInGameOnly = d.in_game_only;
+    updateOverlayToggleUI();
+  } catch (e) {
+    alert('Errore salvataggio impostazioni overlay: ' + e.message);
+    _overlayInGameOnly = !_overlayInGameOnly;
+    updateOverlayToggleUI();
+  }
+}
+
+function updateOverlayToggleUI() {
+  const btn = document.getElementById('overlay-in-game-toggle');
+  if (btn) {
+    btn.textContent = _overlayInGameOnly ? 'ON' : 'OFF';
+    btn.style.background = _overlayInGameOnly ? 'var(--status-valid)' : 'var(--surface-elevated)';
+    btn.style.color = _overlayInGameOnly ? '#0b0d10' : 'var(--ink-primary)';
+    btn.style.border = _overlayInGameOnly ? '1px solid var(--status-valid)' : '1px solid var(--border-subtle)';
+  }
+}
+
+loadOverlaySettings();
+
+/* ─── Utilities ──────────────────────────────────────────────────── */
+function fmtTime(secs) {
+  if (secs == null) return '—';
+  const m = Math.floor(secs / 60);
+  const s = (secs % 60).toFixed(3).padStart(6, '0');
+  return m > 0 ? `${m}:${s}` : `${s} s`;
+}
+
+/* ─── Degradation Chart ──────────────────────────────────────────── */
+let degradChart = null;
+
+function buildDegradChart(curve, rawPoints) {
+  const ctx = document.getElementById('chart-degradation').getContext('2d');
+  if (degradChart) degradChart.destroy();
+
+  const labels = curve.map(p => p.age);
+  const predicted = curve.map(p => p.predicted_time);
+  const scatterData = rawPoints.map(p => ({ x: p.tyre_age, y: p.lap_time }));
+
+  const rootStyle = getComputedStyle(document.documentElement);
+  const colorPrimary = rootStyle.getPropertyValue('--border-focus').trim() || '#4a9eff';
+  const colorScatter = rootStyle.getPropertyValue('--ink-secondary').trim() || '#99a3af';
+  const gridColor = rootStyle.getPropertyValue('--border-subtle').trim() || '#262c35';
+
+  degradChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Model (Huber)',
+          data: predicted,
+          borderColor: colorPrimary,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.1,
+          fill: false,
+        },
+        {
+          label: 'Telemetry',
+          data: scatterData,
+          type: 'scatter',
+          backgroundColor: colorScatter,
+          borderColor: 'transparent',
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        }
+      ]
+    },
+    options: {
+      responsive: true, 
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+           backgroundColor: 'rgba(15, 15, 15, 0.95)',
+           titleFont: { family: "'Geist', sans-serif" },
+           bodyFont: { family: "'JetBrains Mono', monospace" },
+           cornerRadius: 4,
+           borderColor: '#262c35',
+           borderWidth: 1
+        }
+      },
+      scales: {
+        x: { 
+          grid: { color: gridColor, drawBorder: false }, 
+          ticks: { color: '#99a3af', font: { family: "'JetBrains Mono', monospace" } } 
+        },
+        y: { 
+          grid: { color: gridColor, drawBorder: false }, 
+          ticks: { color: '#99a3af', font: { family: "'JetBrains Mono', monospace" } } 
+        }
+      }
+    }
+  });
+}
+
+/* ─── PROFILO DEGRADO ────────────────────────────────────────────── */
+async function loadProfile() {
+  const car   = document.getElementById('prof-car').value.trim();
+  const track = document.getElementById('prof-track').value.trim();
+  const comp  = document.getElementById('prof-compound').value.trim();
+  if (!car || !track) { alert('Inserisci auto e pista.'); return; }
+
+  let url = `/api/profile?car=${encodeURIComponent(car)}&track=${encodeURIComponent(track)}`;
+  if (comp) url += `&compound=${encodeURIComponent(comp)}`;
+
+  try {
+    const res = await fetch(url);
+    const d   = await res.json();
+
+    const warnDiv = document.getElementById('prof-warning');
+    if (d.warning) {
+      document.getElementById('prof-warning-text').textContent = d.warning;
+      warnDiv.style.display = 'flex';
+    } else {
+      warnDiv.style.display = 'none';
+    }
+
+    document.getElementById('prof-n-laps').textContent = d.n_valid_laps ?? '—';
+    document.getElementById('prof-avg-lap').textContent = d.avg_lap_time != null ? fmtTime(d.avg_lap_time) : '—';
+    document.getElementById('prof-std-lap').textContent = d.std_lap_time != null ? `± ${d.std_lap_time.toFixed(3)} s` : '';
+    document.getElementById('prof-avg-fuel').textContent = d.avg_fuel_consumption != null ? `${d.avg_fuel_consumption.toFixed(2)} L/lap` : '—';
+    document.getElementById('prof-std-fuel').textContent = d.std_fuel_consumption != null ? `± ${d.std_fuel_consumption.toFixed(2)} L` : '';
+
+    const m = d.degradation_model;
+    document.getElementById('prof-cliff').textContent = m && m.cliff_lap < 990 ? `${m.cliff_lap}` : 'N/D';
+    document.getElementById('prof-beta2').textContent = m && m.beta_2 > 0.01 ? `+${(m.beta_2).toFixed(3)} s/lap` : '';
+
+    const tbody = document.getElementById('model-detail-tbody');
+    if (m) {
+      tbody.innerHTML = `
+        <tr><td>Base Time</td><td class="num-col">${fmtTime(m.base_time)}</td></tr>
+        <tr><td>Fuel Effect (α)</td><td class="num-col">${m.alpha.toFixed(4)} s/L</td></tr>
+        <tr><td>Linear Deg (β₁)</td><td class="num-col">${m.beta_1.toFixed(4)} s/lap</td></tr>
+        <tr><td>Post-Cliff (β₂)</td><td class="num-col">${m.beta_2.toFixed(4)} s/lap</td></tr>
+        <tr><td>Cliff Lap</td><td class="num-col" style="color:var(--status-invalid)">${m.cliff_lap < 990 ? m.cliff_lap : 'N/D'}</td></tr>
+      `;
+    } else {
+      tbody.innerHTML = '<tr><td colspan="2" class="text-mono" style="color:var(--ink-muted); text-align:center;">Dati insufficienti.</td></tr>';
+    }
+
+    if (d.degradation_curve && d.raw_points) {
+      buildDegradChart(d.degradation_curve, d.raw_points);
+    }
+  } catch (e) {
+    alert('Errore fetch profilo: ' + e.message);
+  }
+}
+
+/* ─── ARCHIVIO GIRI ──────────────────────────────────────────────── */
+let _lapsData = [];
+let _sortKey = 'lap_number';
+let _sortAsc = true;
+
+async function loadLaps() {
+  const car  = document.getElementById('arch-car').value.trim();
+  const track = document.getElementById('arch-track').value.trim();
+  const comp = document.getElementById('arch-compound').value.trim();
+  const incDel = document.getElementById('arch-deleted').value === '1';
+
+  let url = `/api/laps?include_deleted=${incDel}`;
+  if (car)  url += `&car=${encodeURIComponent(car)}`;
+  if (track) url += `&track=${encodeURIComponent(track)}`;
+  if (comp) url += `&compound=${encodeURIComponent(comp)}`;
+
+  const tbody = document.getElementById('laps-tbody');
+  tbody.innerHTML = '<tr><td colspan="11" class="text-mono" style="color:var(--ink-muted); text-align:center;">Fetching...</td></tr>';
+
+  try {
+    const res = await fetch(url);
+    _lapsData = await res.json();
+    renderLapsTable();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="11" class="text-mono" style="color:var(--status-invalid); text-align:center;">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function sortTable(key) {
+  if (_sortKey === key) _sortAsc = !_sortAsc;
+  else { _sortKey = key; _sortAsc = true; }
+  renderLapsTable();
+}
+
+function renderLapsTable() {
+  const data = [..._lapsData].sort((a, b) => {
+    const av = a[_sortKey], bv = b[_sortKey];
+    if (av == null) return 1; if (bv == null) return -1;
+    return _sortAsc ? (av < bv ? -1 : 1) : (av > bv ? -1 : 1);
+  });
+
+  const tbody = document.getElementById('laps-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="text-mono" style="color:var(--ink-muted); text-align:center;">Nessun giro trovato.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(l => {
+    const deleted = l.is_deleted === 1;
+    const cls = deleted ? ' class="deleted"' : '';
+    const validBadge = l.is_valid_lap ? '<span class="badge badge-valid">VALID</span>' : '<span class="badge badge-invalid">INVALID</span>';
+    const pitBadge = l.is_pit_in_lap ? '<span class="badge badge-pit">IN</span> ' : l.is_pit_out_lap ? '<span class="badge badge-pit">OUT</span> ' : '';
+    const anomStr = l.anomaly_flag ? `<span style="color:var(--status-warn); cursor:help;" title="${l.anomaly_reason || 'Anomalia rilevata'}">⚠️</span>` : '';
+
+    const action = deleted
+      ? `<button class="btn btn-restore" onclick="restoreLap(${l.id})">Restore</button>`
+      : `<button class="btn btn-danger" onclick="deleteLap(${l.id})">Drop</button>`;
+
+    return `<tr${cls}>
+      <td class="num-col">${l.lap_number}</td>
+      <td class="num-col">${fmtTime(l.lap_time)}</td>
+      <td class="num-col">${l.sector_1 ? l.sector_1.toFixed(3) : '—'}</td>
+      <td class="num-col">${l.sector_2 ? l.sector_2.toFixed(3) : '—'}</td>
+      <td class="num-col">${l.sector_3 ? l.sector_3.toFixed(3) : '—'}</td>
+      <td class="num-col">${l.fuel_start_l != null ? l.fuel_start_l.toFixed(1) : '—'}</td>
+      <td class="num-col">${l.tyre_age_laps ?? '—'}</td>
+      <td>${l.compound_front || '—'}</td>
+      <td class="num-col">${l.track_temp != null ? l.track_temp.toFixed(1) : '—'}</td>
+      <td>${pitBadge}${validBadge} ${anomStr}</td>
+      <td style="text-align: right; padding: var(--space-xs) var(--space-md);">${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteLap(id) {
+  if (!confirm('Drop this lap from model analysis?')) return;
+  await fetch(`/api/laps/${id}/delete`, { method: 'POST' });
+  loadLaps();
+}
+
+async function restoreLap(id) {
+  await fetch(`/api/laps/${id}/restore`, { method: 'POST' });
+  loadLaps();
+}
+
+/* ─── CALCOLO STRATEGIA ──────────────────────────────────────────── */
+async function calculateStrategy() {
+  const car      = document.getElementById('strat-car').value.trim();
+  const track    = document.getElementById('strat-track').value.trim();
+  const laps     = document.getElementById('strat-laps').value;
+  const fuel     = document.getElementById('strat-fuel').value;
+  const capacity = document.getElementById('strat-capacity').value;
+  const maxstops = document.getElementById('strat-maxstops').value;
+
+  if (!car || !track) { alert('Inserisci auto e pista.'); return; }
+
+  document.getElementById('strat-error').style.display = 'none';
+  document.getElementById('strat-results').style.display = 'none';
+
+  const url = `/api/strategy?car=${encodeURIComponent(car)}&track=${encodeURIComponent(track)}`
+    + `&laps_remaining=${laps}&current_fuel=${fuel}&fuel_capacity=${capacity}&max_stops=${maxstops}`;
+
+  try {
+    const res = await fetch(url);
+    const d   = await res.json();
+
+    if (!res.ok) {
+      document.getElementById('strat-error-text').textContent = d.error || 'Errore sconosciuto.';
+      document.getElementById('strat-error').style.display = 'flex';
+      return;
+    }
+
+    const r = d.result;
+    const optStops = r.optimal ? r.optimal.stops : null;
+    const cards = Object.values(r.alternatives || {}).sort((a, b) => a.stops - b.stops);
+    
+    // Costruzione varianti strategia
+    const cardsHtml = cards.map(s => {
+      const isOpt = s.stops === optStops;
+      const timeMin = Math.floor(s.total_time / 60);
+      const timeSec = (s.total_time % 60).toFixed(1);
+      const pitLapsStr = s.pit_laps.length ? s.pit_laps.join(', ') : 'No Stop';
+      const badge = isOpt ? '<span class="badge badge-valid" style="margin-bottom:var(--space-xs); width:max-content;">OPTIMAL</span>' : '';
+
+      return `
+      <div class="strat-variant${isOpt ? ' optimal' : ''}">
+        <div>${badge}</div>
+        <div style="font-size:1.5rem; font-family:var(--font-mono); line-height:1">${s.stops} <span style="font-size:0.875rem; color:var(--ink-secondary)">Stops</span></div>
+        <div style="font-size:0.875rem; margin-top:var(--space-xs);">Pit Windows: <span class="text-mono" style="font-weight:600;">${pitLapsStr}</span></div>
+        <div style="font-size:0.875rem; color:var(--ink-secondary)">Est. Race Time: <span class="text-mono" style="color:var(--ink-primary); font-weight:600;">${timeMin}m ${timeSec}s</span></div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('strat-cards').innerHTML = cardsHtml || '<p class="text-mono" style="color:var(--ink-muted)">No viable strategy found.</p>';
+
+    // Costruzione Timeline Telemetrica dei giri (sostituisce le vecchie emoji)
+    if (r.optimal) {
+      const opt = r.optimal;
+      const timelineCells = (opt.decisions || []).map((dec, i) => {
+        const isPit = dec === 'pit';
+        return `<div class="lap-cell${isPit ? ' pit' : ''}">${i + 1}</div>`;
+      }).join('');
+
+      document.getElementById('strat-detail').innerHTML = `
+        <div style="display: flex; gap: var(--space-xl); margin-bottom: var(--space-xl);">
+          <div>
+            <div class="stat-label">Mean Fuel/Lap</div>
+            <div class="stat-value text-mono" style="color: var(--status-valid);">${opt.mean_fuel_consumption} L</div>
+          </div>
+          <div style="padding-left: var(--space-xl); border-left: 1px solid var(--border-subtle);">
+            <div class="stat-label">Pit Loss Penalty</div>
+            <div class="stat-value text-mono" style="color: var(--status-invalid);">${opt.pit_loss_seconds} s</div>
+          </div>
+        </div>
+        
+        <div>
+          <div class="stat-label">Lap-by-Lap Execution Plan</div>
+          <div class="timeline-grid">${timelineCells}</div>
+        </div>
+      `;
+    }
+
+    document.getElementById('strat-results').style.display = 'block';
+  } catch (e) {
+    document.getElementById('strat-error-text').textContent = 'Network error: ' + e.message;
+    document.getElementById('strat-error').style.display = 'flex';
+  }
+}
+</script>
+</body>
+</html>
