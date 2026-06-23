@@ -122,12 +122,39 @@ def _launch_overlay_subprocess():
     """Launch overlay as a separate process so PySide6 errors don't kill the launcher."""
     if getattr(sys, 'frozen', False):
         overlay_path = os.path.join(os.path.dirname(sys.executable), "LMU Overlay.exe")
-        proc = subprocess.Popen([overlay_path])
+        proc = subprocess.Popen(
+            [overlay_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
     else:
         script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_overlay_live.py")
         python_exe = sys.executable
-        proc = subprocess.Popen([python_exe, script_path])
+        proc = subprocess.Popen(
+            [python_exe, script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+
+    threading.Thread(
+        target=_pump_stdout,
+        args=(proc,),
+        daemon=True,
+    ).start()
+
     return proc
+
+
+def _pump_stdout(proc):
+    try:
+        for line in proc.stdout:
+            print(f"[Overlay] {line.rstrip()}")
+    except Exception:
+        pass
 
 
 def main():

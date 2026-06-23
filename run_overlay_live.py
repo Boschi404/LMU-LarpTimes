@@ -1,12 +1,18 @@
 """Run the LMU Pit Strategist overlay with live shared memory data from LMU/rFactor 2."""
+import sys
+import time
+
+print("[Overlay] Starting...")
+
 from overlay.app import run_overlay
 from telemetry.source import LiveSharedMemorySource
 
-if __name__ == "__main__":
-    # Use the live shared memory source (LMU or rFactor 2 fallback)
-    # Make sure:
-    #  1. LMU is running on this machine
-    #  2. "Enable Plugins" is enabled in LMU Settings → Gameplay
-    #  3. LMU is in Windowed or Borderless mode (not exclusive fullscreen)
-    source = LiveSharedMemorySource()
-    run_overlay(source)
+print("[Overlay] Initialising telemetry source...")
+source = LiveSharedMemorySource()
+source.start()
+print("[Overlay] Source started.")
+
+print("[Overlay] Launching overlay GUI...")
+ret = run_overlay(source)
+print(f"[Overlay] Overlay exited with code {ret}")
+sys.exit(ret)

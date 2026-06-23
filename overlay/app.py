@@ -98,9 +98,10 @@ class TelemetryWorker(QObject):
         while self._running:
             frame = self.source.get_next_frame()
             if frame is not None:
-                # Record to DB
+                print(f"[Worker] Frame lap={frame.lap_number}, fuel={frame.fuel:.1f}, in_pits={frame.in_pits}")
                 lap_id = self._detector.process_frame(frame)
                 if lap_id is not None:
+                    print(f"[Worker] Lap completed, id={lap_id}")
                     self.lap_completed.emit(lap_id)
                 self.frame_ready.emit(frame)
             time.sleep(TICK)

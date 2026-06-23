@@ -135,6 +135,7 @@ class LapBoundaryDetector:
             }
             
             lap_id = database.insert_lap(lap_data, db_path=self.db_path)
+            print(f"[Detector] Lap {completed_lap} saved (id={lap_id}, valid={self.lap_is_valid})")
             
             # --- Pit Stop Sequence Logic ---
             if is_pit_in:
