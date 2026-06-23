@@ -1,6 +1,7 @@
 """Production-ready launcher for LMU Pit Strategist.
 
 Single entry point: starts web UI, auto-launches overlay when LMU is detected.
+On first run, auto-installs dependencies from requirements.txt if missing.
 """
 import sys
 import os
@@ -8,22 +9,78 @@ import time
 import webbrowser
 import signal
 import threading
-import urllib.request
-import urllib.error
 import subprocess
-
-import psutil
-import uvicorn
-
+import importlib
 
 LMU_EXE_NAMES = ["LMU.exe", "Le Mans Ultimate.exe", "LMU_Racer.exe", "LMU"]
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8000
 POLL_INTERVAL = 2.0
 
+REQUIRED_MODULES = {
+    "numpy": "numpy",
+    "fastapi": "fastapi",
+    "uvicorn": "uvicorn",
+    "jinja2": "jinja2",
+    "psutil": "psutil",
+    "PySide6": "PySide6",
+    "scipy": "scipy",
+}
+
+
+def _check_dependencies() -> list:
+    missing = []
+    for mod_name, _pkg_name in REQUIRED_MODULES.items():
+        try:
+            importlib.import_module(mod_name)
+        except ImportError:
+            missing.append(mod_name)
+    return missing
+
+
+def _install_dependencies(missing: list) -> bool:
+    req_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requirements.txt")
+    if not os.path.exists(req_file):
+        print("[Launcher] requirements.txt not found. Cannot auto-install.")
+        return False
+
+    print(f"[Launcher] Missing dependencies: {', '.join(missing)}")
+    print("[Launcher] Installing from requirements.txt...")
+    python_exe = sys.executable
+    try:
+        proc = subprocess.run(
+            [python_exe, "-m", "pip", "install", "-r", req_file],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0:
+            print("[Launcher] Dependencies installed successfully.")
+            return True
+        else:
+            print(f"[Launcher] pip install failed:\n{proc.stderr}")
+            return False
+    except Exception as e:
+        print(f"[Launcher] Failed to run pip: {e}")
+        return False
+
+
+def _ensure_dependencies() -> None:
+    missing = _check_dependencies()
+    if not missing:
+        return
+
+    print("[Launcher] First run detected — setting up environment...")
+    success = _install_dependencies(missing)
+    if not success:
+        print("[Launcher] WARNING: Some dependencies could not be installed.")
+        print("[Launcher] Please run: pip install -r requirements.txt")
+        sys.exit(1)
+
 
 def _is_lmu_running() -> bool:
     try:
+        import psutil
         for proc in psutil.process_iter(['name']):
             try:
                 name = (proc.info.get('name') or '').lower()
@@ -37,6 +94,7 @@ def _is_lmu_running() -> bool:
 
 
 def _run_server():
+    import uvicorn
     uvicorn.run(
         "web.server:app",
         host=SERVER_HOST,
@@ -47,6 +105,7 @@ def _run_server():
 
 
 def _wait_for_server(timeout: float = 10.0) -> bool:
+    import urllib.request
     url = f"http://{SERVER_HOST}:{SERVER_PORT}/"
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -72,6 +131,8 @@ def _launch_overlay_subprocess():
 
 
 def main():
+    _ensure_dependencies()
+
     print("=" * 60)
     print("  LMU Pit Strategist — Launcher")
     print("=" * 60)
