@@ -53,7 +53,8 @@ def qcolor_hex(c: QColor) -> str:
 # Config persistence
 # ══════════════════════════════════════════════════════════════════════════════
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "overlay_config.json")
+import paths
+CONFIG_PATH = paths.data_path("overlay", "overlay_config.json")
 DEFAULT_CONFIG = {
     "delta_x": 50, "delta_y": 50, "delta_vis": True,
     "fuel_x": 220, "fuel_y": 50, "fuel_vis": True,

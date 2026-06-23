@@ -29,8 +29,9 @@ from analysis.anomaly import detect_anomalies_for_session
 from analysis.models import fit_degradation_model, fit_fuel_model, DegradationModelFit
 from analysis.strategist import PitStrategist
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+import paths
+BASE_DIR = paths.base_dir()
+TEMPLATES_DIR = os.path.join(BASE_DIR, "web", "templates")
 
 @asynccontextmanager
 async def lifespan(app):
@@ -89,7 +90,7 @@ async def get_sessions():
 async def get_overlay_settings():
     import json
     import os
-    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "overlay", "overlay_config.json")
+    config_path = paths.data_path("overlay", "overlay_config.json")
     default_settings = {"in_game_only": False}
     if os.path.exists(config_path):
         try:
@@ -106,7 +107,7 @@ async def set_overlay_settings(request: Request):
     import json
     import os
     body = await request.json()
-    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "overlay", "overlay_config.json")
+    config_path = paths.data_path("overlay", "overlay_config.json")
     existing = {}
     if os.path.exists(config_path):
         try:

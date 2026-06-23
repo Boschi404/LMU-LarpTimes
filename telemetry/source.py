@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Tuple
 
 # Setup path for vendored dependencies
-VENDOR_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vendor")
+VENDOR_PATH = paths.data_path("vendor")
 sys.path.insert(0, os.path.join(VENDOR_PATH, "pyLMUSharedMemory"))
 sys.path.insert(0, os.path.join(VENDOR_PATH, "pyRfactor2SharedMemory"))
 

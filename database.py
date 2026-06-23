@@ -3,7 +3,9 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lmu_pit_strategist.db")
+import paths
+
+DEFAULT_DB_PATH = paths.data_path("lmu_pit_strategist.db")
 
 
 def get_db_connection(db_path: Optional[str] = None) -> sqlite3.Connection:

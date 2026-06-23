@@ -61,9 +61,13 @@ def _wait_for_server(timeout: float = 10.0) -> bool:
 
 def _launch_overlay_subprocess():
     """Launch overlay as a separate process so PySide6 errors don't kill the launcher."""
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_overlay_live.py")
-    python_exe = sys.executable
-    proc = subprocess.Popen([python_exe, script_path])
+    if getattr(sys, 'frozen', False):
+        overlay_path = os.path.join(os.path.dirname(sys.executable), "LMU Overlay.exe")
+        proc = subprocess.Popen([overlay_path])
+    else:
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_overlay_live.py")
+        python_exe = sys.executable
+        proc = subprocess.Popen([python_exe, script_path])
     return proc
 
 

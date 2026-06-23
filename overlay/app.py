@@ -54,7 +54,8 @@ from analysis.strategist import PitStrategist
 # Config persistence
 # ──────────────────────────────────────────────────────────────────────────────
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "overlay_config.json")
+import paths
+CONFIG_PATH = paths.data_path("overlay", "overlay_config.json")
 DEFAULT_CONFIG = {"x": 50, "y": 50, "visible": True, "in_game_only": False}
 
 
