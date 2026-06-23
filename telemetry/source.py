@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Tuple
 
+import paths
+
 # Setup path for vendored dependencies
 VENDOR_PATH = paths.data_path("vendor")
 sys.path.insert(0, os.path.join(VENDOR_PATH, "pyLMUSharedMemory"))
