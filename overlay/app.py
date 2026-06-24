@@ -41,7 +41,7 @@ def qcolor_hex(c: QColor) -> str:
     """Return CSS-style hex for QColor (ignores alpha for simplicity)."""
     return '#%02x%02x%02x' % (c.red(), c.green(), c.blue())
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QMenu
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QSizePolicy, QMenu
 )
 
 import database
@@ -170,7 +170,7 @@ class OverlayWidget(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.setMinimumSize(320, 180)
+        self.setMinimumSize(380, 150)
         self.move(self._cfg.get("x", 50), self._cfg.get("y", 50))
         if self._cfg.get("visible", True):
             self.show()
@@ -179,51 +179,70 @@ class OverlayWidget(QWidget):
 
     def _build_ui(self):
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(12, 10, 12, 12)
-        outer.setSpacing(6)
+        outer.setContentsMargins(10, 8, 10, 8)
+        outer.setSpacing(4)
 
-        # Title row
-        title_row = QHBoxLayout()
-        lbl_title = QLabel("🏁 LMU Pit Strategist")
-        # Title font (use Geist if available, fallback to system)
-        lbl_title.setFont(QFont("Geist", 10, QFont.Weight.Bold))
-        lbl_title.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; letter-spacing: 1px;")
-        title_row.addWidget(lbl_title)
-        title_row.addStretch()
-        outer.addLayout(title_row)
+        # ── Title with track - car ──────────────────────────────────────
+        self._lbl_track_car = QLabel("—")
+        self._lbl_track_car.setFont(QFont("Geist", 9, QFont.Weight.Bold))
+        self._lbl_track_car.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; letter-spacing: 0.5px;")
+        self._lbl_track_car.setMaximumHeight(16)
+        outer.addWidget(self._lbl_track_car)
 
-        # Separator line (drawn in paintEvent)
-        outer.addSpacing(2)
+        # ── Grid: 3 colonne x 2 righe ───────────────────────────────────
+        grid = QGridLayout()
+        grid.setSpacing(8)
+        grid.setContentsMargins(0, 0, 0, 0)
 
-        def _row(label_text: str, default: str = "—") -> tuple:
-            row = QHBoxLayout()
-            row.setSpacing(8)
+        def cell(label_text, default="—"):
+            wrap = QVBoxLayout()
+            wrap.setSpacing(1)
             lbl = QLabel(label_text)
-            lbl.setFont(QFont("Geist", 9))
+            lbl.setFont(QFont("Geist", 8))
             lbl.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
-            lbl.setMinimumWidth(140)
             val = QLabel(default)
-            val.setFont(QFont("JetBrains Mono", 11, QFont.Weight.Bold))
+            val.setFont(QFont("JetBrains Mono", 10, QFont.Weight.Bold))
             val.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)};")
-            row.addWidget(lbl)
-            row.addWidget(val)
-            row.addStretch()
-            return row, val
+            wrap.addWidget(lbl)
+            wrap.addWidget(val)
+            return wrap, val
 
-        row1, self._lbl_delta       = _row("Delta vs miglior giro:")
-        row2, self._lbl_fuel_laps   = _row("Giri carburante rimasti:")
-        row3, self._lbl_cliff       = _row("Giri al cliff gomma:")
-        row4, self._lbl_pit_info    = _row("Box suggerito:")
-        row5, self._lbl_warning     = _row("")   # warning banner
+        c1, self._lbl_delta    = cell("DELTA", "+0.000 s")
+        c2, self._lbl_lap_time  = cell("GIRO", "—")
+        c3, self._lbl_sector    = cell("SETTORI", "—")
+        c4, self._lbl_fuel      = cell("CARBURANTE", "— L")
+        c5, self._lbl_fuel_laps = cell("GIRI CARB.", "—")
+        c6, self._lbl_wear      = cell("USURA FL", "—%")
+        c7, self._lbl_cliff     = cell("CLIFF", "—")
+        c8, self._lbl_compound  = cell("MESCOLA", "—")
+        c9, self._lbl_pit       = cell("BOX", "—")
 
-        for r in (row1, row2, row3, row4, row5):
-            outer.addLayout(r)
+        grid.addLayout(c1, 0, 0)
+        grid.addLayout(c2, 0, 1)
+        grid.addLayout(c3, 0, 2)
+        grid.addLayout(c4, 1, 0)
+        grid.addLayout(c5, 1, 1)
+        grid.addLayout(c6, 1, 2)
+        outer.addLayout(grid)
 
-        # Warning label styling override
-        self._lbl_warning.setStyleSheet(
-            f"color: {qcolor_hex(ACCENT_AMBER)}; font-size: 10pt; font-weight: bold;"
-        )
+        # Seconda riga più piccola
+        grid2 = QGridLayout()
+        grid2.setSpacing(6)
+        grid2.setContentsMargins(0, 0, 0, 0)
+        c10, self._lbl_weather = cell("METEO", "—")
+        c11, self._lbl_track_temp = cell("PISTA", "—")
+        c12, self._lbl_ambient = cell("ARIA", "—")
+        grid2.addLayout(c10, 0, 0)
+        grid2.addLayout(c11, 0, 1)
+        grid2.addLayout(c12, 0, 2)
+        outer.addLayout(grid2)
+
+        # ── Warning banner ──────────────────────────────────────────────
+        self._lbl_warning = QLabel("")
+        self._lbl_warning.setFont(QFont("Geist", 8, QFont.Weight.Bold))
+        self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)};")
         self._lbl_warning.setVisible(False)
+        outer.addWidget(self._lbl_warning)
 
         self.setLayout(outer)
 
@@ -337,51 +356,90 @@ class OverlayWidget(QWidget):
         self._apply_auto_visibility(frame)
         self._current_lap = frame.lap_number
 
-        # ── Delta best ──────────────────────────────────────────────────
+        # Title
+        self._lbl_track_car.setText(f"{frame.track_name} — {frame.car_name}")
+
+        # Delta
         delta = frame.delta_best
         sign = "+" if delta > 0 else ""
-        delta_str = f"{sign}{delta:.3f} s"
+        delta_str = f"{sign}{delta:.3f}"
         color = qcolor_hex(ACCENT_RED) if delta > 0 else qcolor_hex(ACCENT_GREEN)
         self._lbl_delta.setText(delta_str)
-        self._lbl_delta.setStyleSheet(f"color: {color}; font-weight: bold;")
+        self._lbl_delta.setStyleSheet(f"color: {color};")
 
-        # ── Fuel laps remaining ─────────────────────────────────────────
+        # Lap time
+        lt = frame.last_lap_time
+        lt_str = f"{lt:.1f}s" if lt > 0 else "—"
+        self._lbl_lap_time.setText(lt_str)
+
+        # Sectors (da cumulative LMU: S2 = cum-S2 - S1, S3 = lap - cum-S2)
+        s1 = frame.last_sector1
+        s2 = frame.last_sector2 - frame.last_sector1
+        s3 = lt - frame.last_sector2 if lt > 0 else 0
+        self._lbl_sector.setText(f"{s1:.1f} / {s2:.1f} / {s3:.1f}")
+
+        # Fuel
+        fl = frame.fuel
+        fc = frame.fuel_capacity
+        self._lbl_fuel.setText(f"{fl:.0f}L")
+        fuel_color = qcolor_hex(ACCENT_AMBER) if fl < 10 else qcolor_hex(TEXT_PRIMARY)
+        self._lbl_fuel.setStyleSheet(f"color: {fuel_color};")
+
+        # Fuel laps remaining
         fuel_laps = self._estimate_fuel_laps(frame)
-        self._lbl_fuel_laps.setText(f"{fuel_laps:.1f} giri")
-        fuel_color = qcolor_hex(ACCENT_AMBER) if fuel_laps < 3 else qcolor_hex(TEXT_PRIMARY)
-        self._lbl_fuel_laps.setStyleSheet(f"color: {fuel_color}; font-weight: bold;")
+        self._lbl_fuel_laps.setText(f"{fuel_laps:.1f}")
+        fuel_color2 = qcolor_hex(ACCENT_AMBER) if fuel_laps < 3 else qcolor_hex(TEXT_PRIMARY)
+        self._lbl_fuel_laps.setStyleSheet(f"color: {fuel_color2};")
 
-        # ── Giri al cliff ───────────────────────────────────────────────
+        # Wear FL
+        wear_fl = (1.0 - frame.tyre_wear[0]) * 100.0
+        self._lbl_wear.setText(f"{wear_fl:.0f}%")
+        wc = qcolor_hex(ACCENT_AMBER) if wear_fl < 40 else qcolor_hex(TEXT_PRIMARY)
+        self._lbl_wear.setStyleSheet(f"color: {wc};")
+
+        # Cliff
         cliff_laps = self._estimate_cliff_laps(frame)
-        self._lbl_cliff.setText(f"{cliff_laps} giri" if cliff_laps < 999 else "N/D")
-        cliff_color = qcolor_hex(ACCENT_AMBER) if cliff_laps < 5 else qcolor_hex(TEXT_PRIMARY)
-        self._lbl_cliff.setStyleSheet(f"color: {cliff_color}; font-weight: bold;")
+        self._lbl_cliff.setText(str(cliff_laps) if cliff_laps < 999 else "—")
+        cc = qcolor_hex(ACCENT_AMBER) if cliff_laps < 5 else qcolor_hex(TEXT_PRIMARY)
+        self._lbl_cliff.setStyleSheet(f"color: {cc};")
 
-        # ── Pit countdown ───────────────────────────────────────────────
+        # Compound
+        c = frame.tyre_compounds[0] or "—"
+        self._lbl_compound.setText(c)
+
+        # Pit
         if self._pit_plan:
             next_pit = next((l for l in self._pit_plan if l >= self._current_lap), None)
             if next_pit is not None:
                 laps_to_pit = next_pit - self._current_lap
                 if laps_to_pit == 0:
-                    self._lbl_pit_info.setText("⚠️ BOX QUESTO GIRO!")
-                    self._lbl_pit_info.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; font-weight: bold;")
+                    self._lbl_pit.setText("BOX!")
+                    self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; font-weight: bold;")
                 else:
-                    self._lbl_pit_info.setText(f"Giro {next_pit}  (fra {laps_to_pit})")
-                    self._lbl_pit_info.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; font-weight: bold;")
+                    self._lbl_pit.setText(f"Giro {next_pit}")
+                    self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)};")
             else:
-                self._lbl_pit_info.setText("Nessuna sosta prevista")
-                self._lbl_pit_info.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+                self._lbl_pit.setText("—")
+                self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
         else:
-            self._lbl_pit_info.setText("Calcola strategia nell'UI")
-            self._lbl_pit_info.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._lbl_pit.setText("—")
+            self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
 
-        # ── Warning banner ──────────────────────────────────────────────
-        # Show warning if we're burning fuel faster than expected
+        # Weather
+        w = frame.weather_state
+        r = " 🌧" if frame.rain_intensity > 0 else ""
+        self._lbl_weather.setText(w + r)
+
+        # Temps
+        self._lbl_track_temp.setText(f"{frame.track_temp:.0f}°")
+        self._lbl_ambient.setText(f"{frame.ambient_temp:.0f}°")
+
+        # Warning
         if fuel_laps < 2 and not frame.in_pits:
-            self._lbl_warning.setText("⚠️ CARBURANTE QUASI ESAURITO!")
+            self._lbl_warning.setText("⚠️ CARBURANTE CRITICO")
             self._lbl_warning.setVisible(True)
         elif self._pit_plan and self._current_lap in self._pit_plan:
-            self._lbl_warning.setText("🔴 È ORA DI ENTRARE AI BOX!")
+            self._lbl_warning.setText("🔴 BOX QUESTO GIRO")
             self._lbl_warning.setVisible(True)
         else:
             self._lbl_warning.setVisible(False)
