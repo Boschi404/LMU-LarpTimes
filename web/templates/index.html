@@ -456,20 +456,26 @@
         <thead>
           <tr>
             <th onclick="sortTable('lap_number')">Lap</th>
+            <th onclick="sortTable('session_type')">Session</th>
+            <th onclick="sortTable('stint_id')" class="text-right">Stint</th>
             <th onclick="sortTable('lap_time')" class="text-right">Time</th>
             <th onclick="sortTable('sector_1')" class="text-right">S1</th>
             <th onclick="sortTable('sector_2')" class="text-right">S2</th>
             <th onclick="sortTable('sector_3')" class="text-right">S3</th>
-            <th onclick="sortTable('fuel_start_l')" class="text-right">Fuel (L)</th>
+            <th onclick="sortTable('fuel_start_l')" class="text-right">Fuel Start</th>
+            <th onclick="sortTable('fuel_end_l')" class="text-right">Fuel End</th>
             <th onclick="sortTable('tyre_age_laps')" class="text-right">Tyre Age</th>
-            <th onclick="sortTable('compound_front')">Compound</th>
+            <th>Compound</th>
+            <th class="text-right">Wear FL</th>
             <th onclick="sortTable('track_temp')" class="text-right">T. Track</th>
+            <th onclick="sortTable('ambient_temp')" class="text-right">T. Amb</th>
+            <th>Weather</th>
             <th>Flags</th>
             <th style="text-align: right;">Action</th>
           </tr>
         </thead>
         <tbody id="laps-tbody">
-          <tr><td colspan="11" class="text-mono" style="color:var(--ink-muted); text-align:center;">Nessun dato caricato. Usa i filtri sopra.</td></tr>
+          <tr><td colspan="17" class="text-mono" style="color:var(--ink-muted); text-align:center;">Nessun dato caricato. Usa i filtri sopra.</td></tr>
         </tbody>
       </table>
     </div>
@@ -792,16 +798,28 @@ function renderLapsTable() {
       ? `<button class="btn btn-restore" onclick="restoreLap(${l.id})">Restore</button>`
       : `<button class="btn btn-danger" onclick="deleteLap(${l.id})">Drop</button>`;
 
+    const wearStart = l.wear_pct_start_FL != null ? l.wear_pct_start_FL.toFixed(0) + '%' : '—';
+    const wearEnd = l.wear_pct_end_FL != null ? l.wear_pct_end_FL.toFixed(0) + '%' : '—';
+    const wearBadge = l.wear_pct_start_FL != null && l.wear_pct_end_FL != null
+      ? `<span style="font-size:0.75rem; color:${l.wear_pct_end_FL > 50 ? 'var(--status-invalid)' : 'var(--ink-secondary)'}">${wearStart} → ${wearEnd}</span>`
+      : '—';
+
     return `<tr${cls}>
       <td class="num-col">${l.lap_number}</td>
+      <td>${l.session_type || '—'}</td>
+      <td class="num-col">${l.stint_id ?? '—'}</td>
       <td class="num-col">${fmtTime(l.lap_time)}</td>
       <td class="num-col">${l.sector_1 ? l.sector_1.toFixed(3) : '—'}</td>
       <td class="num-col">${l.sector_2 ? l.sector_2.toFixed(3) : '—'}</td>
       <td class="num-col">${l.sector_3 ? l.sector_3.toFixed(3) : '—'}</td>
       <td class="num-col">${l.fuel_start_l != null ? l.fuel_start_l.toFixed(1) : '—'}</td>
+      <td class="num-col">${l.fuel_end_l != null ? l.fuel_end_l.toFixed(1) : '—'}</td>
       <td class="num-col">${l.tyre_age_laps ?? '—'}</td>
-      <td>${l.compound_front || '—'}</td>
-      <td class="num-col">${l.track_temp != null ? l.track_temp.toFixed(1) : '—'}</td>
+      <td>${l.compound_front || '—'}${l.compound_rear ? ' / ' + l.compound_rear : ''}</td>
+      <td class="num-col">${wearBadge}</td>
+      <td class="num-col">${l.track_temp != null ? l.track_temp.toFixed(1) : '—'}°</td>
+      <td class="num-col">${l.ambient_temp != null ? l.ambient_temp.toFixed(1) : '—'}°</td>
+      <td>${l.weather_state || '—'}${l.rain_intensity > 0 ? ' 🌧' : ''}</td>
       <td>${pitBadge}${validBadge} ${anomStr}</td>
       <td style="text-align: right; padding: var(--space-xs) var(--space-md);">${action}</td>
     </tr>`;
