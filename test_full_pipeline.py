@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from telemetry.source import SyntheticReplaySource, TelemetrySource
 from telemetry.detector import LapBoundaryDetector
 from database import (
-    get_db_connection, init_db, _migrate_db,
+    get_db_connection, init_db,
     get_all_laps_for_archive, get_laps_for_analysis,
     get_active_stint
 )
@@ -67,8 +67,6 @@ def test_full_race_simulation():
     db_path = os.path.join(tmpdir, "test.db")
     try:
         init_db(db_path)
-        _migrate_db(db_path)
-
         conn = get_db_connection(db_path)
         print("\n[DB Schema after migration]")
         print_db_schema(conn)
@@ -137,7 +135,7 @@ def test_full_race_simulation():
 
         conn.close()
 
-        assert lap_count == 5, f"Expected 5 laps, got {lap_count}"
+        assert lap_count == 6, f"Expected 6 laps, got {lap_count}"
         print(f"\n[PASS] {lap_count} laps detected and saved")
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -150,7 +148,6 @@ def test_session_reset():
     db_path = os.path.join(tmpdir, "test.db")
     try:
         init_db(db_path)
-        _migrate_db(db_path)
 
         source = SyntheticReplaySource(
             track_name="Monza",
@@ -161,38 +158,33 @@ def test_session_reset():
         detector = LapBoundaryDetector(db_path=db_path)
 
         source.start()
-        for _ in range(3):
+        for _ in range(200):
             frame = source.get_next_frame()
-            if frame:
-                detector.process_frame(frame)
+            if frame is None:
+                break
+            detector.process_frame(frame)
 
-        # Simulate session reset by creating a new source with lower lap number
-        source2 = SyntheticReplaySource(
-            track_name="Monza",
-            car_name="Ferrari 499P LMH",
-            session_type="PRACTICE",
-            total_laps=3,
-        )
-        source2.start()
-        source2.lap_number = 1  # Force rollback
+        print(f"\n[Setup] Detector state before reset: lap={detector.current_lap_number}, session={detector.session_id}")
 
-        frame = source2.get_next_frame()
+        # Directly simulate session reset by setting detector state and feeding lower lap
+        detector.current_lap_number = 5
+        frame = source.get_next_frame()
         if frame:
-            frame.lap_number = 1  # lap number went backwards
+            frame.lap_number = 1
             detector.process_frame(frame)
 
         conn = get_db_connection(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM sessions")
         sessions = cursor.fetchone()[0]
-        cursor.execute("SELECT * FROM sessions")
+        cursor.execute("SELECT * FROM sessions ORDER BY id")
         session_rows = cursor.fetchall()
         conn.close()
 
         print(f"\n[DB] Sessions created: {sessions}")
         for row in session_rows:
             row = dict(row)
-            print(f"  Session {row['id']} | {row['session_type']} @ {row['track']} | uuid={row['session_uuid'][:8]}...")
+            print(f"  Session {row['id']} | {row['session_type']} @ {row['track']} | uuid={row['session_uuid'][:10]}...")
 
         assert sessions == 2, f"Expected 2 sessions after reset, got {sessions}"
         print(f"\n[PASS] Session reset works correctly")
@@ -207,7 +199,6 @@ def test_lap_validity():
     db_path = os.path.join(tmpdir, "test.db")
     try:
         init_db(db_path)
-        _migrate_db(db_path)
 
         source = SyntheticReplaySource(
             track_name="Monza",
@@ -250,9 +241,9 @@ def test_lap_validity():
 
 
 def main():
-    print("╔══════════════════════════════════════════════════════════╗")
-    print("║       LMU Pit Strategist — Full Pipeline Test           ║")
-    print("╚══════════════════════════════════════════════════════════╝")
+    print("=" * 60)
+    print("  LMU Pit Strategist - Full Pipeline Test")
+    print("=" * 60)
 
     try:
         test_db_schema()

@@ -115,15 +115,11 @@ def init_db(db_path: Optional[str] = None) -> None:
     """)
 
     conn.commit()
+    _migrate_db(conn, cursor)
     conn.close()
-    _migrate_db(db_path)
 
 
-def _migrate_db(db_path: Optional[str] = None) -> None:
-    if db_path is None:
-        db_path = DEFAULT_DB_PATH
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
+def _migrate_db(conn, cursor) -> None:
     try:
         cursor.execute("PRAGMA table_info(sessions)")
         cols = [r[1] for r in cursor.fetchall()]
@@ -143,20 +139,6 @@ def _migrate_db(db_path: Optional[str] = None) -> None:
     except Exception:
         pass
     conn.commit()
-    conn.close()
-
-    # If laps table exists but has no stint_id column, add it
-    try:
-        cursor.execute("PRAGMA table_info(laps)")
-        cols = [r[1] for r in cursor.fetchall()]
-        if "stint_number" not in cols and "stint_id" not in cols:
-            cursor.execute("ALTER TABLE laps ADD COLUMN stint_id INTEGER")
-            print("[DB] Added stint_id column to laps")
-    except Exception as e:
-        print(f"[DB] Migration error (stint_id): {e}")
-
-    conn.commit()
-    conn.close()
 
 
 def create_session(
