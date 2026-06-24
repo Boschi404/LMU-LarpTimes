@@ -78,16 +78,14 @@ class LiveSharedMemorySource(TelemetrySource):
 
     def start(self) -> None:
         self.running = True
-        # Try to initialize LMU Shared Memory
-        try:
-            from lmu_mmap import SimInfo as LMUSimInfo
-            self.lmu_info = LMUSimInfo()
-            # Test if we can read version or if LMU is running
-            if self.lmu_info.LMUData.generic.gameVersion > 0:
-                self.active_api = "LMU"
-                return
-        except Exception:
-            self.lmu_info = None
+        from lmu_mmap import SimInfo as LMUSimInfo
+        self.lmu_info = LMUSimInfo()
+        if self.lmu_info.LMUData.generic.gameVersion > 0:
+            self.active_api = "LMU"
+            print("[Source] LMU shared memory initialized")
+            return
+        print("[Source] LMU version=0, falling back to RF2")
+        self.lmu_info = None
 
         # Fallback to rFactor 2 Shared Memory
         try:
@@ -106,18 +104,15 @@ class LiveSharedMemorySource(TelemetrySource):
         if self.active_api == "LMU" and self.lmu_info:
             try:
                 data = self.lmu_info.LMUData
-                # Check game running
                 if data.generic.gameVersion <= 0:
                     return None
 
-                # Player vehicle index
                 p_idx = data.telemetry.playerVehicleIdx
                 if p_idx >= len(data.telemetry.telemInfo):
                     return None
 
                 telem = data.telemetry.telemInfo[p_idx]
-                
-                # Find player scoring
+
                 scoring = None
                 for i in range(data.scoring.scoringInfo.mNumVehicles):
                     veh = data.scoring.vehScoringInfo[i]
@@ -128,7 +123,6 @@ class LiveSharedMemorySource(TelemetrySource):
                 if not scoring:
                     return None
 
-                # Parse track names and car name
                 def clean_str(b: bytes) -> str:
                     return b.partition(b'\0')[0].decode('utf-8', errors='ignore').strip()
 
@@ -137,12 +131,9 @@ class LiveSharedMemorySource(TelemetrySource):
                 if not car:
                     car = clean_str(telem.mVehicleName)
 
-                # Compounds
                 comp_front = clean_str(telem.mFrontTireCompoundName)
                 comp_rear = clean_str(telem.mRearTireCompoundName)
 
-                # Sector formatting: S0=sector3, S1=sector1, S2=sector2 in S397 scoring
-                # But in standard telemetry we represent: 1=sector1, 2=sector2, 3=sector3
                 sector_raw = scoring.mSector
                 if sector_raw == 1:
                     sector = 1
@@ -151,10 +142,9 @@ class LiveSharedMemorySource(TelemetrySource):
                 else:
                     sector = 3
 
-                # Session mapping
                 session_raw = data.scoring.scoringInfo.mSession
                 if session_raw == 0:
-                    session_type = "PRACTICE"  # Test day
+                    session_type = "PRACTICE"
                 elif session_raw in [1, 2, 3, 4]:
                     session_type = "PRACTICE"
                 elif session_raw in [5, 6, 7, 8]:
@@ -162,7 +152,6 @@ class LiveSharedMemorySource(TelemetrySource):
                 else:
                     session_type = "RACE"
 
-                # Tyre wear: 4 wheels
                 wear = [
                     telem.mWheels[0].mWear,
                     telem.mWheels[1].mWear,
@@ -172,11 +161,11 @@ class LiveSharedMemorySource(TelemetrySource):
 
                 frame = TelemetryFrame(
                     track_name=track,
-                    layout_name="",  # Layout details are typically merged in track name
+                    layout_name="",
                     car_name=car,
                     session_type=session_type,
                     lap_number=telem.mLapNumber,
-                    stint_number=1,  # Stint is computed in detector
+                    stint_number=1,
                     elapsed_time=telem.mElapsedTime,
                     fuel=telem.mFuel,
                     fuel_capacity=telem.mFuelCapacity,
