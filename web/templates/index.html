@@ -1107,9 +1107,9 @@ async function loadSetupAdvice() {
     const tempEntries = Object.entries(d.temp_buckets || {}).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
     const overallBest = d.all_time_best;
     tempTbody.innerHTML = tempEntries.map(([bucket, laps]) => {
-      const times = [l["lap_time"] for l in laps];
-      const best = Math.min(...times);
-      const avg = times.reduce((a, b) => a + b, 0) / times.length;
+      const times = laps.map(function(l) { return l["lap_time"]; });
+      const best = Math.min.apply(null, times);
+      const avg = times.reduce(function(a, b) { return a + b; }, 0) / times.length;
       const delta = overallBest ? (avg - overallBest).toFixed(2) : '—';
       return `<tr>
         <td>${bucket}°C - ${parseInt(bucket)+5}°C</td>
