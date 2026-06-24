@@ -365,16 +365,22 @@
     
     <div class="filter-bar">
       <div class="filter-group">
-        <label for="prof-car">Chassis</label>
-        <input type="text" id="prof-car" value="Ferrari 499P" placeholder="Es. Ferrari 499P"/>
+        <label for="prof-car">macchina</label>
+        <select id="prof-car">
+          <option value="">Seleziona...</option>
+        </select>
       </div>
       <div class="filter-group">
-        <label for="prof-track">Circuit</label>
-        <input type="text" id="prof-track" value="Le Mans" placeholder="Es. Le Mans"/>
+        <label for="prof-track">pista</label>
+        <select id="prof-track">
+          <option value="">Seleziona...</option>
+        </select>
       </div>
       <div class="filter-group">
-        <label for="prof-compound">Compound (Opt)</label>
-        <input type="text" id="prof-compound" placeholder="Es. Medium"/>
+        <label for="prof-compound">mescola</label>
+        <select id="prof-compound">
+          <option value="">Tutte</option>
+        </select>
       </div>
       <div class="filter-group">
         <button class="btn btn-primary" onclick="loadProfile()">Load Profile</button>
@@ -429,16 +435,22 @@
 
     <div class="filter-bar">
       <div class="filter-group">
-        <label for="arch-car">Chassis</label>
-        <input type="text" id="arch-car" placeholder="Filtra auto..."/>
+        <label for="arch-car">macchina</label>
+        <select id="arch-car">
+          <option value="">Tutte</option>
+        </select>
       </div>
       <div class="filter-group">
-        <label for="arch-track">Circuit</label>
-        <input type="text" id="arch-track" placeholder="Filtra pista..."/>
+        <label for="arch-track">pista</label>
+        <select id="arch-track">
+          <option value="">Tutte</option>
+        </select>
       </div>
       <div class="filter-group">
-        <label for="arch-compound">Compound</label>
-        <input type="text" id="arch-compound" placeholder="Filtra mescola..."/>
+        <label for="arch-compound">mescola</label>
+        <select id="arch-compound">
+          <option value="">Tutte</option>
+        </select>
       </div>
       <div class="filter-group">
         <label for="arch-deleted">Dropped Laps</label>
@@ -489,12 +501,16 @@
 
     <div class="filter-bar">
       <div class="filter-group">
-        <label for="strat-car">Chassis</label>
-        <input type="text" id="strat-car" value="Ferrari 499P" placeholder="e.g. Ferrari 499P" style="width:200px"/>
+        <label for="strat-car">macchina</label>
+        <select id="strat-car">
+          <option value="">Seleziona...</option>
+        </select>
       </div>
       <div class="filter-group">
-        <label for="strat-track">Circuit</label>
-        <input type="text" id="strat-track" value="Le Mans" placeholder="e.g. Le Mans" style="width:180px"/>
+        <label for="strat-track">pista</label>
+        <select id="strat-track">
+          <option value="">Seleziona...</option>
+        </select>
       </div>
       <div class="filter-group">
         <label for="strat-laps">Laps Rem.</label>
@@ -538,12 +554,16 @@
 
     <div class="filter-bar">
       <div class="filter-group">
-        <label for="setup-car">Chassis</label>
-        <input type="text" id="setup-car" value="Ferrari 499P" placeholder="Es. Ferrari 499P"/>
+        <label for="setup-car">macchina</label>
+        <select id="setup-car">
+          <option value="">Seleziona...</option>
+        </select>
       </div>
       <div class="filter-group">
-        <label for="setup-track">Circuit</label>
-        <input type="text" id="setup-track" value="Le Mans" placeholder="Es. Le Mans"/>
+        <label for="setup-track">pista</label>
+        <select id="setup-track">
+          <option value="">Seleziona...</option>
+        </select>
       </div>
       <div class="filter-group">
         <button class="btn btn-primary" onclick="loadSetupAdvice()">Analyze Setup</button>

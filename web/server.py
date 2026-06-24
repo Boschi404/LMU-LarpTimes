@@ -129,6 +129,31 @@ async def set_overlay_settings(request: Request):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# API — Filters
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/filters/cars")
+async def get_filter_cars():
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    cars = sorted({l.get("car", "") for l in laps if l.get("car")})
+    return cars
+
+
+@app.get("/api/filters/tracks")
+async def get_filter_tracks():
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    tracks = sorted({l.get("track", "") for l in laps if l.get("track")})
+    return tracks
+
+
+@app.get("/api/filters/compounds")
+async def get_filter_compounds():
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    compounds = sorted({l.get("compound_front", "") for l in laps if l.get("compound_front")})
+    return compounds
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # API — Setup Advisor
 # ──────────────────────────────────────────────────────────────────────────────
 

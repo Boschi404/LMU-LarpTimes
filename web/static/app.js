@@ -14,6 +14,41 @@ function showPage(name) {
   }
 }
 
+async function populateFilters() {
+  try {
+    const [cars, tracks, compounds] = await Promise.all([
+      fetch('/api/filters/cars').then(r => r.json()),
+      fetch('/api/filters/tracks').then(r => r.json()),
+      fetch('/api/filters/compounds').then(r => r.json()),
+    ]);
+
+    function fillSelect(id, items) {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const current = sel.value;
+      sel.innerHTML = '<option value="">Tutte</option>';
+      items.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        sel.appendChild(opt);
+      });
+      if (current && items.includes(current)) sel.value = current;
+    }
+
+    fillSelect('arch-car', cars);
+    fillSelect('arch-track', tracks);
+    fillSelect('arch-compound', compounds);
+    fillSelect('prof-car', cars);
+    fillSelect('prof-track', tracks);
+    fillSelect('prof-compound', compounds);
+  } catch (e) {
+    console.error('Failed to populate filters:', e);
+  }
+}
+
+populateFilters();
+
 let _overlayInGameOnly = false;
 
 async function loadOverlaySettings() {
