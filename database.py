@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import uuid
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -34,6 +35,7 @@ def init_db(db_path: Optional[str] = None) -> None:
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_uuid TEXT NOT NULL,
             track TEXT NOT NULL,
             layout TEXT NOT NULL,
             car TEXT NOT NULL,
@@ -42,13 +44,29 @@ def init_db(db_path: Optional[str] = None) -> None:
         )
     """)
 
+    # Create stints table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            stint_number INTEGER NOT NULL,
+            compound_front TEXT NOT NULL,
+            compound_rear TEXT NOT NULL,
+            start_lap INTEGER NOT NULL,
+            end_lap INTEGER,
+            start_fuel_l REAL NOT NULL,
+            end_fuel_l REAL,
+            FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+        )
+    """)
+
     # Create laps table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS laps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id INTEGER NOT NULL,
+            stint_id INTEGER,
             lap_number INTEGER NOT NULL,
-            stint_number INTEGER NOT NULL,
             lap_time REAL NOT NULL,
             sector_1 REAL NOT NULL,
             sector_2 REAL NOT NULL,
@@ -74,10 +92,12 @@ def init_db(db_path: Optional[str] = None) -> None:
             ambient_temp REAL NOT NULL,
             weather_state TEXT NOT NULL,
             rain_intensity REAL NOT NULL,
+            completed_at TEXT NOT NULL,
             anomaly_flag INTEGER NOT NULL DEFAULT 0,
             anomaly_reason TEXT,
             is_deleted INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+            FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+            FOREIGN KEY (stint_id) REFERENCES stints (id)
         )
     """)
 
@@ -93,6 +113,40 @@ def init_db(db_path: Optional[str] = None) -> None:
             FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
         )
     """)
+
+    conn.commit()
+    conn.close()
+    _migrate_db(db_path)
+
+
+def _migrate_db(db_path: Optional[str] = None) -> None:
+    if db_path is None:
+        db_path = DEFAULT_DB_PATH
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+
+    for col, coltype in [("session_uuid", "TEXT NOT NULL DEFAULT ''"), ("completed_at", "TEXT NOT NULL DEFAULT ''")]:
+        try:
+            cursor.execute(f"PRAGMA table_info(sessions)")
+            cols = [r[1] for r in cursor.fetchall()]
+            if col not in cols:
+                cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col} {coltype}")
+        except Exception:
+            pass
+        try:
+            cursor.execute(f"PRAGMA table_info(laps)")
+            cols = [r[1] for r in cursor.fetchall()]
+            if col not in cols:
+                cursor.execute(f"ALTER TABLE laps ADD COLUMN {col} {coltype}")
+        except Exception:
+            pass
+    try:
+        cursor.execute("PRAGMA table_info(laps)")
+        cols = [r[1] for r in cursor.fetchall()]
+        if "stint_id" not in cols:
+            cursor.execute("ALTER TABLE laps ADD COLUMN stint_id INTEGER")
+    except Exception:
+        pass
 
     conn.commit()
     conn.close()
@@ -112,19 +166,80 @@ def create_session(
     if started_at is None:
         started_at = datetime.now().isoformat()
 
+    session_uuid = str(uuid.uuid4())
+
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO sessions (track, layout, car, session_type, started_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (session_uuid, track, layout, car, session_type, started_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (track, layout, car, session_type, started_at)
+        (session_uuid, track, layout, car, session_type, started_at)
     )
     session_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return session_id
+
+
+def create_stint(
+    session_id: int,
+    stint_number: int,
+    compound_front: str,
+    compound_rear: str,
+    start_lap: int,
+    start_fuel_l: float,
+    db_path: Optional[str] = None
+) -> int:
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO stints (session_id, stint_number, compound_front, compound_rear, start_lap, start_fuel_l)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (session_id, stint_number, compound_front, compound_rear, start_lap, start_fuel_l)
+    )
+    stint_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return stint_id
+
+
+def update_stint_end(
+    stint_id: int,
+    end_lap: int,
+    end_fuel_l: float,
+    db_path: Optional[str] = None
+) -> None:
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE stints SET end_lap = ?, end_fuel_l = ? WHERE id = ?
+        """,
+        (end_lap, end_fuel_l, stint_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_active_stint(
+    session_id: int,
+    db_path: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM stints WHERE session_id = ? AND end_lap IS NULL ORDER BY stint_number DESC LIMIT 1
+        """,
+        (session_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
@@ -136,7 +251,7 @@ def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
     
     # Check fields
     fields = [
-        "session_id", "lap_number", "stint_number", "lap_time",
+        "session_id", "stint_id", "lap_number", "lap_time",
         "sector_1", "sector_2", "sector_3", "is_valid_lap",
         "is_pit_in_lap", "is_pit_out_lap", "compound_front", "compound_rear",
         "tyre_age_laps", "wear_pct_start_FL", "wear_pct_start_FR",
@@ -144,7 +259,7 @@ def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
         "wear_pct_end_FR", "wear_pct_end_RL", "wear_pct_end_RR",
         "fuel_start_l", "fuel_end_l", "fuel_used_l",
         "track_temp", "ambient_temp", "weather_state", "rain_intensity",
-        "anomaly_flag", "anomaly_reason"
+        "completed_at"
     ]
     
     # Prepare query
