@@ -633,6 +633,7 @@
 </main>
 
 <script>
+{% raw %}
 /* ─── Navigation ─────────────────────────────────────────────────── */
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1126,6 +1127,7 @@ async function loadSetupAdvice() {
     document.getElementById('setup-loading').style.display = 'none';
   }
 }
+{% endraw %}
 </script>
 </body>
 </html>
