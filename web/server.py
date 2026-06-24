@@ -33,6 +33,7 @@ from analysis.strategist import PitStrategist
 import paths
 BASE_DIR = paths.base_dir()
 TEMPLATES_DIR = os.path.join(BASE_DIR, "web", "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "web", "static")
 
 @asynccontextmanager
 async def lifespan(app):
@@ -41,6 +42,10 @@ async def lifespan(app):
 
 app = FastAPI(title="LMU Pit Strategist", version="1.0.0", lifespan=lifespan)
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# Serve static files (JS, CSS, images)
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Minimum valid laps for reliable estimates
 MIN_LAPS_FOR_ESTIMATE = 10

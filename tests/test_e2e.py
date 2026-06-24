@@ -143,17 +143,14 @@ class TestTelemetryRecording:
         for i in range(1, len(non_pit_laps)):
             prev = non_pit_laps[i - 1]
             curr = non_pit_laps[i]
-            # Only compare within same stint
-            if curr["stint_number"] == prev["stint_number"]:
-                assert curr["fuel_start_l"] < prev["fuel_start_l"], (
-                    f"Fuel not decreasing between laps {prev['lap_number']} and {curr['lap_number']}"
-                )
+            if curr["stint_id"] == prev["stint_id"]:
+                assert curr["fuel_start_l"] < prev["fuel_start_l"]
 
     def test_tyre_age_increases_in_stint(self, db_path, recorded_laps):
         laps = database.get_laps_for_analysis(CAR, TRACK, db_path=db_path)
         for i in range(1, len(laps)):
             prev, curr = laps[i - 1], laps[i]
-            if curr["stint_number"] == prev["stint_number"]:
+            if curr["stint_id"] == prev["stint_id"]:
                 assert curr["tyre_age_laps"] > prev["tyre_age_laps"]
 
 
@@ -321,7 +318,7 @@ class TestFastAPIEndpoints:
         resp = client.get("/")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
-        assert "LMU Pit Strategist" in resp.text
+        assert "Race Strategy" in resp.text
 
     def test_sessions_endpoint(self, client, db_path, recorded_laps):
         resp = client.get("/api/sessions")

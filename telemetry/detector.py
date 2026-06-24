@@ -27,6 +27,7 @@ class LapBoundaryDetector:
         self.pit_in_lap_number: Optional[int] = None
         self.pit_in_lap_time: Optional[float] = None
         self.in_pit_stop_sequence: bool = False
+        self._lap_start_elapsed: float = 0.0
 
     def _create_session(self, frame: TelemetryFrame) -> None:
         self.track_name = frame.track_name
@@ -58,6 +59,7 @@ class LapBoundaryDetector:
             db_path=self.db_path
         )
         self._take_lap_snapshots(frame)
+        self._lap_start_elapsed = frame.elapsed_time
         self.pit_in_lap_number = None
         self.pit_in_lap_time = None
         self.in_pit_stop_sequence = False
@@ -66,12 +68,16 @@ class LapBoundaryDetector:
         self.lap_start_fuel = frame.fuel
         self.lap_start_wear = [(1.0 - w) * 100.0 for w in frame.tyre_wear]
         self.lap_start_compounds = list(frame.tyre_compounds)
-        self.lap_is_valid = frame.is_valid_lap
         self.lap_start_in_pits = frame.in_pits
+        self._lap_start_elapsed = frame.elapsed_time
 
     def process_frame(self, frame: TelemetryFrame) -> Optional[int]:
         if frame is None:
             return None
+
+        # Always reset lap-is-valid flag at start of processing
+        # It will be set False again below if this lap is invalid
+        self.lap_is_valid = frame.is_valid_lap
 
         # 1. Session reset: lap number went backwards
         if self.session_id is not None and frame.lap_number < self.current_lap_number:
@@ -91,9 +97,6 @@ class LapBoundaryDetector:
             self.current_lap_number = frame.lap_number
             return None
 
-        if not frame.is_valid_lap:
-            self.lap_is_valid = False
-
         if frame.lap_number > self.current_lap_number:
             lap_gap = frame.lap_number - self.current_lap_number
             if lap_gap > 1:
@@ -108,10 +111,13 @@ class LapBoundaryDetector:
                 return None
 
             # 11. Validate lap time
-            if not frame.last_lap_time or frame.last_lap_time < 20.0:
-                print(f"[WARNING] Discarding lap {completed_lap}: invalid lap_time={frame.last_lap_time}")
+            computed_lap_time = frame.elapsed_time - self._lap_start_elapsed
+            use_lap_time = frame.last_lap_time if (frame.last_lap_time and frame.last_lap_time >= 20.0) else computed_lap_time
+            if not use_lap_time or use_lap_time < 20.0:
+                print(f"[WARNING] Discarding lap {completed_lap}: invalid lap_time={use_lap_time:.3f}s")
                 self.current_lap_number = frame.lap_number
                 self._take_lap_snapshots(frame)
+                self._lap_start_elapsed = frame.elapsed_time
                 return None
 
             # 2. Save only valid laps
@@ -125,7 +131,7 @@ class LapBoundaryDetector:
             current_wear = [(1.0 - w) * 100.0 for w in frame.tyre_wear]
             s1 = frame.last_sector1
             s2 = frame.last_sector2 - frame.last_sector1
-            s3 = frame.last_lap_time - frame.last_sector2
+            s3 = use_lap_time - frame.last_sector2
 
             is_pit_in = 1 if (frame.in_pits or frame.pit_state in [2, 3]) else 0
             is_pit_out = 1 if self.lap_start_in_pits else 0
@@ -134,7 +140,7 @@ class LapBoundaryDetector:
                 "session_id": self.session_id,
                 "stint_id": self.current_stint_id,
                 "lap_number": completed_lap,
-                "lap_time": frame.last_lap_time,
+                "lap_time": use_lap_time,
                 "sector_1": max(0.0, s1),
                 "sector_2": max(0.0, s2),
                 "sector_3": max(0.0, s3),
@@ -202,8 +208,9 @@ class LapBoundaryDetector:
             self._handle_stint_change(frame, completed_lap)
 
             self.current_lap_number = frame.lap_number
-            self.last_lap_time = frame.last_lap_time
+            self.last_lap_time = use_lap_time
             self._take_lap_snapshots(frame)
+            self._lap_start_elapsed = frame.elapsed_time
 
             return lap_id
 
