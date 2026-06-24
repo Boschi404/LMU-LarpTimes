@@ -78,7 +78,7 @@ class LiveSharedMemorySource(TelemetrySource):
 
     def start(self) -> None:
         self.running = True
-        from lmu_mmap import SimInfo as LMUSimInfo
+        from lmu_data import SimInfo as LMUSimInfo
         self.lmu_info = LMUSimInfo()
         if self.lmu_info.LMUData.generic.gameVersion > 0:
             self.active_api = "LMU"
