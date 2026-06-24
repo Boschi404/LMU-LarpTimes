@@ -134,14 +134,27 @@ def _migrate_db(db_path: Optional[str] = None) -> None:
     except Exception:
         pass
 
-    # Check laps schema: if old schema (has stint_number, no stint_id), recreate
+    # Check laps schema: if old schema (has stint_number), recreate to remove NOT NULL constraint
     try:
         cursor.execute("PRAGMA table_info(laps)")
         cols = [r[1] for r in cursor.fetchall()]
-        if "stint_number" in cols and "stint_id" not in cols:
-            print("[DB] Migrating laps schema: dropping old data")
+        if "stint_number" in cols:
+            print("[DB] Migrating laps schema: dropping old table with stint_number")
             cursor.execute("DROP TABLE IF EXISTS laps")
-            cursor.execute("DROP TABLE IF EXISTS stints")
+            cursor.execute("""
+                CREATE TABLE stints (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NOT NULL,
+                    stint_number INTEGER NOT NULL,
+                    compound_front TEXT NOT NULL,
+                    compound_rear TEXT NOT NULL,
+                    start_lap INTEGER NOT NULL,
+                    end_lap INTEGER,
+                    start_fuel_l REAL NOT NULL,
+                    end_fuel_l REAL,
+                    FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+                )
+            """)
             cursor.execute("""
                 CREATE TABLE laps (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,8 +194,19 @@ def _migrate_db(db_path: Optional[str] = None) -> None:
                     FOREIGN KEY (stint_id) REFERENCES stints (id)
                 )
             """)
+            print("[DB] Laps table recreated with new schema")
     except Exception as e:
-        print(f"[DB] Migration error: {e}")
+        print(f"[DB] Migration error (stint_number): {e}")
+
+    # If laps table exists but has no stint_id column, add it
+    try:
+        cursor.execute("PRAGMA table_info(laps)")
+        cols = [r[1] for r in cursor.fetchall()]
+        if "stint_number" not in cols and "stint_id" not in cols:
+            cursor.execute("ALTER TABLE laps ADD COLUMN stint_id INTEGER")
+            print("[DB] Added stint_id column to laps")
+    except Exception as e:
+        print(f"[DB] Migration error (stint_id): {e}")
 
     conn.commit()
     conn.close()
