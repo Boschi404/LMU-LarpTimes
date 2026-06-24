@@ -125,28 +125,64 @@ def _migrate_db(db_path: Optional[str] = None) -> None:
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
 
-    for col, coltype in [("session_uuid", "TEXT NOT NULL DEFAULT ''"), ("completed_at", "TEXT NOT NULL DEFAULT ''")]:
-        try:
-            cursor.execute(f"PRAGMA table_info(sessions)")
-            cols = [r[1] for r in cursor.fetchall()]
-            if col not in cols:
-                cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col} {coltype}")
-        except Exception:
-            pass
-        try:
-            cursor.execute(f"PRAGMA table_info(laps)")
-            cols = [r[1] for r in cursor.fetchall()]
-            if col not in cols:
-                cursor.execute(f"ALTER TABLE laps ADD COLUMN {col} {coltype}")
-        except Exception:
-            pass
+    # Add session_uuid to sessions
+    try:
+        cursor.execute("PRAGMA table_info(sessions)")
+        cols = [r[1] for r in cursor.fetchall()]
+        if "session_uuid" not in cols:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN session_uuid TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+
+    # Check laps schema: if old schema (has stint_number, no stint_id), recreate
     try:
         cursor.execute("PRAGMA table_info(laps)")
         cols = [r[1] for r in cursor.fetchall()]
-        if "stint_id" not in cols:
-            cursor.execute("ALTER TABLE laps ADD COLUMN stint_id INTEGER")
-    except Exception:
-        pass
+        if "stint_number" in cols and "stint_id" not in cols:
+            print("[DB] Migrating laps schema: dropping old data")
+            cursor.execute("DROP TABLE IF EXISTS laps")
+            cursor.execute("DROP TABLE IF EXISTS stints")
+            cursor.execute("""
+                CREATE TABLE laps (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NOT NULL,
+                    stint_id INTEGER,
+                    lap_number INTEGER NOT NULL,
+                    lap_time REAL NOT NULL,
+                    sector_1 REAL NOT NULL,
+                    sector_2 REAL NOT NULL,
+                    sector_3 REAL NOT NULL,
+                    is_valid_lap INTEGER NOT NULL,
+                    is_pit_in_lap INTEGER NOT NULL,
+                    is_pit_out_lap INTEGER NOT NULL,
+                    compound_front TEXT NOT NULL,
+                    compound_rear TEXT NOT NULL,
+                    tyre_age_laps INTEGER NOT NULL,
+                    wear_pct_start_FL REAL NOT NULL,
+                    wear_pct_start_FR REAL NOT NULL,
+                    wear_pct_start_RL REAL NOT NULL,
+                    wear_pct_start_RR REAL NOT NULL,
+                    wear_pct_end_FL REAL NOT NULL,
+                    wear_pct_end_FR REAL NOT NULL,
+                    wear_pct_end_RL REAL NOT NULL,
+                    wear_pct_end_RR REAL NOT NULL,
+                    fuel_start_l REAL NOT NULL,
+                    fuel_end_l REAL NOT NULL,
+                    fuel_used_l REAL NOT NULL,
+                    track_temp REAL NOT NULL,
+                    ambient_temp REAL NOT NULL,
+                    weather_state TEXT NOT NULL,
+                    rain_intensity REAL NOT NULL,
+                    completed_at TEXT NOT NULL DEFAULT '',
+                    anomaly_flag INTEGER NOT NULL DEFAULT 0,
+                    anomaly_reason TEXT,
+                    is_deleted INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+                    FOREIGN KEY (stint_id) REFERENCES stints (id)
+                )
+            """)
+    except Exception as e:
+        print(f"[DB] Migration error: {e}")
 
     conn.commit()
     conn.close()
