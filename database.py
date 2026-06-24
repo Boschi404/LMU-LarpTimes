@@ -124,79 +124,26 @@ def _migrate_db(db_path: Optional[str] = None) -> None:
         db_path = DEFAULT_DB_PATH
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
-
-    # Add session_uuid to sessions
     try:
         cursor.execute("PRAGMA table_info(sessions)")
         cols = [r[1] for r in cursor.fetchall()]
         if "session_uuid" not in cols:
             cursor.execute("ALTER TABLE sessions ADD COLUMN session_uuid TEXT NOT NULL DEFAULT ''")
+        if "completed_at" not in cols:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''")
     except Exception:
         pass
-
-    # Check laps schema: if old schema (has stint_number), recreate to remove NOT NULL constraint
     try:
         cursor.execute("PRAGMA table_info(laps)")
         cols = [r[1] for r in cursor.fetchall()]
-        if "stint_number" in cols:
-            print("[DB] Migrating laps schema: dropping old table with stint_number")
-            cursor.execute("DROP TABLE IF EXISTS laps")
-            cursor.execute("""
-                CREATE TABLE stints (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id INTEGER NOT NULL,
-                    stint_number INTEGER NOT NULL,
-                    compound_front TEXT NOT NULL,
-                    compound_rear TEXT NOT NULL,
-                    start_lap INTEGER NOT NULL,
-                    end_lap INTEGER,
-                    start_fuel_l REAL NOT NULL,
-                    end_fuel_l REAL,
-                    FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
-                )
-            """)
-            cursor.execute("""
-                CREATE TABLE laps (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id INTEGER NOT NULL,
-                    stint_id INTEGER,
-                    lap_number INTEGER NOT NULL,
-                    lap_time REAL NOT NULL,
-                    sector_1 REAL NOT NULL,
-                    sector_2 REAL NOT NULL,
-                    sector_3 REAL NOT NULL,
-                    is_valid_lap INTEGER NOT NULL,
-                    is_pit_in_lap INTEGER NOT NULL,
-                    is_pit_out_lap INTEGER NOT NULL,
-                    compound_front TEXT NOT NULL,
-                    compound_rear TEXT NOT NULL,
-                    tyre_age_laps INTEGER NOT NULL,
-                    wear_pct_start_FL REAL NOT NULL,
-                    wear_pct_start_FR REAL NOT NULL,
-                    wear_pct_start_RL REAL NOT NULL,
-                    wear_pct_start_RR REAL NOT NULL,
-                    wear_pct_end_FL REAL NOT NULL,
-                    wear_pct_end_FR REAL NOT NULL,
-                    wear_pct_end_RL REAL NOT NULL,
-                    wear_pct_end_RR REAL NOT NULL,
-                    fuel_start_l REAL NOT NULL,
-                    fuel_end_l REAL NOT NULL,
-                    fuel_used_l REAL NOT NULL,
-                    track_temp REAL NOT NULL,
-                    ambient_temp REAL NOT NULL,
-                    weather_state TEXT NOT NULL,
-                    rain_intensity REAL NOT NULL,
-                    completed_at TEXT NOT NULL DEFAULT '',
-                    anomaly_flag INTEGER NOT NULL DEFAULT 0,
-                    anomaly_reason TEXT,
-                    is_deleted INTEGER NOT NULL DEFAULT 0,
-                    FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
-                    FOREIGN KEY (stint_id) REFERENCES stints (id)
-                )
-            """)
-            print("[DB] Laps table recreated with new schema")
-    except Exception as e:
-        print(f"[DB] Migration error (stint_number): {e}")
+        if "stint_id" not in cols:
+            cursor.execute("ALTER TABLE laps ADD COLUMN stint_id INTEGER")
+        if "completed_at" not in cols:
+            cursor.execute("ALTER TABLE laps ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    conn.commit()
+    conn.close()
 
     # If laps table exists but has no stint_id column, add it
     try:
@@ -304,29 +251,62 @@ def get_active_stint(
 
 def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
     """
-    Insert a lap record into the database.
+    Insert a lap record into the database. Adapts to existing schema.
     """
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
-    
-    # Check fields
-    fields = [
-        "session_id", "stint_id", "lap_number", "lap_time",
-        "sector_1", "sector_2", "sector_3", "is_valid_lap",
-        "is_pit_in_lap", "is_pit_out_lap", "compound_front", "compound_rear",
-        "tyre_age_laps", "wear_pct_start_FL", "wear_pct_start_FR",
-        "wear_pct_start_RL", "wear_pct_start_RR", "wear_pct_end_FL",
-        "wear_pct_end_FR", "wear_pct_end_RL", "wear_pct_end_RR",
-        "fuel_start_l", "fuel_end_l", "fuel_used_l",
-        "track_temp", "ambient_temp", "weather_state", "rain_intensity",
-        "completed_at"
-    ]
-    
-    # Prepare query
+
+    cursor.execute("PRAGMA table_info(laps)")
+    existing_cols = {r[1] for r in cursor.fetchall()}
+
+    # Map new field names to old column names if needed
+    field_map = {
+        "session_id": "session_id",
+        "stint_id": "stint_id" if "stint_id" in existing_cols else "stint_number",
+        "lap_number": "lap_number",
+        "lap_time": "lap_time",
+        "sector_1": "sector_1",
+        "sector_2": "sector_2",
+        "sector_3": "sector_3",
+        "is_valid_lap": "is_valid_lap",
+        "is_pit_in_lap": "is_pit_in_lap",
+        "is_pit_out_lap": "is_pit_out_lap",
+        "compound_front": "compound_front",
+        "compound_rear": "compound_rear",
+        "tyre_age_laps": "tyre_age_laps",
+        "wear_pct_start_FL": "wear_pct_start_FL",
+        "wear_pct_start_FR": "wear_pct_start_FR",
+        "wear_pct_start_RL": "wear_pct_start_RL",
+        "wear_pct_start_RR": "wear_pct_start_RR",
+        "wear_pct_end_FL": "wear_pct_end_FL",
+        "wear_pct_end_FR": "wear_pct_end_FR",
+        "wear_pct_end_RL": "wear_pct_end_RL",
+        "wear_pct_end_RR": "wear_pct_end_RR",
+        "fuel_start_l": "fuel_start_l",
+        "fuel_end_l": "fuel_end_l",
+        "fuel_used_l": "fuel_used_l",
+        "track_temp": "track_temp",
+        "ambient_temp": "ambient_temp",
+        "weather_state": "weather_state",
+        "rain_intensity": "rain_intensity",
+        "completed_at": "completed_at",
+    }
+
+    # Filter to only columns that exist in the table
+    fields = []
+    values = []
+    for new_name, col_name in field_map.items():
+        if col_name in existing_cols:
+            fields.append(col_name)
+            val = lap_data.get(new_name)
+            if col_name == "stint_number" and val is None:
+                val = lap_data.get("stint_id", 1) or 1
+            if new_name == "completed_at" and val is None:
+                val = ""
+            values.append(val)
+
     placeholders = ", ".join(["?"] * len(fields))
     columns = ", ".join(fields)
-    values = [lap_data.get(f) for f in fields]
-    
     cursor.execute(f"INSERT INTO laps ({columns}) VALUES ({placeholders})", values)
     lap_id = cursor.lastrowid
     conn.commit()
