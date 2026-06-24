@@ -350,6 +350,7 @@
     <button class="nav-btn active" id="btn-profilo" onclick="showPage('profilo')">Tyre Profile Model</button>
     <button class="nav-btn" id="btn-archivio" onclick="showPage('archivio')">Lap Archive</button>
     <button class="nav-btn" id="btn-strategia" onclick="showPage('strategia')">Strategy Calculation</button>
+    <button class="nav-btn" id="btn-setup" onclick="showPage('setup')">Setup Advisor</button>
     <div style="margin-left:auto; display:flex; align-items:center; gap: var(--space-sm);">
       <label style="font-size:0.8rem; color:var(--ink-secondary); cursor:pointer;" for="overlay-in-game-toggle">Overlay in-game only</label>
       <button class="btn" id="overlay-in-game-toggle" onclick="toggleOverlayMode()" style="padding: var(--space-xs) var(--space-sm); font-size:0.8rem;">OFF</button>
@@ -527,6 +528,108 @@
     </div>
   </section>
 
+  <section class="page" id="page-setup">
+    <h2>Setup Advisor</h2>
+    <p style="color:var(--ink-secondary); margin-bottom: var(--space-lg);">
+      Setup recommendations based on track temperature, weather conditions, and historical lap data.
+    </p>
+
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label for="setup-car">Chassis</label>
+        <input type="text" id="setup-car" value="Ferrari 499P" placeholder="Es. Ferrari 499P"/>
+      </div>
+      <div class="filter-group">
+        <label for="setup-track">Circuit</label>
+        <input type="text" id="setup-track" value="Le Mans" placeholder="Es. Le Mans"/>
+      </div>
+      <div class="filter-group">
+        <button class="btn btn-primary" onclick="loadSetupAdvice()">Analyze Setup</button>
+      </div>
+    </div>
+
+    <div id="setup-loading" class="alert" style="display:none">
+      <span>Analyzing telemetry data...</span>
+    </div>
+
+    <div id="setup-error" class="alert" style="display:none">
+      <span id="setup-error-text"></span>
+    </div>
+
+    <div id="setup-content" style="display:none">
+      <div class="grid-stats">
+        <div class="stat-card">
+          <div class="stat-label">Valid Laps Analyzed</div>
+          <div class="stat-value" id="setup-valid-laps">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Optimal Track Temp</div>
+          <div class="stat-value text-mono" style="color: var(--status-valid);" id="setup-optimal-temp">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Current Conditions</div>
+          <div class="stat-value text-mono" id="setup-current-temp">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Best Lap Time</div>
+          <div class="stat-value text-mono" style="color: var(--status-valid);" id="setup-best-lap">—</div>
+        </div>
+      </div>
+
+      <div class="section-label">Setup Recommendations</div>
+      <div id="setup-recommendations" style="display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: var(--space-xl);">
+      </div>
+
+      <div class="section-label">Weather Performance Impact</div>
+      <div class="table-container" style="margin-bottom: var(--space-xl);">
+        <table>
+          <thead>
+            <tr>
+              <th>Condition</th>
+              <th class="text-right">Avg Lap Time</th>
+              <th class="text-right">Delta</th>
+            </tr>
+          </thead>
+          <tbody id="setup-weather-tbody">
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-label">Tyre Compound Performance</div>
+      <div class="table-container" style="margin-bottom: var(--space-xl);">
+        <table>
+          <thead>
+            <tr>
+              <th>Compound</th>
+              <th class="text-right">Avg Lap</th>
+              <th class="text-right">Laps</th>
+              <th class="text-right">Avg Wear/Lap</th>
+              <th>Operating Temps</th>
+            </tr>
+          </thead>
+          <tbody id="setup-compound-tbody">
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-label">Temperature vs Lap Time Distribution</div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Track Temp Range</th>
+              <th class="text-right">Laps</th>
+              <th class="text-right">Best Lap</th>
+              <th class="text-right">Avg Lap</th>
+            </tr>
+          </thead>
+          <tbody id="setup-temp-tbody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <script>
@@ -539,6 +642,8 @@ function showPage(name) {
   if (name === 'archivio') {
     loadLaps(true);
     startLapAutoRefresh();
+  } else if (name === 'setup') {
+    loadSetupAdvice();
   } else {
     stopLapAutoRefresh();
   }
@@ -918,6 +1023,107 @@ async function calculateStrategy() {
   } catch (e) {
     document.getElementById('strat-error-text').textContent = 'Network error: ' + e.message;
     document.getElementById('strat-error').style.display = 'flex';
+  }
+}
+
+/* ─── SETUP ADVISOR ──────────────────────────────────────────────────── */
+async function loadSetupAdvice() {
+  const car = document.getElementById('setup-car').value.trim();
+  const track = document.getElementById('setup-track').value.trim();
+
+  if (!car || !track) {
+    alert('Inserisci auto e pista.');
+    return;
+  }
+
+  document.getElementById('setup-error').style.display = 'none';
+  document.getElementById('setup-content').style.display = 'none';
+  document.getElementById('setup-loading').style.display = 'flex';
+
+  try {
+    const res = await fetch(`/api/setup?car=${encodeURIComponent(car)}&track=${encodeURIComponent(track)}`);
+    const d = await res.json();
+
+    if (!res.ok || d.insufficient_data) {
+      document.getElementById('setup-error-text').textContent = d.message || 'Insufficient data for setup analysis.';
+      document.getElementById('setup-error').style.display = 'flex';
+      document.getElementById('setup-loading').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('setup-valid-laps').textContent = d.total_valid_laps;
+    document.getElementById('setup-optimal-temp').textContent = d.optimal_temp_range || 'N/A';
+    document.getElementById('setup-current-temp').textContent = d.current_avg_track_temp ? `${d.current_avg_track_temp.toFixed(1)}°C` : 'N/A';
+    document.getElementById('setup-best-lap').textContent = fmtTime(d.all_time_best);
+
+    // Recommendations
+    const recDiv = document.getElementById('setup-recommendations');
+    if (d.recommendations && d.recommendations.length > 0) {
+      recDiv.innerHTML = d.recommendations.map(r => {
+        const priorityColor = r.priority === 'high' ? 'var(--status-invalid)' : r.priority === 'medium' ? 'var(--status-warn)' : 'var(--ink-secondary)';
+        return `
+        <div style="padding: var(--space-md); background: var(--surface-elevated); border-radius: var(--radius-sm); border-left: 4px solid ${priorityColor};">
+          <div style="font-weight: 600; margin-bottom: var(--space-xs);">${r.title}</div>
+          <div style="font-size: 0.9rem; color: var(--ink-secondary); margin-bottom: var(--space-xs);">${r.message}</div>
+          <div style="font-size: 0.8rem; color: var(--ink-muted);">Impact: ${r.impact}</div>
+        </div>`;
+      }).join('');
+    } else {
+      recDiv.innerHTML = '<p style="color: var(--ink-muted);">No specific recommendations. Conditions are within optimal range based on historical data.</p>';
+    }
+
+    // Weather table
+    const weatherTbody = document.getElementById('setup-weather-tbody');
+    const weatherEntries = Object.entries(d.weather_performance || {}).sort((a, b) => a[1] - b[1]);
+    const bestWeatherTime = weatherEntries.length > 0 ? weatherEntries[0][1] : null;
+    weatherTbody.innerHTML = weatherEntries.map(([weather, avgTime]) => {
+      const delta = bestWeatherTime ? (avgTime - bestWeatherTime).toFixed(2) : '—';
+      const deltaColor = delta === '—' || parseFloat(delta) <= 0 ? 'var(--status-valid)' : 'var(--status-invalid)';
+      return `<tr>
+        <td>${weather}</td>
+        <td class="num-col">${fmtTime(avgTime)}</td>
+        <td class="num-col" style="color: ${deltaColor};">${delta === '—' ? '—' : (delta > 0 ? '+' : '') + delta + 's'}</td>
+      </tr>`;
+    }).join('');
+
+    // Compound table
+    const compoundTbody = document.getElementById('setup-compound-tbody');
+    const compoundEntries = Object.entries(d.compound_stats || {}).sort((a, b) => a[1]["avg_lap"] - b[1]["avg_lap"]);
+    compoundTbody.innerHTML = compoundEntries.map(([compound, stats]) => {
+      const temps = stats.temps;
+      const tempRange = temps && temps.length > 0 ? `${Math.min(...temps).toFixed(0)}°C - ${Math.max(...temps).toFixed(0)}°C` : '—';
+      return `<tr>
+        <td><strong>${compound}</strong></td>
+        <td class="num-col">${fmtTime(stats.avg_lap)}</td>
+        <td class="num-col">${stats.count}</td>
+        <td class="num-col">${stats.avg_wear_increase.toFixed(1)}%</td>
+        <td>${tempRange}</td>
+      </tr>`;
+    }).join('');
+
+    // Temperature distribution table
+    const tempTbody = document.getElementById('setup-temp-tbody');
+    const tempEntries = Object.entries(d.temp_buckets || {}).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+    const overallBest = d.all_time_best;
+    tempTbody.innerHTML = tempEntries.map(([bucket, laps]) => {
+      const times = [l["lap_time"] for l in laps];
+      const best = Math.min(...times);
+      const avg = times.reduce((a, b) => a + b, 0) / times.length;
+      const delta = overallBest ? (avg - overallBest).toFixed(2) : '—';
+      return `<tr>
+        <td>${bucket}°C - ${parseInt(bucket)+5}°C</td>
+        <td class="num-col">${laps.length}</td>
+        <td class="num-col">${fmtTime(best)}</td>
+        <td class="num-col">${fmtTime(avg)}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('setup-content').style.display = 'block';
+    document.getElementById('setup-loading').style.display = 'none';
+  } catch (e) {
+    document.getElementById('setup-error-text').textContent = 'Network error: ' + e.message;
+    document.getElementById('setup-error').style.display = 'flex';
+    document.getElementById('setup-loading').style.display = 'none';
   }
 }
 </script>

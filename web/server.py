@@ -11,6 +11,7 @@ FastAPI server che espone:
   GET  /api/sessions   → lista sessioni
   GET  /api/overlay/settings → lettura impostazioni overlay
   POST /api/overlay/settings → scrittura impostazioni overlay
+  GET  /api/setup      → consigli setup basati su condizioni meteo/temperatura
 """
 
 import os
@@ -120,6 +121,183 @@ async def set_overlay_settings(request: Request):
     with open(config_path, "w") as f:
         json.dump(existing, f, indent=2)
     return {"status": "ok", "in_game_only": existing.get("in_game_only", False)}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# API — Setup Advisor
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/setup")
+async def get_setup_advice(car: str, track: str):
+    """
+    Restituisce consigli di setup basati su:
+    - Track/air temperature vs lap time
+    - Weather conditions vs performance
+    - Tyre compound performance at different temps
+    - Historical best laps under similar conditions
+    """
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+
+    car_laps = [l for l in laps if l.get("car") == car and l.get("track") == track]
+    valid_laps = [l for l in car_laps if l.get("is_valid_lap") == 1 and not l.get("is_pit_in_lap") and not l.get("is_pit_out_lap")]
+
+    if not valid_laps:
+        return {
+            "car": car, "track": track,
+            "insufficient_data": True,
+            "message": "Insufficient valid laps for setup analysis. Complete more laps first.",
+            "recommendations": []
+        }
+
+    # Group by track temperature ranges (5-degree buckets)
+    temp_buckets = {}
+    for l in valid_laps:
+        tt = l.get("track_temp")
+        if tt is None:
+            continue
+        bucket = int(tt // 5) * 5  # 20-25, 25-30, 30-35, etc.
+        if bucket not in temp_buckets:
+            temp_buckets[bucket] = []
+        temp_buckets[bucket].append(l)
+
+    # Find optimal temperature range
+    best_lap_by_temp = {}
+    for bucket, bucket_laps in temp_buckets.items():
+        times = [l["lap_time"] for l in bucket_laps if l.get("lap_time")]
+        if times:
+            best_lap_by_temp[bucket] = min(times)
+
+    overall_best = min(best_lap_by_temp.values()) if best_lap_by_temp else None
+    optimal_temp_range = None
+    if overall_best:
+        for bucket, time in best_lap_by_temp.items():
+            if time == overall_best:
+                optimal_temp_range = f"{bucket}°C - {bucket+5}°C"
+                break
+
+    # Weather analysis
+    weather_perf = {}
+    for l in valid_laps:
+        w = l.get("weather_state", "UNKNOWN")
+        if w not in weather_perf:
+            weather_perf[w] = []
+        if l.get("lap_time"):
+            weather_perf[w].append(l["lap_time"])
+
+    weather_avg = {w: sum(times)/len(times) for w, times in weather_perf.items() if times}
+
+    # Compound performance at different conditions
+    compound_perf = {}
+    for l in valid_laps:
+        c = l.get("compound_front", "Unknown")
+        tt = l.get("track_temp")
+        if c not in compound_perf:
+            compound_perf[c] = []
+        if l.get("lap_time"):
+            compound_perf[c].append({
+                "lap_time": l["lap_time"],
+                "track_temp": tt,
+                "wear_start": l.get("wear_pct_start_FL"),
+                "wear_end": l.get("wear_pct_end_FL")
+            })
+
+    compound_stats = {}
+    for c, data in compound_perf.items():
+        if data:
+            valid_wear = [d for d in data if d.get("wear_end") and d.get("wear_start")]
+            compound_stats[c] = {
+                "avg_lap": sum(d["lap_time"] for d in data) / len(data),
+                "count": len(data),
+                "temps": [d["track_temp"] for d in data if d.get("track_temp") is not None],
+                "avg_wear_increase": sum((d["wear_end"] or 0) - (d["wear_start"] or 0) for d in valid_wear) / max(1, len(valid_wear))
+            }
+
+    # Setup recommendations
+    recommendations = []
+
+    # Temperature-based recommendations
+    current_avg_temp = sum(l.get("track_temp", 0) for l in valid_laps[-5:]) / min(5, len(valid_laps[-5:])) if valid_laps else None
+
+    if optimal_temp_range and current_avg_temp:
+        current_bucket = int(current_avg_temp // 5) * 5
+        if current_bucket != int(overall_best // 5) * 5:
+            diff = current_avg_temp - (int(overall_best // 5) * 5 + 2.5)
+            if diff > 5:
+                recommendations.append({
+                    "type": "temp",
+                    "priority": "high",
+                    "title": "Track Temperature High",
+                    "message": f"Current track temp (~{current_avg_temp:.0f}°C) is above optimal range ({optimal_temp_range}). Consider softening front wing and reducing camber.",
+                    "impact": f"~{abs(diff)*0.3:.1f}s/lap penalty if unaddressed"
+                })
+            elif diff < -5:
+                recommendations.append({
+                    "type": "temp",
+                    "priority": "high",
+                    "title": "Track Temperature Low",
+                    "message": f"Current track temp (~{current_avg_temp:.0f}°C) is below optimal range ({optimal_temp_range}). Consider stiffening front wing and increasing camber.",
+                    "impact": f"~{abs(diff)*0.3:.1f}s/lap penalty if unaddressed"
+                })
+
+    # Weather recommendations
+    if "WET" in weather_avg and "DRY" in weather_avg:
+        wet_penalty = weather_avg["WET"] - weather_avg["DRY"]
+        if wet_penalty > 5:
+            recommendations.append({
+                "type": "weather",
+                "priority": "medium",
+                "title": "Wet Conditions Detected",
+                "message": f"Wet laps are ~{wet_penalty:.1f}s slower than dry. Use wet compound tyres and increase ride height.",
+                "impact": f"{wet_penalty:.1f}s/lap in wet vs dry"
+            })
+
+    # Tyre wear analysis for setup hints
+    high_wear_compounds = [c for c, s in compound_stats.items() if s.get("avg_wear_increase", 0) > 15]
+    if high_wear_compounds:
+        recommendations.append({
+            "type": "wear",
+            "priority": "medium",
+            "title": "High Tyre Wear Detected",
+            "message": f"Compounds {', '.join(high_wear_compounds)} show excessive wear (>15%/lap). Reduce camber and consider softer compound.",
+            "impact": "Increased degradation in later stints"
+        })
+
+    # Fuel effect
+    if len(valid_laps) >= 2:
+        early_laps = [l for l in valid_laps if l.get("tyre_age_laps", 999) <= 3]
+        late_laps = [l for l in valid_laps if l.get("tyre_age_laps", 0) >= 8]
+        if early_laps and late_laps:
+            early_avg = sum(l["lap_time"] for l in early_laps) / len(early_laps)
+            late_avg = sum(l["lap_time"] for l in late_laps) / len(late_laps)
+            fuel_effect = late_avg - early_avg
+            if fuel_effect > 1.0:
+                recommendations.append({
+                    "type": "fuel",
+                    "priority": "low",
+                    "title": "Fuel Load Impact",
+                    "message": f"Late laps are {fuel_effect:.1f}s slower than fresh tyres. Plan pit stops before significant degradation.",
+                    "impact": f"{fuel_effect:.1f}s delta between fresh and worn tyres"
+                })
+
+    # Summary stats
+    recent_laps = valid_laps[-5:] if len(valid_laps) >= 5 else valid_laps
+    recent_avg = sum(l["lap_time"] for l in recent_laps) / len(recent_laps) if recent_laps else None
+    all_best = min(l["lap_time"] for l in valid_laps) if valid_laps else None
+
+    return {
+        "car": car,
+        "track": track,
+        "total_valid_laps": len(valid_laps),
+        "insufficient_data": len(valid_laps) < 5,
+        "optimal_temp_range": optimal_temp_range,
+        "current_avg_track_temp": current_avg_temp,
+        "recent_avg_lap": recent_avg,
+        "all_time_best": all_best,
+        "weather_performance": weather_avg,
+        "compound_stats": compound_stats,
+        "temp_buckets": {str(k): v for k, v in temp_buckets.items()},
+        "recommendations": recommendations
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
