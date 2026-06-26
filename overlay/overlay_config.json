@@ -1,6 +1,18 @@
 {
-  "x": 89,
-  "y": 141,
-  "visible": true,
-  "in_game_only": false
+  "delta_x": 1205,
+  "delta_y": 88,
+  "delta_vis": true,
+  "fuel_x": 1512,
+  "fuel_y": 90,
+  "fuel_vis": true,
+  "cliff_x": 1654,
+  "cliff_y": 91,
+  "cliff_vis": true,
+  "pit_x": 1349,
+  "pit_y": 89,
+  "pit_vis": true,
+  "in_game_only": false,
+  "x": 1006,
+  "y": 321,
+  "visible": true
 }

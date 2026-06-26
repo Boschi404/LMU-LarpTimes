@@ -25,21 +25,6 @@ from PySide6.QtGui import (
     QFont, QColor, QPainter, QLinearGradient, QPen, QBrush, QFontDatabase
 )
 
-# Color & font tokens aligned with web UI design
-# CSS equivalents: --bg-0, --bg-1, --bg-2, --accent-green, --accent-blue, --accent-red, --text-primary, --text-muted
-BG_0 = QColor(10, 14, 24, 230)        # --bg-0
-BG_1 = QColor(17, 21, 31, 220)        # --bg-1
-BG_2 = QColor(22, 29, 46, 220)        # --bg-2
-ACCENT_GREEN = QColor(29, 209, 161)
-ACCENT_BLUE = QColor(74, 158, 255)
-ACCENT_RED = QColor(255, 107, 107)
-ACCENT_AMBER = QColor(255, 169, 77)
-TEXT_PRIMARY = QColor(240, 244, 255)
-TEXT_MUTED = QColor(156, 163, 175)
-
-def qcolor_hex(c: QColor) -> str:
-    """Return CSS-style hex for QColor (ignores alpha for simplicity)."""
-    return '#%02x%02x%02x' % (c.red(), c.green(), c.blue())
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QSizePolicy, QMenu
 )
@@ -49,6 +34,29 @@ from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Color & Font Tokens (aligned with app_new design system)
+
+BG_0 = QColor(10, 14, 24, 230)
+BG_1 = QColor(17, 21, 31, 220)
+BG_2 = QColor(22, 29, 46, 220)
+BORDER_DIM = QColor(28, 33, 40, 255)
+BORDER_BRIGHT = QColor(45, 51, 59, 255)
+
+ACCENT_GREEN = QColor(29, 209, 161)
+ACCENT_BLUE = QColor(74, 158, 255)
+ACCENT_RED = QColor(255, 107, 107)
+ACCENT_AMBER = QColor(255, 169, 77)
+
+TEXT_PRIMARY = QColor(240, 244, 255)
+TEXT_SECONDARY = QColor(125, 133, 144)
+TEXT_MUTED = QColor(156, 163, 175)
+
+FONT_TITLE = "Geist"
+FONT_VALUE = "JetBrains Mono"
+
+def qcolor_hex(c: QColor) -> str:
+    return '#%02x%02x%02x' % (c.red(), c.green(), c.blue())
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Config persistence
@@ -58,18 +66,15 @@ import paths
 CONFIG_PATH = paths.data_path("overlay", "overlay_config.json")
 DEFAULT_CONFIG = {"x": 50, "y": 50, "visible": True, "in_game_only": False}
 
-
 def load_config() -> dict:
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r") as f:
             return {**DEFAULT_CONFIG, **json.load(f)}
     return dict(DEFAULT_CONFIG)
 
-
 def save_config(cfg: dict) -> None:
     with open(CONFIG_PATH, "w") as f:
         json.dump(cfg, f, indent=2)
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Telemetry worker thread
@@ -118,7 +123,7 @@ class TelemetryWorker(QObject):
 class OverlayWidget(QWidget):
     """
     Transparent frameless always-on-top overlay.
-    Styled with a semi-transparent dark background and vibrant accent colours.
+    Styled with the LMU LarpTimes dark glassmorphism aesthetic.
     """
 
     def __init__(self, db_path: str = database.DEFAULT_DB_PATH):
@@ -145,6 +150,10 @@ class OverlayWidget(QWidget):
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{ background-color: {qcolor_hex(BG_PANEL)}; color: {qcolor_hex(TEXT_PRIMARY)}; border: 1px solid {qcolor_hex(BORDER_BRIGHT)}; }}
+            QMenu::item:selected {{ background-color: {qcolor_hex(ACCENT_BLUE)}; }}
+        """)
         act_close_app = menu.addAction("Chiudi App")
         act_close_overlay = menu.addAction("Chiudi Overlay")
         act_minimize = menu.addAction("Minimizza App")
@@ -170,7 +179,7 @@ class OverlayWidget(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.setMinimumSize(380, 150)
+        self.setMinimumSize(340, 220)
         self.move(self._cfg.get("x", 50), self._cfg.get("y", 50))
         if self._cfg.get("visible", True):
             self.show()
@@ -179,59 +188,79 @@ class OverlayWidget(QWidget):
 
     def _build_ui(self):
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(10, 8, 10, 8)
-        outer.setSpacing(4)
+        outer.setContentsMargins(16, 12, 16, 12)
+        outer.setSpacing(8)
 
-        # ── Title with track - car ──────────────────────────────────────
+        # ── Header ──────────────────────────────────────────────────────
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 4)
+        header_layout.setSpacing(8)
+
+        self._lbl_brand = QLabel("LMU  LarpTimes")
+        self._lbl_brand.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
+        self._lbl_brand.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)}; letter-spacing: 1px;")
+        
         self._lbl_track_car = QLabel("—")
-        self._lbl_track_car.setFont(QFont("Geist", 9, QFont.Weight.Bold))
-        self._lbl_track_car.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; letter-spacing: 0.5px;")
-        self._lbl_track_car.setMaximumHeight(16)
-        outer.addWidget(self._lbl_track_car)
+        self._lbl_track_car.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
+        self._lbl_track_car.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; letter-spacing: 1px;")
+        self._lbl_track_car.setAlignment(Qt.AlignmentFlag.AlignRight)
 
-        # ── Grid: 3 colonne x 2 righe ───────────────────────────────────
+        header_layout.addWidget(self._lbl_brand)
+        header_layout.addStretch()
+        header_layout.addWidget(self._lbl_track_car)
+        outer.addLayout(header_layout)
+
+        # ── Main Data Grid 3x3 ──────────────────────────────────────────
         grid = QGridLayout()
-        grid.setSpacing(8)
-        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(12)
+        grid.setContentsMargins(0, 4, 0, 4)
 
-        def cell(label_text, default="—"):
+        def cell(label_text, default="—", font_size=10):
             wrap = QVBoxLayout()
-            wrap.setSpacing(1)
+            wrap.setSpacing(2)
             lbl = QLabel(label_text)
-            lbl.setFont(QFont("Geist", 8))
-            lbl.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            lbl.setFont(QFont(FONT_TITLE, 7, QFont.Weight.Bold))
+            lbl.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; letter-spacing: 1px;")
             val = QLabel(default)
-            val.setFont(QFont("JetBrains Mono", 10, QFont.Weight.Bold))
+            val.setFont(QFont(FONT_VALUE, font_size, QFont.Weight.Bold))
             val.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)};")
             wrap.addWidget(lbl)
             wrap.addWidget(val)
             return wrap, val
 
-        c1, self._lbl_delta    = cell("DELTA", "+0.000 s")
-        c2, self._lbl_lap_time  = cell("GIRO", "—")
-        c3, self._lbl_sector    = cell("SETTORI", "—")
-        c4, self._lbl_fuel      = cell("CARBURANTE", "— L")
-        c5, self._lbl_fuel_laps = cell("GIRI CARB.", "—")
-        c6, self._lbl_wear      = cell("USURA FL", "—%")
-        c7, self._lbl_cliff     = cell("CLIFF", "—")
-        c8, self._lbl_compound  = cell("MESCOLA", "—")
-        c9, self._lbl_pit       = cell("BOX", "—")
+        c1, self._lbl_delta    = cell("DELTA", "+0.000", 11)
+        c2, self._lbl_lap_time  = cell("GIRO", "—", 11)
+        c3, self._lbl_sector    = cell("SETTORI", "—", 10)
+        c4, self._lbl_fuel      = cell("CARBURANTE", "— L", 11)
+        c5, self._lbl_fuel_laps = cell("GIRI CARB.", "—", 10)
+        c6, self._lbl_wear      = cell("USURA FL", "—%", 10)
+        c7, self._lbl_cliff     = cell("CLIFF", "—", 10)
+        c8, self._lbl_compound  = cell("MESCOLA", "—", 10)
+        c9, self._lbl_pit       = cell("BOX", "—", 11)
 
+        # Righe 0 e 1 (Dati giro e risorse)
         grid.addLayout(c1, 0, 0)
         grid.addLayout(c2, 0, 1)
         grid.addLayout(c3, 0, 2)
         grid.addLayout(c4, 1, 0)
         grid.addLayout(c5, 1, 1)
         grid.addLayout(c6, 1, 2)
+        
+        # Righe 2 e 3 (Pianificazione e condizioni)
+        grid.addLayout(c7, 2, 0)
+        grid.addLayout(c8, 2, 1)
+        grid.addLayout(c9, 2, 2)
+        
         outer.addLayout(grid)
 
-        # Seconda riga più piccola
+        # ── Bottom Grid (Meteo) ─────────────────────────────────────────
         grid2 = QGridLayout()
-        grid2.setSpacing(6)
-        grid2.setContentsMargins(0, 0, 0, 0)
-        c10, self._lbl_weather = cell("METEO", "—")
-        c11, self._lbl_track_temp = cell("PISTA", "—")
-        c12, self._lbl_ambient = cell("ARIA", "—")
+        grid2.setSpacing(12)
+        grid2.setContentsMargins(0, 4, 0, 0)
+        c10, self._lbl_weather = cell("METEO", "—", 10)
+        c11, self._lbl_track_temp = cell("PISTA", "—", 10)
+        c12, self._lbl_ambient = cell("ARIA", "—", 10)
+        
         grid2.addLayout(c10, 0, 0)
         grid2.addLayout(c11, 0, 1)
         grid2.addLayout(c12, 0, 2)
@@ -239,8 +268,9 @@ class OverlayWidget(QWidget):
 
         # ── Warning banner ──────────────────────────────────────────────
         self._lbl_warning = QLabel("")
-        self._lbl_warning.setFont(QFont("Geist", 8, QFont.Weight.Bold))
-        self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)};")
+        self._lbl_warning.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
+        self._lbl_warning.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; padding: 2px;")
         self._lbl_warning.setVisible(False)
         outer.addWidget(self._lbl_warning)
 
@@ -252,20 +282,18 @@ class OverlayWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Rounded semi-transparent background
         rect = self.rect()
-        # Background using web UI token BG_0 with slight opacity
-        painter.setBrush(QBrush(BG_0))
-        painter.setPen(QPen(ACCENT_GREEN.darker(150), 1.2))
-        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 10, 10)
 
-        # Top accent gradient matching web accents
+        painter.setBrush(QBrush(BG_0))
+        painter.setPen(QPen(ACCENT_GREEN.darker(150), 1))
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
+
         grad = QLinearGradient(0, 0, rect.width(), 0)
         grad.setColorAt(0.0, ACCENT_GREEN)
         grad.setColorAt(1.0, ACCENT_BLUE)
         painter.setBrush(QBrush(grad))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(0, 0, rect.width(), 3, 2, 2)
+        painter.drawRoundedRect(0, 0, rect.width(), 2, 2, 2)
 
     # ── Drag to move ──────────────────────────────────────────────────────────
 
@@ -356,7 +384,7 @@ class OverlayWidget(QWidget):
         self._apply_auto_visibility(frame)
         self._current_lap = frame.lap_number
 
-        # Title
+        # Header Info
         self._lbl_track_car.setText(f"{frame.track_name} — {frame.car_name}")
 
         # Delta
@@ -427,8 +455,8 @@ class OverlayWidget(QWidget):
 
         # Weather
         w = frame.weather_state
-        r = " 🌧" if frame.rain_intensity > 0 else ""
-        self._lbl_weather.setText(w + r)
+        rain = "RAIN" if frame.rain_intensity > 0 else ""
+        self._lbl_weather.setText(f"{w} {rain}".strip())
 
         # Temps
         self._lbl_track_temp.setText(f"{frame.track_temp:.0f}°")
@@ -436,10 +464,12 @@ class OverlayWidget(QWidget):
 
         # Warning
         if fuel_laps < 2 and not frame.in_pits:
-            self._lbl_warning.setText("⚠️ CARBURANTE CRITICO")
+            self._lbl_warning.setText("CARBURANTE CRITICO")
+            self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)}; padding: 2px;")
             self._lbl_warning.setVisible(True)
         elif self._pit_plan and self._current_lap in self._pit_plan:
-            self._lbl_warning.setText("🔴 BOX QUESTO GIRO")
+            self._lbl_warning.setText("BOX QUESTO GIRO")
+            self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; padding: 2px;")
             self._lbl_warning.setVisible(True)
         else:
             self._lbl_warning.setVisible(False)

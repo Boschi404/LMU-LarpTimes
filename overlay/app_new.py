@@ -100,10 +100,8 @@ class TelemetryWorker(QObject):
         while self._running:
             frame = self.source.get_next_frame()
             if frame is not None:
-                print(f"[Worker] Frame lap={frame.lap_number}, fuel={frame.fuel:.1f}, in_pits={frame.in_pits}")
                 lap_id = self._detector.process_frame(frame)
                 if lap_id is not None:
-                    print(f"[Worker] Lap completed, id={lap_id}")
                     self.lap_completed.emit(lap_id)
                 self.frame_ready.emit(frame)
             time.sleep(TICK)
@@ -217,8 +215,8 @@ class MiniOverlay(QWidget):
 
 class DeltaOverlay(MiniOverlay):
     """Delta vs best lap."""
-    def __init__(self):
-        super().__init__("delta", 140, 50)
+    def __init__(self, manager=None):
+        super().__init__("delta", 140, 50, manager=manager)
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -245,8 +243,8 @@ class DeltaOverlay(MiniOverlay):
 
 class FuelOverlay(MiniOverlay):
     """Fuel laps remaining."""
-    def __init__(self):
-        super().__init__("fuel", 140, 50)
+    def __init__(self, manager=None):
+        super().__init__("fuel", 140, 50, manager=manager)
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -272,8 +270,8 @@ class FuelOverlay(MiniOverlay):
 
 class CliffOverlay(MiniOverlay):
     """Tyre cliff prediction."""
-    def __init__(self):
-        super().__init__("cliff", 140, 50)
+    def __init__(self, manager=None):
+        super().__init__("cliff", 140, 50, manager=manager)
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -300,8 +298,8 @@ class CliffOverlay(MiniOverlay):
 
 class PitOverlay(MiniOverlay):
     """Next pit info."""
-    def __init__(self):
-        super().__init__("pit", 160, 50)
+    def __init__(self, manager=None):
+        super().__init__("pit", 160, 50, manager=manager)
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -331,8 +329,8 @@ class PitOverlay(MiniOverlay):
 
 class WarningOverlay(MiniOverlay):
     """Large warning message."""
-    def __init__(self):
-        super().__init__("warning", 200, 70)
+    def __init__(self, manager=None):
+        super().__init__("warning", 200, 70, manager=manager)
         self.hide()  # Hidden by default
 
     def _build_ui(self):
