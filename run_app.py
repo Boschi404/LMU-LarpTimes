@@ -11,6 +11,7 @@ import signal
 import threading
 import subprocess
 import importlib
+from pathlib import Path
 
 LMU_EXE_NAMES = ["LMU.exe", "Le Mans Ultimate.exe", "LMU_Racer.exe", "LMU"]
 SERVER_HOST = "127.0.0.1"
@@ -26,6 +27,55 @@ REQUIRED_MODULES = {
     "PySide6": "PySide6",
     "scipy": "scipy",
 }
+
+
+def _load_dotenv() -> dict:
+    """
+    Load a simple KEY=VALUE .env file from the project root.
+    Returns the parsed dict. Does NOT override os.environ entries
+    that are already set (env vars take precedence).
+    """
+    env_path = Path(__file__).resolve().parent / ".env"
+    parsed = {}
+    if not env_path.exists():
+        return parsed
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k = k.strip()
+        v = v.strip().strip('"').strip("'")
+        parsed[k] = v
+        if k not in os.environ:
+            os.environ[k] = v
+    return parsed
+
+
+def _configure_cloud_backend() -> None:
+    """
+    If TURSO_URL and TURSO_TOKEN are set, configure the TursoSync backend.
+    No-op otherwise. Errors are logged but not fatal — the app still runs
+    fine without a cloud backend (just local-only mode).
+    """
+    if not os.environ.get("TURSO_URL") or not os.environ.get("TURSO_TOKEN"):
+        return
+    try:
+        from database.cloud import backend_from_config, set_backend
+        backend = backend_from_config({
+            "backend": "turso",
+            "turso": {
+                "url": os.environ["TURSO_URL"],
+                "auth_token": os.environ["TURSO_TOKEN"],
+            },
+        })
+        set_backend(backend)
+        # Print status on startup
+        status = backend.status()
+        if status.get("message"):
+            print(f"[Cloud] {status['message']}")
+    except Exception as e:
+        print(f"[Cloud] WARNING: could not configure Turso backend: {e}")
 
 
 def _check_dependencies() -> list:
@@ -161,6 +211,21 @@ def _pump_stdout(proc):
 
 def main():
     _ensure_dependencies()
+
+    # Load .env (TURSO_URL, TURSO_TOKEN, ...) BEFORE configuring backend
+    _load_dotenv()
+    _configure_cloud_backend()
+
+    # Security self-audit on startup
+    print()
+    try:
+        from security.self_audit import run_audit
+        audit = run_audit(silent=True)
+        if audit.get("has_critical"):
+            print("  ⚠️   RUN_AUDIT FOUND CRITICAL ISSUES — fix them before going live")
+            print(f"  ⚠️   See details above or run: python -m security.self_audit")
+    except ImportError:
+        pass  # security module may not exist on very old clones
 
     print("=" * 60)
     print("  LMU Pit Strategist — Launcher")

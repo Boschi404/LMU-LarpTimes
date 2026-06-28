@@ -537,3 +537,56 @@ async function loadSetupAdvice() {
     document.getElementById('setup-loading').style.display = 'none';
   }
 }
+
+
+// ── Owner email (S-4) ──────────────────────────────────────────────────
+
+async function loadOwner() {
+  try {
+    var r = await fetch('/api/owner');
+    var d = await r.json();
+    var input = document.getElementById('owner-email-input');
+    if (input) input.value = d.email || '';
+  } catch (e) {
+    console.error('loadOwner:', e);
+  }
+}
+
+async function saveOwner() {
+  var input = document.getElementById('owner-email-input');
+  var status = document.getElementById('owner-status');
+  var email = (input.value || '').trim();
+  if (email === '') {
+    status.textContent = 'Inserisci un\'email o lascia vuoto per togliere il filtro';
+    status.style.color = 'var(--text-muted)';
+    return;
+  }
+  try {
+    var r = await fetch('/api/owner', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: email})
+    });
+    var d = await r.json();
+    if (r.ok) {
+      status.textContent = '✓ Salvato (' + (d.email || 'nessuno') + ')';
+      status.style.color = 'var(--accent-green)';
+      // Re-load profile with the new filter
+      if (typeof loadProfile === 'function') loadProfile();
+      if (typeof loadLaps === 'function') loadLaps();
+    } else {
+      status.textContent = '✗ ' + (d.error || 'Errore');
+      status.style.color = 'var(--accent-red)';
+    }
+  } catch (e) {
+    status.textContent = '✗ Network error';
+    status.style.color = 'var(--accent-red)';
+  }
+}
+
+// Load owner when the profilo page is shown
+var _origShowPage = showPage;
+showPage = function(name) {
+  _origShowPage(name);
+  if (name === 'profilo') loadOwner();
+};

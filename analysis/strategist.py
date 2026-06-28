@@ -28,12 +28,19 @@ class PitStrategist:
         laps_remaining: int,
         current_tyre_age: int,
         current_fuel: float,
-        max_stops: int = 3
+        max_stops: int = 3,
+        # Optional compound recommendation inputs
+        laps_history: Optional[List[Dict[str, Any]]] = None,
+        weather_forecast: Optional[List[Dict[str, Any]]] = None,
+        track_temp: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Compute the optimal strategy and alternative strategies.
         Returns a dictionary containing the optimal stops, pit laps, and total time,
         as well as alternatives (1, 2, 3 stops, etc.).
+
+        If `laps_history` is provided, also returns a recommended compound per stint
+        (and per alternative) using the same `analysis/compounds.py` recommender.
         """
         # Convert current fuel level to integer laps remaining
         fuel_curr_laps = int(current_fuel // self.fuel_consumption)
@@ -96,12 +103,25 @@ class PitStrategist:
                     if decision == "pit":
                         pit_laps.append(idx + 1)
                 
-                results[s] = {
+                entry: Dict[str, Any] = {
                     "stops": s,
                     "pit_laps": pit_laps,
                     "total_time": total_time,
                     "decisions": path
                 }
+
+                # Compound recommendation per stint (only if we have history)
+                if laps_history is not None:
+                    from analysis.compounds import plan_compounds
+                    entry["compound_plan"] = plan_compounds(
+                        pit_laps_relative=pit_laps,
+                        total_laps=laps_remaining,
+                        laps_history=laps_history,
+                        weather_per_stint=weather_forecast,
+                        track_temp=track_temp,
+                    )
+
+                results[s] = entry
 
         # Find the overall best strategy
         best_s = None

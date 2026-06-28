@@ -112,6 +112,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+auth_secret.txt
 
 # Spyder project settings
 .spyderproject.conf

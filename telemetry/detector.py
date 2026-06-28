@@ -6,9 +6,13 @@ from telemetry.source import TelemetryFrame
 
 
 class LapBoundaryDetector:
-    def __init__(self, db_path: str = database.DEFAULT_DB_PATH, fallback_pit_loss: float = 30.0):
+    def __init__(self, db_path: str = database.DEFAULT_DB_PATH, fallback_pit_loss: float = 30.0, on_session_complete=None):
         self.db_path = db_path
         self.fallback_pit_loss = fallback_pit_loss
+        # Optional callback: on_session_complete(session_uuid: str)
+        # Fired when a session ends (reset, change, or shutdown).
+        # The overlay can use this to auto-push to the community DB.
+        self.on_session_complete = on_session_complete
         self.session_id: Optional[int] = None
         self.session_uuid: Optional[str] = None
         self.track_name: str = ""
@@ -28,8 +32,16 @@ class LapBoundaryDetector:
         self.pit_in_lap_time: Optional[float] = None
         self.in_pit_stop_sequence: bool = False
         self._lap_start_elapsed: float = 0.0
+        # Ensure the DB schema exists (safe to call multiple times)
+        database.init_db(db_path=db_path)
 
     def _create_session(self, frame: TelemetryFrame) -> None:
+        # If we had a previous session, fire the completion hook
+        if self.session_id is not None and self.session_uuid and self.on_session_complete:
+            try:
+                self.on_session_complete(self.session_uuid)
+            except Exception:
+                pass
         self.track_name = frame.track_name
         self.session_type = frame.session_type
         self.car_name = frame.car_name

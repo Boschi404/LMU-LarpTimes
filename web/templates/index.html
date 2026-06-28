@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LMU LarpTimes - Telemetry & Strategy</title>
+  <title>LMU LarpTimes - Telemetry & Race Strategy</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -616,7 +616,14 @@
     <!-- PAGE: PROFILO -->
     <section class="page active" id="page-profilo">
       <h2>Tyre Degradation Analysis</h2>
-      
+
+      <div id="owner-bar" class="card" style="display:flex;align-items:center;gap:12px;padding:10px 16px;margin-bottom:16px;">
+        <span style="color:var(--text-secondary);font-size:12px;text-transform:uppercase;letter-spacing:1px;">La tua email</span>
+        <input id="owner-email-input" type="email" placeholder="tu@example.com" style="flex:1;max-width:320px;padding:6px 10px;background:var(--bg-1);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);">
+        <button class="btn" id="owner-save-btn" onclick="saveOwner()">Salva</button>
+        <span id="owner-status" style="font-size:12px;color:var(--text-muted);"></span>
+      </div>
+
       <div class="filter-bar">
         <div class="filter-group">
           <label for="prof-car">macchina</label>

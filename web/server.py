@@ -16,31 +16,138 @@ FastAPI server che espone:
 
 import os
 import sys
+import time
+import json as _json
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 
 import database
 from analysis.anomaly import detect_anomalies_for_session
 from analysis.models import fit_degradation_model, fit_fuel_model, DegradationModelFit
 from analysis.strategist import PitStrategist
+from analysis.weather import linear_rain_forecast, build_stint_weather_forecast
 
 import paths
 BASE_DIR = paths.base_dir()
 TEMPLATES_DIR = os.path.join(BASE_DIR, "web", "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "web", "static")
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Security middleware
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Simple in-memory rate limiter: {ip: [(timestamp, count), ...]}
+_rate_limit_store: Dict[str, List[float]] = {}
+_RATE_LIMIT = 200  # max requests per minute per IP
+
+
+def reset_rate_limit():
+    """Clear the rate-limit counter (useful in tests)."""
+    _rate_limit_store.clear()
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers and enforce basic rate limiting."""
+
+    async def dispatch(self, request: Request, call_next):
+        # Rate limiting (skip static files)
+        if not request.url.path.startswith("/static"):
+            client_ip = request.client.host if request.client else "127.0.0.1"
+            now = time.time()
+            # Clean old entries
+            if client_ip in _rate_limit_store:
+                _rate_limit_store[client_ip] = [
+                    t for t in _rate_limit_store[client_ip]
+                    if now - t < 60
+                ]
+            else:
+                _rate_limit_store[client_ip] = []
+            if len(_rate_limit_store[client_ip]) >= _RATE_LIMIT:
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": "rate limit exceeded (200 req/min)"},
+                )
+            _rate_limit_store[client_ip].append(now)
+
+        response: Response = await call_next(request)
+
+        # Security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none';"
+        )
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "interest-cohort=()"
+
+        return response
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+_MAX_IMPORT_SIZE = 50 * 1024 * 1024  # 50 MB max import payload
+_MAX_IMPORT_DEPTH = 5                # max nesting in import
+
+def _validate_import_payload(payload: Any) -> Optional[str]:
+    """
+    Validate the structure of an import payload.
+    Returns an error string if invalid, None if OK.
+    """
+    if not isinstance(payload, dict):
+        return "payload must be a JSON object"
+    if "sessions" not in payload:
+        return "payload missing 'sessions' key"
+    sessions = payload["sessions"]
+    if not isinstance(sessions, list):
+        return "'sessions' must be a list"
+    if len(sessions) > _MAX_IMPORT_DEPTH:
+        return f"too many sessions ({len(sessions)} > {_MAX_IMPORT_DEPTH})"
+    for i, entry in enumerate(sessions):
+        if not isinstance(entry, dict):
+            return f"sessions[{i}] must be an object"
+        sess = entry.get("session")
+        if not isinstance(sess, dict):
+            return f"sessions[{i}].session must be an object"
+        laps = entry.get("laps")
+        if laps is not None and not isinstance(laps, list):
+            return f"sessions[{i}].laps must be a list"
+        if isinstance(laps, list) and len(laps) > 5000:
+            return f"sessions[{i}] too many laps ({len(laps)} > 5000)"
+        stints = entry.get("stints")
+        if stints is not None and not isinstance(stints, list):
+            return f"sessions[{i}].stints must be a list"
+        if isinstance(stints, list) and len(stints) > 30:
+            return f"sessions[{i}] too many stints ({len(stints)} > 30)"
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app):
     database.init_db()
+    # Security audit on startup (silent — only warnings/criticals shown)
+    try:
+        from security.self_audit import run_audit as _run_audit
+        _run_audit(silent=True)
+    except ImportError:
+        pass
     yield
 
 app = FastAPI(title="LMU Pit Strategist", version="1.0.0", lifespan=lifespan)
+app.add_middleware(SecurityHeadersMiddleware)
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Serve static files (JS, CSS, images)
@@ -331,6 +438,199 @@ async def get_setup_advice(car: str, track: str):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# API — Community DB (opt-in, push, pull, status)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/cloud/user")
+async def get_cloud_user():
+    """Return the local user's opt-in status and identity."""
+    return database.get_local_user()
+
+
+@app.post("/api/cloud/opt-in")
+async def opt_in(request: Request):
+    """
+    Opt the local user in to the community DB.
+    Body: {"display_name": "<optional>"}
+    """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    return database.opt_in_to_community(display_name=body.get("display_name"))
+
+
+@app.post("/api/cloud/opt-out")
+async def opt_out(request: Request):
+    """
+    Opt the local user out.
+    Body: {"delete_cloud_data": bool}
+    """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    return database.opt_out_of_community(
+        delete_cloud_data=bool(body.get("delete_cloud_data", False))
+    )
+
+
+@app.post("/api/cloud/display-name")
+async def set_cloud_display_name(request: Request):
+    """Update the user's display name. Body: {"display_name": "..."}."""
+    body = await request.json()
+    return database.set_display_name(new_name=body.get("display_name", ""))
+
+
+@app.get("/api/cloud/status")
+async def cloud_status():
+    """Combined status: backend + sync state + user."""
+    return {
+        "user": database.get_local_user(),
+        "sync": database.get_sync_status(),
+    }
+
+
+@app.post("/api/cloud/push")
+async def cloud_push():
+    """Push all pending sessions to the cloud."""
+    return database.push_pending_sessions()
+
+
+@app.post("/api/cloud/pull")
+async def cloud_pull():
+    """Pull all community sessions and import locally (with dedup)."""
+    return database.pull_remote_sessions()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# API — Sharing (export/import for the global DB pattern)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/laps/export")
+async def export_laps(
+    car: Optional[str] = None,
+    track: Optional[str] = None,
+):
+    """
+    Export sessions + laps + stints + pit stops as a portable JSON payload.
+
+    Optional filters: car, track. The payload can be saved as a file,
+    shared, and re-imported with POST /api/laps/import.
+    """
+    payload = database.export_sessions(
+        db_path=database.DEFAULT_DB_PATH,
+        car=car,
+        track=track,
+    )
+    return payload
+
+
+@app.post("/api/laps/import")
+async def import_laps(
+    request: Request,
+    overwrite_existing: bool = False,
+):
+    """
+    Import laps from a payload previously produced by /api/laps/export.
+
+    Security: validates payload structure and enforces size limits.
+    Dedup is automatic on (session_uuid, lap_number). Pass
+    overwrite_existing=true to REPLACE existing laps with the imported ones.
+    """
+    # Size limit check (raw body)
+    body_raw = await request.body()
+    if len(body_raw) > _MAX_IMPORT_SIZE:
+        return JSONResponse(
+            status_code=413,
+            content={"error": f"payload too large ({len(body_raw)} bytes > {_MAX_IMPORT_SIZE} bytes)"},
+        )
+
+    # Parse
+    try:
+        body = _json.loads(body_raw)
+    except _json.JSONDecodeError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"invalid JSON: {e}"},
+        )
+
+    # Structure validation
+    err = _validate_import_payload(body)
+    if err:
+        return JSONResponse(status_code=422, content={"error": err})
+
+    summary = database.import_sessions(
+        payload=body,
+        db_path=database.DEFAULT_DB_PATH,
+        overwrite_existing=overwrite_existing,
+    )
+    return summary
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# API — Weather forecast
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/weather/forecast")
+async def get_weather_forecast(
+    history: Optional[str] = None,  # JSON: [{"t_min": -10, "rain_intensity": 0.1, "weather_state": "DRY"}, ...]
+    horizon_minutes: int = 15,
+):
+    """
+    Linear extrapolation of rain intensity. Returns predicted state and
+    when (if ever) rain will cross the WET threshold.
+
+    `history` is a JSON string of observations. If omitted, returns a
+    DRY/calm default.
+    """
+    import json as _json
+    hist_list = []
+    if history:
+        try:
+            hist_list = _json.loads(history)
+        except Exception:
+            hist_list = []
+    forecast = linear_rain_forecast(hist_list, horizon_minutes=horizon_minutes)
+    return {
+        "horizon_minutes": horizon_minutes,
+        "forecast": forecast,
+    }
+
+
+@app.get("/api/weather/stint-forecast")
+async def get_stint_weather_forecast(
+    total_laps: int = 40,
+    avg_lap_time_s: float = 100.0,
+    history: Optional[str] = None,
+    horizon_minutes: int = 15,
+):
+    """
+    Build a per-stint weather forecast from the linear forecast above.
+    Useful for the UI to show 'stint 2 will be WET — consider Inter'.
+    """
+    import json as _json
+    hist_list = []
+    if history:
+        try:
+            hist_list = _json.loads(history)
+        except Exception:
+            hist_list = []
+    forecast = linear_rain_forecast(hist_list, horizon_minutes=horizon_minutes)
+    stint_forecast = build_stint_weather_forecast(
+        total_laps=total_laps,
+        avg_lap_time_s=avg_lap_time_s,
+        weather_forecast=forecast,
+    )
+    return {
+        "forecast": forecast,
+        "stints": stint_forecast,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # API — Giri
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -339,9 +639,14 @@ async def get_laps(
     car: Optional[str] = None,
     track: Optional[str] = None,
     compound: Optional[str] = None,
+    owner_email: Optional[str] = None,
     include_deleted: bool = False
 ):
-    """Restituisce tutti i giri, opzionalmente filtrati."""
+    """Restituisce tutti i giri, opzionalmente filtrati.
+
+    Se `owner_email` è passato, filtra solo i giri di quell'utente.
+    Se non è passato, restituisce tutti i giri (modalità admin).
+    """
     laps = database.get_all_laps_for_archive(include_deleted=include_deleted)
     if car:
         laps = [l for l in laps if l.get("car") == car]
@@ -349,7 +654,28 @@ async def get_laps(
         laps = [l for l in laps if l.get("track") == track]
     if compound:
         laps = [l for l in laps if l.get("compound_front") == compound]
+    if owner_email:
+        owner = owner_email.strip().lower()
+        laps = [l for l in laps if (l.get("owner_email") or "").lower() == owner]
     return laps
+
+
+@app.get("/api/owner")
+async def get_owner():
+    """Return the current local owner email (or empty string)."""
+    return {"email": database.get_owner_email() or ""}
+
+
+@app.post("/api/owner")
+async def set_owner(request: Request):
+    """Set the local owner email. Body: {"email": "..."} or {"email": null}."""
+    body = await request.json()
+    email = body.get("email")
+    try:
+        new_email = database.set_owner_email(email)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+    return {"email": new_email or ""}
 
 
 @app.post("/api/laps/{lap_id}/delete")
@@ -466,9 +792,21 @@ async def get_strategy(
     current_tyre_age: int = 1,
     current_fuel: float = 100.0,
     fuel_capacity: float = 100.0,
-    max_stops: int = 3
+    max_stops: int = 3,
+    track_temp: Optional[float] = None,
+    weather_state: Optional[str] = "DRY",
+    rain_intensity: float = 0.0,
 ):
-    """Calcola la strategia di pit stop ottimale."""
+    """Calcola la strategia di pit stop ottimale.
+
+    Parametri meteo (opzionali):
+      - track_temp: temperatura tracciato attuale in °C
+      - weather_state: "DRY" o "WET" — condizione attuale
+      - rain_intensity: 0.0-1.0 — intensità pioggia attuale
+
+    Se vengono passati, l'API includerà anche un compound_plan
+    (mescola consigliata per ogni stint) basato su meteo + dati storici.
+    """
     clean_laps = database.get_laps_for_analysis(car, track, compound_front=compound)
     if len(clean_laps) < 5:
         return JSONResponse(
@@ -490,11 +828,22 @@ async def get_strategy(
         model_fit=model
     )
 
+    # If weather is provided, ask strategist to also recommend compounds
+    weather_forecast = None
+    if weather_state or rain_intensity:
+        weather_forecast = [{
+            "weather_state": weather_state or "DRY",
+            "rain_intensity": rain_intensity,
+        }]
+
     result = strat.optimize(
         laps_remaining=laps_remaining,
         current_tyre_age=current_tyre_age,
         current_fuel=current_fuel,
-        max_stops=max_stops
+        max_stops=max_stops,
+        laps_history=clean_laps if weather_forecast else None,
+        weather_forecast=weather_forecast,
+        track_temp=track_temp,
     )
 
     return {
@@ -504,5 +853,10 @@ async def get_strategy(
         "laps_remaining": laps_remaining,
         "mean_fuel_consumption": round(mean_fuel, 3),
         "pit_loss_seconds": round(pit_loss, 1),
+        "current_weather": {
+            "state": weather_state,
+            "rain_intensity": rain_intensity,
+            "track_temp": track_temp,
+        },
         "result": result
     }

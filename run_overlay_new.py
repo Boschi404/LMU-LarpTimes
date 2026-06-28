@@ -1,4 +1,8 @@
-"""Run the LMU Pit Strategist overlay (new multi-tool) with synthetic data."""
+"""Run the LMU Pit Strategist MODULAR overlay (4 separate mini-windows) with synthetic data.
+
+Click the ⚙ tray button (or right-click any mini-window) to open the config menu
+and toggle individual components on/off.
+"""
 from overlay.app_new import run_overlay
 from telemetry.source import SyntheticReplaySource
 
@@ -13,6 +17,6 @@ if __name__ == "__main__":
         cliff_lap=18,
         anomaly_laps={5: 2.0, 12: 1.8},
         total_laps=40,
-        tick_rate=0.5
+        tick_rate=0.5,
     )
     run_overlay(source)
