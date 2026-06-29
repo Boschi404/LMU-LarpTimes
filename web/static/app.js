@@ -42,6 +42,8 @@ async function populateFilters() {
     fillSelect('prof-car', cars);
     fillSelect('prof-track', tracks);
     fillSelect('prof-compound', compounds);
+    fillSelect('strat-car', cars);
+    fillSelect('strat-track', tracks);
   } catch (e) {
     console.error('Failed to populate filters:', e);
   }
@@ -365,6 +367,7 @@ async function calculateStrategy() {
   var fuel  = document.getElementById('strat-fuel').value;
   var capacity = document.getElementById('strat-capacity').value;
   var maxstops = document.getElementById('strat-maxstops').value;
+  var mode = document.getElementById('strat-mode').value;
 
   if (!car || !track) { alert('Inserisci auto e pista.'); return; }
 
@@ -372,7 +375,12 @@ async function calculateStrategy() {
   document.getElementById('strat-results').style.display = 'none';
 
   var url = '/api/strategy?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track) +
-    '&laps_remaining=' + laps + '&current_fuel=' + fuel + '&fuel_capacity=' + capacity + '&max_stops=' + maxstops;
+    '&current_fuel=' + fuel + '&fuel_capacity=' + capacity + '&max_stops=' + maxstops;
+  if (mode === 'time') {
+    url += '&duration_hours=' + document.getElementById('strat-hours').value;
+  } else {
+    url += '&laps_remaining=' + laps;
+  }
 
   try {
     var res = await fetch(url);
@@ -545,44 +553,47 @@ async function loadOwner() {
   try {
     var r = await fetch('/api/owner');
     var d = await r.json();
-    var input = document.getElementById('owner-email-input');
-    if (input) input.value = d.email || '';
+    var display = document.getElementById('owner-display');
+    if (display) {
+      display.textContent = d.email || 'Non loggato';
+    }
+    // Show welcome banner if no laps
+    var r2 = await fetch('/api/laps?limit=1');
+    var laps = await r2.json();
+    var banner = document.getElementById('welcome-banner');
+    if (banner) {
+      banner.style.display = (!laps || laps.length === 0) ? 'block' : 'none';
+    }
   } catch (e) {
     console.error('loadOwner:', e);
   }
 }
 
-async function saveOwner() {
-  var input = document.getElementById('owner-email-input');
-  var status = document.getElementById('owner-status');
-  var email = (input.value || '').trim();
-  if (email === '') {
-    status.textContent = 'Inserisci un\'email o lascia vuoto per togliere il filtro';
-    status.style.color = 'var(--text-muted)';
-    return;
-  }
+async function seedData() {
+  var btn = document.getElementById('seed-btn');
+  var status = document.getElementById('seed-status');
+  btn.disabled = true;
+  status.textContent = 'Creazione in corso...';
   try {
-    var r = await fetch('/api/owner', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email: email})
-    });
+    var r = await fetch('/api/seed', {method: 'POST'});
     var d = await r.json();
-    if (r.ok) {
-      status.textContent = '✓ Salvato (' + (d.email || 'nessuno') + ')';
-      status.style.color = 'var(--accent-green)';
-      // Re-load profile with the new filter
-      if (typeof loadProfile === 'function') loadProfile();
-      if (typeof loadLaps === 'function') loadLaps();
+    status.textContent = d.message || 'Fatto!';
+    if (d.ok) {
+      location.reload();
     } else {
-      status.textContent = '✗ ' + (d.error || 'Errore');
-      status.style.color = 'var(--accent-red)';
+      status.textContent = d.message;
+      btn.disabled = false;
     }
   } catch (e) {
-    status.textContent = '✗ Network error';
-    status.style.color = 'var(--accent-red)';
+    status.textContent = 'Errore: ' + e.message;
+    btn.disabled = false;
   }
 }
+
+async function saveOwner() {
+  window.location.href = '/login';
+}
+
 
 // Load owner when the profilo page is shown
 var _origShowPage = showPage;
@@ -590,3 +601,260 @@ showPage = function(name) {
   _origShowPage(name);
   if (name === 'profilo') loadOwner();
 };
+
+
+// ── Lap Time Evolution Chart (C-2) ─────────────────────────────────────
+
+var _lapChartInstance = null;
+
+async function renderLapChart(car, track) {
+  if (!car || !track) return;
+  try {
+    var r = await fetch('/api/laps/chart?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track));
+    var data = await r.json();
+    if (!data.laps || data.laps.length < 3) {
+      document.getElementById('strat-chart').style.display = 'none';
+      return;
+    }
+    document.getElementById('strat-chart').style.display = 'block';
+
+    if (_lapChartInstance) {
+      _lapChartInstance.destroy();
+      _lapChartInstance = null;
+    }
+
+    var canvas = document.getElementById('strat-chart');
+    var ctx = canvas.getContext('2d');
+
+    // ── Compute fuel-corrected pace (removes the effect of fuel so you see pure tyre deg) ──
+    // Best estimate of fuel penalty: use alpha from degradation model if available, else 0.03s/lap
+    var alphaFuel = 0.03;
+    if (data.degradation && data.degradation.params) {
+      alphaFuel = data.degradation.params.alpha || 0.03;
+    }
+
+    // Each point: lap_number, raw_lap_time, fuel_corrected (time minus fuel penalty)
+    var allPoints = data.laps.map(function(lap) {
+      return {
+        x: lap.lap_number,
+        y: lap.lap_time,
+        yc: lap.lap_time - alphaFuel * (lap.fuel_start_l || 0),
+        fuel: lap.fuel_start_l,
+        age: lap.tyre_age_laps,
+        stint_id: lap.stint_id,
+        compound: lap.compound_front,
+      };
+    });
+
+    // ── Stint colors and single legend entry per stint (no duplicates) ──
+    var stintColors = {
+      1: '#1dd1a1', 2: '#4a9eff', 3: '#ff6b6b',
+      4: '#ffa94d', 5: '#a29bfe', 6: '#fd79a8'
+    };
+
+    // Group points by stint (for color, not for legend)
+    var stints = {};  // stint_id -> {color, compound, lap_start, lap_end, fuel_start}
+    allPoints.forEach(function(p) {
+      var s = p.stint_id || 1;
+      if (!stints[s]) {
+        stints[s] = {
+          id: s, color: stintColors[s] || '#7d8590',
+          compound: p.compound || 'Medium', lap_start: p.x, lap_end: p.x,
+          fuel_start: p.fuel, fuel_end: p.fuel
+        };
+      }
+      stints[s].lap_end = p.x;
+      stints[s].fuel_end = p.fuel;
+    });
+    var stintList = Object.values(stints);
+
+    // ── Build chart datasets ──
+    var datasets = [];
+
+    // 1) RAW pace (real lap times — includes fuel effect)
+    datasets.push({
+      label: 'Lap time (real)',
+      data: allPoints.map(function(p) { return {x: p.x, y: p.y}; }),
+      backgroundColor: '#7d8590',
+      borderColor: '#7d8590',
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      showLine: false,
+      type: 'scatter',
+      order: 4
+    });
+
+    // 2) FUEL-CORRECTED pace (pure tyre degradation, the real underlying signal)
+    datasets.push({
+      label: 'Tyre degradation (fuel-corrected)',
+      data: allPoints.map(function(p) { return {x: p.x, y: p.yc}; }),
+      backgroundColor: function(ctx) {
+        return stintColors[ctx.raw.stint_id] || '#ffa94d';
+      },
+      borderColor: '#ffa94d',
+      pointRadius: 4,
+      pointHoverRadius: 7,
+      showLine: false,
+      type: 'scatter',
+      order: 3
+    });
+
+    // 3) Degradation model line (the fit through fuel-corrected pace)
+    if (data.degradation && data.degradation.curve) {
+      datasets.push({
+        label: 'Degradation model fit',
+        data: data.degradation.curve.map(function(p) { return {x: p.age, y: p.predicted}; }),
+        borderColor: '#1dd1a1',
+        backgroundColor: 'rgba(29,209,161,0.15)',
+        pointRadius: 0,
+        borderWidth: 2.5,
+        borderDash: [6, 4],
+        showLine: true,
+        fill: false,
+        order: 1
+      });
+    }
+
+    // 4) FUEL MASS line (how much fuel = how much lap time penalty)
+    // Show this as a separate small chart on the right axis? Simpler: add to tooltip only.
+
+    // ── Pit stop annotations (one per stint transition) ──
+    var pitAnnotations = {};
+    if (data.pit_stops && data.pit_stops.length > 0) {
+      data.pit_stops.forEach(function(ps) {
+        pitAnnotations['pit-' + ps.lap_number] = {
+          type: 'line',
+          xMin: ps.lap_number, xMax: ps.lap_number,
+          yMin: 0, yMax: 999,
+          borderColor: '#ff6b6b',
+          borderWidth: 2,
+          borderDash: [8, 4],
+          label: {
+            display: true,
+            content: 'PIT ' + Math.round(ps.pit_loss) + 's',
+            position: 'start',
+            backgroundColor: 'rgba(255,107,107,0.85)',
+            color: '#fff',
+            padding: 3,
+            font: {size: 10, weight: 'bold'}
+          }
+        };
+      });
+    }
+
+    // ── Stint bands (background colors to show each stint's range) ──
+    stintList.forEach(function(st) {
+      pitAnnotations['stint-' + st.id] = {
+        type: 'box',
+        xMin: st.lap_start,
+        xMax: st.lap_end + 0.5,
+        backgroundColor: st.color + '14',  // very transparent
+        borderColor: st.color + '40',
+        borderWidth: 1,
+        borderDash: [2, 2],
+        label: {
+          display: true,
+          content: 'Stint ' + st.id + ' (' + st.compound + ')',
+          position: {x: 'center', y: 'start'},
+          color: st.color,
+          font: {size: 10, weight: 'bold'},
+          backgroundColor: 'rgba(10,14,24,0.7)',
+          padding: 3
+        }
+      };
+    });
+
+    // ── Chart options ──
+    _lapChartInstance = new Chart(ctx, {
+      type: 'scatter',
+      data: {datasets: datasets},
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {duration: 300},
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: '#7d8590',
+              font: {family: 'Inter, sans-serif', size: 11},
+              generateLabels: function(chart) {
+                // Build labels: 2 dataset labels + 1 per stint
+                var labels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                // Add stint info as legend entries
+                stintList.forEach(function(st) {
+                  labels.push({
+                    text: 'Stint ' + st.id + ': ' + st.compound + ' (' + st.lap_start + '–' + st.lap_end + ')',
+                    fillStyle: st.color,
+                    strokeStyle: st.color,
+                    lineWidth: 0,
+                    fontColor: '#7d8590',
+                    pointStyle: 'rect',
+                    hidden: false
+                  });
+                });
+                return labels;
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                var raw = ctx.raw || {};
+                var p = allPoints.find(function(x) { return x.x === raw.x; });
+                if (!p) return ctx.formattedValue;
+                var lines = [
+                  'Lap ' + p.x + ' — ' + p.y.toFixed(2) + 's',
+                  'Stint ' + p.stint_id + ' (' + p.compound + ')',
+                  'Tyre age: ' + p.age + ' laps',
+                  'Fuel: ' + p.fuel.toFixed(1) + 'L (' + (p.fuel * 0.62).toFixed(1) + 'kg)',
+                  'Fuel penalty: +' + (alphaFuel * p.fuel).toFixed(2) + 's',
+                  'Pure tyre pace: ' + p.yc.toFixed(2) + 's'
+                ];
+                return lines;
+              }
+            }
+          },
+          annotation: {
+            annotations: pitAnnotations
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            title: {display: true, text: 'Lap Number', color: '#7d8590'},
+            ticks: {color: '#7d8590', stepSize: 1, precision: 0},
+            grid: {color: 'rgba(255,255,255,0.05)'}
+          },
+          y: {
+            title: {display: true, text: 'Lap Time (s)', color: '#7d8590'},
+            ticks: {color: '#7d8590'},
+            grid: {color: 'rgba(255,255,255,0.05)'}
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.error('renderLapChart:', e);
+  }
+}
+
+// Auto-load chart after strategy calculation
+var _origCalcStrategy = calculateStrategy;
+calculateStrategy = function() {
+  _origCalcStrategy();
+  // After a brief delay for the strategy results to render, load the chart
+  setTimeout(function() {
+    var car = document.getElementById('strat-car').value.trim();
+    var track = document.getElementById('strat-track').value.trim();
+    if (car && track) renderLapChart(car, track);
+  }, 500);
+};
+
+// ── Toggle race mode (laps vs duration) ────────────────────────────
+
+function toggleStratMode() {
+  var mode = document.getElementById('strat-mode').value;
+  document.getElementById('strat-laps-group').style.display = mode === 'laps' ? '' : 'none';
+  document.getElementById('strat-hours-group').style.display = mode === 'time' ? '' : 'none';
+}

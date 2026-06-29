@@ -25,10 +25,13 @@ class PitStrategist:
 
     def optimize(
         self,
-        laps_remaining: int,
-        current_tyre_age: int,
-        current_fuel: float,
+        laps_remaining: Optional[int] = None,
+        current_tyre_age: int = 1,
+        current_fuel: float = 100.0,
         max_stops: int = 3,
+        # Time-based race support
+        duration_hours: Optional[float] = None,
+        avg_pace: Optional[float] = None,
         # Optional compound recommendation inputs
         laps_history: Optional[List[Dict[str, Any]]] = None,
         weather_forecast: Optional[List[Dict[str, Any]]] = None,
@@ -39,13 +42,32 @@ class PitStrategist:
         Returns a dictionary containing the optimal stops, pit laps, and total time,
         as well as alternatives (1, 2, 3 stops, etc.).
 
+        Supports two modes:
+          - **Fixed laps**: pass `laps_remaining` (e.g. 50-lap sprint).
+          - **Time-based**: pass `duration_hours` (e.g. 6.0 for 6 hours).
+            If `avg_pace` is not given, it's estimated from the model fit at
+            average fuel/age (first stint, half tank).
+
         If `laps_history` is provided, also returns a recommended compound per stint
         (and per alternative) using the same `analysis/compounds.py` recommender.
         """
+        # Time-based → laps conversion
+        if duration_hours is not None and laps_remaining is None:
+            if avg_pace is None:
+                # Estimate pace at half tank, fresh tyres
+                pace = self.model_fit.predict(current_tyre_age, self.fuel_capacity / 2)
+                if pace <= 0:
+                    pace = 100.0  # safety fallback (~1:40)
+            else:
+                pace = avg_pace
+            laps_remaining = int(duration_hours * 3600 / pace)
+            laps_remaining = max(laps_remaining, 1)
+
+        if laps_remaining is None:
+            laps_remaining = 40  # sensible default
         # Convert current fuel level to integer laps remaining
-        fuel_curr_laps = int(current_fuel // self.fuel_consumption)
-        # Ensure we have at least 0 fuel laps
-        fuel_curr_laps = max(0, fuel_curr_laps)
+        # Use / not // to avoid FP floor issues (32.0 // 3.2 = 9.0 on some builds)
+        fuel_curr_laps = max(0, int(round(current_fuel / self.fuel_consumption)))
 
         results = {}
         
@@ -79,7 +101,16 @@ class PitStrategist:
                         best_time = cost
                         best_path = ["stay"] + future_path
 
-                # Option 2: Pit - valid if we have fuel for this lap and stops left
+                # Option 3: Out of fuel, force pit (if stops left)
+                if k_fuel < 1 and stops_left >= 1:
+                    # No lap — immediately pit, then start with full fuel
+                    future_time, future_path = solve(lap_idx, 0, self.L_fuel, stops_left - 1)
+                    cost = self.pit_loss + future_time
+                    if cost < best_time:
+                        best_time = cost
+                        best_path = ["pit"] + future_path
+
+                # Option 2: Pit after completing this lap - valid if we have fuel for this lap and stops left
                 if k_fuel >= 1 and stops_left >= 1:
                     fuel_liters = k_fuel * self.fuel_consumption
                     lap_time_est = self.model_fit.predict(age, fuel_liters)
@@ -135,6 +166,7 @@ class PitStrategist:
         
         return {
             "optimal": optimal_strat,
-            "alternatives": results
+            "alternatives": results,
+            "laps_used": laps_remaining,
         }
 print("Pit strategist module written.")

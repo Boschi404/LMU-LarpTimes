@@ -315,6 +315,7 @@ class TestFastAPIEndpoints:
         database.DEFAULT_DB_PATH = original
 
     def test_root_returns_html(self, client, db_path):
+        database.set_owner_email("test@x.com", db_path=db_path)
         resp = client.get("/")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]

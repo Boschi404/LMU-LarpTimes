@@ -220,6 +220,57 @@ def _migrate_db(conn, cursor) -> None:
             cursor.execute("ALTER TABLE db_users ADD COLUMN email TEXT")
     except Exception:
         pass
+    # Make stint_number nullable if it exists (legacy compatibility)
+    try:
+        cursor.execute("PRAGMA table_info(laps)")
+        for r in cursor.fetchall():
+            if r["name"] == "stint_number" and r["notnull"] == 1:
+                cursor.execute("ALTER TABLE laps RENAME TO laps_old")
+                cursor.execute("""
+                    CREATE TABLE laps_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id INTEGER NOT NULL,
+                        stint_id INTEGER,
+                        lap_number INTEGER NOT NULL,
+                        lap_time REAL NOT NULL,
+                        sector_1 REAL NOT NULL,
+                        sector_2 REAL NOT NULL,
+                        sector_3 REAL NOT NULL,
+                        is_valid_lap INTEGER NOT NULL,
+                        is_pit_in_lap INTEGER NOT NULL,
+                        is_pit_out_lap INTEGER NOT NULL,
+                        compound_front TEXT NOT NULL,
+                        compound_rear TEXT NOT NULL,
+                        tyre_age_laps INTEGER NOT NULL,
+                        wear_pct_start_FL REAL NOT NULL,
+                        wear_pct_start_FR REAL NOT NULL,
+                        wear_pct_start_RL REAL NOT NULL,
+                        wear_pct_start_RR REAL NOT NULL,
+                        wear_pct_end_FL REAL NOT NULL,
+                        wear_pct_end_FR REAL NOT NULL,
+                        wear_pct_end_RL REAL NOT NULL,
+                        wear_pct_end_RR REAL NOT NULL,
+                        fuel_start_l REAL NOT NULL,
+                        fuel_end_l REAL NOT NULL,
+                        fuel_used_l REAL NOT NULL,
+                        track_temp REAL NOT NULL,
+                        ambient_temp REAL NOT NULL,
+                        weather_state TEXT NOT NULL,
+                        rain_intensity REAL NOT NULL,
+                        completed_at TEXT NOT NULL,
+                        anomaly_flag INTEGER NOT NULL DEFAULT 0,
+                        anomaly_reason TEXT,
+                        is_deleted INTEGER NOT NULL DEFAULT 0,
+                        owner_email TEXT,
+                        stint_number INTEGER
+                    )
+                """)
+                cursor.execute("INSERT INTO laps_new SELECT * FROM laps_old")
+                cursor.execute("DROP TABLE laps_old")
+                cursor.execute("ALTER TABLE laps_new RENAME TO laps")
+                print("[Migration] stint_number made nullable")
+    except Exception:
+        pass
     conn.commit()
 
 
@@ -326,9 +377,11 @@ def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
     existing_cols = {r[1] for r in cursor.fetchall()}
 
     # Map new field names to old column names if needed
+    has_stint_id = "stint_id" in existing_cols
+    has_stint_number = "stint_number" in existing_cols
     field_map = {
         "session_id": "session_id",
-        "stint_id": "stint_id" if "stint_id" in existing_cols else "stint_number",
+        "stint_id": "stint_id" if has_stint_id else ("stint_number" if has_stint_number else None),
         "lap_number": "lap_number",
         "lap_time": "lap_time",
         "sector_1": "sector_1",
@@ -357,6 +410,8 @@ def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
         "rain_intensity": "rain_intensity",
         "completed_at": "completed_at",
         "owner_email": "owner_email",  # S-2
+        "anomaly_flag": "anomaly_flag",  # engine core
+        "anomaly_reason": "anomaly_reason",
     }
 
     # Filter to only columns that exist in the table
@@ -373,7 +428,18 @@ def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
             if col_name == "owner_email" and val is None:
                 # Auto-tag: inherit from current owner
                 val = get_owner_email(db_path)
+            if col_name == "anomaly_flag" and val is None:
+                val = 0
+            if col_name == "anomaly_reason" and val is None:
+                val = None
             values.append(val)
+
+    # If both stint_id and stint_number exist, provide stint_number value
+    if has_stint_id and has_stint_number and "stint_number" not in fields:
+        st_id_val = lap_data.get("stint_id")
+        if st_id_val is not None:
+            fields.append("stint_number")
+            values.append(st_id_val)
 
     placeholders = ", ".join(["?"] * len(fields))
     columns = ", ".join(fields)
@@ -569,6 +635,81 @@ def get_pit_stops_loss_by_session(
     rows = cursor.fetchall()
     conn.close()
     return [row["pit_loss"] for row in rows]
+
+
+def get_laps_chart_data(
+    car: str,
+    track: str,
+    compound_front: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Return structured data for the Chart.js lap-evolution chart.
+
+    Returns:
+    {
+        "laps": [{lap_number, lap_time, stint_id, compound, is_pit_in/out,
+                  fuel_start_l, tyre_age_laps, track_temp, weather_state}, ...],
+        "pit_stops": [{lap_number, pit_loss}, ...],
+        "stints": [{stint_number, compound_front, lap_start, lap_end}, ...],
+        "sessions": [{session_uuid, session_type, car, track}, ...]
+    }
+    """
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+
+    # Laps (only active, valid, non-deleted)
+    cursor.execute("""
+        SELECT l.lap_number, l.lap_time, l.stint_id, l.compound_front,
+               l.is_pit_in_lap, l.is_pit_out_lap, l.fuel_start_l,
+               l.tyre_age_laps, l.track_temp, l.weather_state,
+               l.session_id, l.anomaly_flag
+        FROM laps l
+        JOIN sessions s ON l.session_id = s.id
+        WHERE s.car = ? AND s.track = ?
+          AND (l.is_deleted = 0 OR l.is_deleted IS NULL)
+        ORDER BY l.id
+    """, (car, track))
+    laps = [dict(r) for r in cursor.fetchall()]
+
+    # Pit stops
+    cursor.execute("""
+        SELECT p.lap_number, p.pit_loss, p.in_lap_number, p.out_lap_number
+        FROM pit_stops p
+        JOIN sessions s ON p.session_id = s.id
+        WHERE s.car = ? AND s.track = ?
+        ORDER BY p.lap_number
+    """, (car, track))
+    pit_stops = [dict(r) for r in cursor.fetchall()]
+
+    # Stints
+    cursor.execute("""
+        SELECT st.stint_number, st.compound_front, st.start_lap, st.end_lap
+        FROM stints st
+        JOIN sessions s ON st.session_id = s.id
+        WHERE s.car = ? AND s.track = ?
+        ORDER BY st.stint_number
+    """, (car, track))
+    stints = [dict(r) for r in cursor.fetchall()]
+
+    # Active sessions
+    cursor.execute("""
+        SELECT s.session_uuid, s.session_type, s.car, s.track,
+               s.started_at, s.owner_email
+        FROM sessions s
+        WHERE s.car = ? AND s.track = ?
+        ORDER BY s.id DESC
+    """, (car, track))
+    sessions = [dict(r) for r in cursor.fetchall()]
+
+    conn.close()
+
+    return {
+        "laps": laps,
+        "pit_stops": pit_stops,
+        "stints": stints,
+        "sessions": sessions,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════

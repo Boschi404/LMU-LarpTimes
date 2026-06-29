@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LMU LarpTimes — Login</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #0a0e18;
+  color: #f0f4ff;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-card {
+  background: #11151f;
+  border: 1px solid #2d333b;
+  border-radius: 16px;
+  padding: 48px 40px 36px;
+  width: 400px;
+  max-width: 90vw;
+  text-align: center;
+}
+.login-card h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+.login-card .subtitle {
+  color: #7d8590;
+  font-size: 13px;
+  margin-bottom: 32px;
+}
+.login-card .brand-bar {
+  width: 60px; height: 3px;
+  background: linear-gradient(90deg, #1dd1a1, #4a9eff);
+  border-radius: 2px;
+  margin: 0 auto 24px;
+}
+.form-group {
+  text-align: left;
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #7d8590;
+  margin-bottom: 6px;
+}
+.form-group input {
+  width: 100%;
+  padding: 12px 14px;
+  background: #0a0e18;
+  border: 1px solid #2d333b;
+  border-radius: 8px;
+  color: #f0f4ff;
+  font-size: 15px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-group input:focus {
+  border-color: #4a9eff;
+}
+.form-group input::placeholder {
+  color: #505664;
+}
+.login-btn {
+  width: 100%;
+  padding: 12px;
+  background: #4a9eff;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+.login-btn:hover { background: #3a7ecc; }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.error-msg {
+  color: #ff6b6b;
+  font-size: 13px;
+  margin-top: 12px;
+  display: none;
+}
+.info-msg {
+  color: #1dd1a1;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.footer {
+  margin-top: 24px;
+  font-size: 12px;
+  color: #505664;
+}
+/* Password hidden by default */
+#password-group { display: none; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="brand-bar"></div>
+  <h1>LMU LarpTimes</h1>
+  <p class="subtitle">Pit Strategist — Accesso</p>
+
+  <div id="login-form">
+    <div class="form-group">
+      <label for="email">La tua email</label>
+      <input id="email" type="email" placeholder="tu@example.com" autocomplete="email" autofocus>
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Entra</button>
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <p class="footer">Inserisci la tua email per iniziare.<br>
+  I dati restano sul tuo computer.</p>
+</div>
+
+<script>
+async function doLogin() {
+  var btn = document.getElementById('login-btn');
+  var email = document.getElementById('email').value.trim();
+  var err = document.getElementById('error-msg');
+  err.style.display = 'none';
+
+  if (!email) {
+    err.textContent = 'Inserisci un indirizzo email';
+    err.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Accesso in corso...';
+  try {
+    var r = await fetch('/api/owner', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: email})
+    });
+    var d = await r.json();
+    if (r.ok) {
+      window.location.href = '/';
+    } else {
+      err.textContent = d.error || 'Email non valida';
+      err.style.display = 'block';
+    }
+  } catch (e) {
+    err.textContent = 'Errore di rete';
+    err.style.display = 'block';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Entra';
+  return false;
+}
+
+document.getElementById('email').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>

@@ -37,7 +37,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMenu,
-    QWidgetAction, QCheckBox
+    QWidgetAction, QCheckBox, QDialog, QSlider, QPushButton
 )
 
 import database
@@ -140,6 +140,7 @@ class TelemetryWorker(QObject):
     """Runs TelemetrySource polling in a background thread and emits frame signals."""
     frame_ready = Signal(object)       # TelemetryFrame
     lap_completed = Signal(int)        # lap_id in DB
+    race_started = Signal(str, str, str)  # session_uuid, car, track
 
     def __init__(self, source: TelemetrySource, db_path: str):
         super().__init__()
@@ -150,7 +151,10 @@ class TelemetryWorker(QObject):
 
     def start_source(self):
         from telemetry.detector import LapBoundaryDetector
-        self._detector = LapBoundaryDetector(db_path=self.db_path)
+        self._detector = LapBoundaryDetector(
+            db_path=self.db_path,
+            on_race_started=self._race_started_wrapper,
+        )
         self.source.start()
         self._running = True
 
@@ -170,6 +174,10 @@ class TelemetryWorker(QObject):
             self.source.stop()
         except Exception:
             pass
+
+    def _race_started_wrapper(self, session_uuid, car, track):
+        """Called from the detector thread when a RACE or QUALIFYING starts."""
+        self.race_started.emit(session_uuid, car, track)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -749,6 +757,14 @@ class OverlayManager(QObject):
     def on_lap_completed(self, _lap_id: int):
         self._refresh_strategy()
 
+    def on_race_started(self, session_uuid: str, car: str, track: str):
+        """Called when a RACE or QUALIFYING session is detected.
+        Sets session info and triggers immediate strategy calculation."""
+        print(f"[Manager] Race/Qualifying started @ {track} [{car}]")
+        self.set_session_info(car=car, track=track, total_laps=60)
+        self._refresh_strategy()
+        self.audio_engine.play("strategy_changed")
+
     def _estimate_fuel_laps(self, frame: TelemetryFrame) -> float:
         fuel = frame.fuel
         if self._car and self._track:
@@ -838,13 +854,232 @@ class OverlayManager(QObject):
                 self.audio_engine.play("pit_soon")
 
 
+    # ── Settings dialog ────────────────────────────────────────────────
+
+    def open_settings_dialog(self):
+        """Open the full settings modal dialog."""
+        dialog = SettingsDialog(self)
+        dialog.exec()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# Manager tray widget (small ⚙ button that opens the settings menu)
+# SettingsDialog — modal with volume slider, component toggles, etc.
+# ══════════════════════════════════════════════════════════════════════════════
+
+class SettingsDialog(QDialog):
+    """Modal dialog for overlay settings: volume, components, audio, etc."""
+
+    def __init__(self, manager, parent=None):
+        super().__init__(parent)
+        self._manager = manager
+        self._cfg = load_config()
+        self.setWindowTitle("Impostazioni Overlay")
+        self.setMinimumWidth(420)
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {qcolor_hex(BG_0)};
+                color: {qcolor_hex(TEXT_PRIMARY)};
+                border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
+                border-radius: 8px;
+            }}
+            QLabel {{
+                color: {qcolor_hex(TEXT_PRIMARY)};
+                font-family: Geist;
+            }}
+            .section-label {{
+                color: {qcolor_hex(TEXT_MUTED)};
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }}
+            QCheckBox {{
+                color: {qcolor_hex(TEXT_PRIMARY)};
+                font-family: 'JetBrains Mono';
+                spacing: 8px;
+                padding: 4px 0;
+            }}
+            QCheckBox::indicator {{
+                width: 16px; height: 16px;
+                border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
+                background: {qcolor_hex(BG_1)};
+                border-radius: 3px;
+            }}
+            QCheckBox::indicator:checked {{
+                background: {qcolor_hex(ACCENT_BLUE)};
+                border-color: {qcolor_hex(ACCENT_BLUE)};
+            }}
+            QSlider::groove:horizontal {{
+                height: 4px;
+                background: {qcolor_hex(BG_1)};
+                border-radius: 2px;
+            }}
+            QSlider::handle:horizontal {{
+                background: {qcolor_hex(ACCENT_BLUE)};
+                width: 14px; height: 14px;
+                margin: -5px 0;
+                border-radius: 7px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: {qcolor_hex(ACCENT_BLUE)};
+                border-radius: 2px;
+            }}
+            QPushButton {{
+                background: {qcolor_hex(ACCENT_BLUE)};
+                color: {qcolor_hex(TEXT_PRIMARY)};
+                border: none;
+                padding: 6px 16px;
+                border-radius: 4px;
+                font-family: Geist;
+                font-weight: bold;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background: {qcolor_hex(QColor(33, 55, 99))};
+            }}
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 16, 20, 16)
+
+        # ── Title ───────────────────────────────────────────────────────
+        title = QLabel("⚙  Impostazioni")
+        title.setFont(QFont(FONT_TITLE, 14, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # ── Audio section ───────────────────────────────────────────────
+        audio_label = QLabel("SUONI")
+        audio_label.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px; "
+                                  "text-transform: uppercase; letter-spacing: 1px;")
+        layout.addWidget(audio_label)
+
+        self._cb_audio = QCheckBox("Abilita suoni (cue audio)")
+        self._cb_audio.setChecked(self._cfg.get("audio_enabled", True))
+        self._cb_audio.toggled.connect(self._on_audio_toggle)
+        layout.addWidget(self._cb_audio)
+
+        vol_layout = QHBoxLayout()
+        vol_layout.setContentsMargins(24, 0, 0, 0)
+        vol_label = QLabel("Volume:")
+        vol_label.setFont(QFont(FONT_VALUE, 10))
+        vol_label.setFixedWidth(60)
+        self._volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self._volume_slider.setRange(0, 100)
+        self._volume_slider.setValue(int(self._cfg.get("audio_volume", 1.0) * 100))
+        self._volume_slider.valueChanged.connect(self._on_volume_change)
+        self._vol_value = QLabel(f"{self._volume_slider.value()}%")
+        self._vol_value.setFont(QFont(FONT_VALUE, 10))
+        self._vol_value.setFixedWidth(40)
+        vol_layout.addWidget(vol_label)
+        vol_layout.addWidget(self._volume_slider, 1)
+        vol_layout.addWidget(self._vol_value)
+        layout.addLayout(vol_layout)
+
+        test_btn = QPushButton("▶ Test suono")
+        test_btn.clicked.connect(self._on_test_sound)
+        layout.addWidget(test_btn)
+
+        # ── Components section ──────────────────────────────────────────
+        comp_label = QLabel("COMPONENTI VISIBILI")
+        comp_label.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px; "
+                                 "text-transform: uppercase; letter-spacing: 1px;")
+        layout.addWidget(comp_label)
+
+        self._comp_checkboxes = {}
+        for key in COMPONENT_ORDER:
+            cb = QCheckBox(COMPONENT_LABELS[key])
+            cb.setChecked(self._cfg.get(f"{key}_enabled", True))
+            cb.toggled.connect(lambda state, k=key: self._on_comp_toggle(k, state))
+            self._comp_checkboxes[key] = cb
+            layout.addWidget(cb)
+
+        # ── Mode toggles ────────────────────────────────────────────────
+        mode_label = QLabel("MODALITÀ")
+        mode_label.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px; "
+                                 "text-transform: uppercase; letter-spacing: 1px;")
+        layout.addWidget(mode_label)
+
+        self._cb_in_game = QCheckBox("Solo quando in gioco (auto-hide)")
+        self._cb_in_game.setChecked(self._cfg.get("in_game_only", False))
+        self._cb_in_game.toggled.connect(self._on_in_game_toggle)
+        layout.addWidget(self._cb_in_game)
+
+        self._cb_practice = QCheckBox("Practice mode (suggerisci stint)")
+        self._cb_practice.setChecked(self._cfg.get("practice_mode", True))
+        self._cb_practice.toggled.connect(self._on_practice_toggle)
+        layout.addWidget(self._cb_practice)
+
+        # ── Reset buttons ───────────────────────────────────────────────
+        btn_layout = QHBoxLayout()
+        reset_pos = QPushButton("↺ Reset Posizioni")
+        reset_pos.clicked.connect(self._on_reset_positions)
+        hide_all = QPushButton("✕ Nascondi Tutti")
+        hide_all.clicked.connect(self._on_hide_all)
+        btn_layout.addWidget(reset_pos)
+        btn_layout.addWidget(hide_all)
+        layout.addLayout(btn_layout)
+
+        # ── Close ───────────────────────────────────────────────────────
+        close_btn = QPushButton("Chiudi")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+        layout.addStretch()
+
+    # ── Handlers ────────────────────────────────────────────────────────
+
+    def _on_audio_toggle(self, state):
+        self._manager.audio_engine.enabled = state
+        self._cfg["audio_enabled"] = state
+        save_config(self._cfg)
+
+    def _on_volume_change(self, val):
+        volume = val / 100.0
+        self._manager.audio_engine.volume = volume
+        self._cfg["audio_volume"] = volume
+        self._vol_value.setText(f"{val}%")
+        save_config(self._cfg)
+
+    def _on_test_sound(self):
+        self._manager.audio_engine.clear_cooldowns()
+        self._manager.audio_engine.play("pit_now", cooldown=False)
+
+    def _on_comp_toggle(self, key, state):
+        self._cfg[f"{key}_enabled"] = state
+        save_config(self._cfg)
+        ov = self._manager.components.get(key)
+        if ov:
+            if state:
+                ov.show_overlay()
+            else:
+                ov.hide()
+
+    def _on_in_game_toggle(self, state):
+        self._cfg["in_game_only"] = state
+        save_config(self._cfg)
+
+    def _on_practice_toggle(self, state):
+        self._cfg["practice_mode"] = state
+        save_config(self._cfg)
+
+    def _on_reset_positions(self):
+        for ov in self._manager.components.values():
+            ov.reset_position()
+
+    def _on_hide_all(self):
+        self._manager.hide_all()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Manager tray widget (small ⚙ button that opens the settings menu/dialog)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class ManagerTray(QWidget):
-    """A tiny always-on-top widget with a single ⚙ button to open the menu."""
+    """A tiny always-on-top widget with a single ⚙ button to open the settings macro-menu.
+    Left-click → quick menu.  Right-click → drag.  Double-click → settings dialog.
+    """
     menu_requested = Signal(QPoint)  # global position to open menu at
+    settings_requested = Signal()    # open the SettingsDialog
 
     def __init__(self, manager: OverlayManager, cfg: dict):
         super().__init__()
@@ -877,6 +1112,11 @@ class ManagerTray(QWidget):
             self.menu_requested.emit(event.globalPos())
         elif event.button() == Qt.MouseButton.RightButton:
             self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+
+    def mouseDoubleClickEvent(self, event):
+        """Double-click opens the full settings dialog."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.settings_requested.emit()
 
     def mouseMoveEvent(self, event):
         if hasattr(self, "_drag_pos") and self._drag_pos and event.buttons() == Qt.MouseButton.LeftButton:
@@ -914,6 +1154,7 @@ def run_overlay(source: TelemetrySource, db_path: str = database.DEFAULT_DB_PATH
     cfg = load_config()
     tray = ManagerTray(manager, cfg)
     tray.menu_requested.connect(manager.show_settings_menu)
+    tray.settings_requested.connect(manager.open_settings_dialog)
 
     # Hotkey polling timer
     hk_timer = QTimer()
@@ -936,6 +1177,7 @@ def run_overlay(source: TelemetrySource, db_path: str = database.DEFAULT_DB_PATH
     thread.started.connect(worker.start_source)
     worker.frame_ready.connect(manager.update_frame)
     worker.lap_completed.connect(manager.on_lap_completed)
+    worker.race_started.connect(manager.on_race_started)
     thread.start()
 
     # Start the adaptive strategy refresher (re-evaluates every 5s if

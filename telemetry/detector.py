@@ -6,13 +6,15 @@ from telemetry.source import TelemetryFrame
 
 
 class LapBoundaryDetector:
-    def __init__(self, db_path: str = database.DEFAULT_DB_PATH, fallback_pit_loss: float = 30.0, on_session_complete=None):
+    def __init__(self, db_path: str = database.DEFAULT_DB_PATH, fallback_pit_loss: float = 30.0, on_session_complete=None, on_race_started=None):
         self.db_path = db_path
         self.fallback_pit_loss = fallback_pit_loss
         # Optional callback: on_session_complete(session_uuid: str)
         # Fired when a session ends (reset, change, or shutdown).
-        # The overlay can use this to auto-push to the community DB.
         self.on_session_complete = on_session_complete
+        # Optional callback: on_race_started(session_uuid, car, track)
+        # Fired when a new RACE or QUALIFYING session starts.
+        self.on_race_started = on_race_started
         self.session_id: Optional[int] = None
         self.session_uuid: Optional[str] = None
         self.track_name: str = ""
@@ -56,6 +58,12 @@ class LapBoundaryDetector:
             db_path=self.db_path
         )
         print(f"[Detector] New session: {self.session_type} @ {self.track_name} [{self.car_name}] uuid={self.session_uuid}")
+        # Fire race-started callback if this is a race or qualy
+        if self.session_type in ("RACE", "QUALIFYING") and self.on_race_started:
+            try:
+                self.on_race_started(self.session_uuid, self.car_name, self.track_name)
+            except Exception:
+                pass
         self._reset_stint_state(frame)
 
     def _reset_stint_state(self, frame: TelemetryFrame) -> None:

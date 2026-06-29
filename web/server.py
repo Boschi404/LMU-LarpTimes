@@ -83,11 +83,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data:; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://cdn.jsdelivr.net; "
             "frame-ancestors 'none';"
         )
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -176,7 +176,16 @@ def _safe_float(v) -> Optional[float]:
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    """Pagina principale — redirect a /login se nessuna email."""
+    email = database.get_owner_email()
+    if not email:
+        return templates.TemplateResponse(request, "login.html", {"request": request})
     return templates.TemplateResponse(request, "index.html", {"request": request})
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse(request, "login.html", {"request": request})
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -660,6 +669,38 @@ async def get_laps(
     return laps
 
 
+@app.get("/api/laps/chart")
+async def get_laps_chart(
+    car: str,
+    track: str,
+    compound: Optional[str] = None,
+):
+    """
+    Return structured chart data for the lap-evolution graph.
+    Used by the Chart.js visualisation on the Strategia page.
+    """
+    data = database.get_laps_chart_data(
+        car=car, track=track, compound_front=compound,
+    )
+
+    # Attach degradation curve if there are enough laps
+    if len(data["laps"]) >= 5:
+        from analysis.models import fit_degradation_model
+        clean_laps = database.get_laps_for_analysis(car, track, compound_front=compound)
+        if len(clean_laps) >= 5:
+            model = fit_degradation_model(clean_laps)
+            max_age = max(l["tyre_age_laps"] for l in clean_laps)
+            data["degradation"] = {
+                "curve": [
+                    {"age": a, "predicted": round(model.predict(a, 50), 3)}
+                    for a in range(1, max_age + 2)
+                ],
+                "params": model.to_dict(),
+            }
+
+    return data
+
+
 @app.get("/api/owner")
 async def get_owner():
     """Return the current local owner email (or empty string)."""
@@ -676,6 +717,48 @@ async def set_owner(request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
     return {"email": new_email or ""}
+
+
+@app.post("/api/seed")
+async def seed_sample_data():
+    """
+    Crea 20 giri di esempio per testare l'app.
+    Usa Le Mans/Ferrari se nessun altro dato esiste.
+    """
+    import database as _db
+    laps = _db.get_all_laps_for_archive()
+    if laps and len(laps) > 5:
+        return {"ok": False, "created": 0, "message": "Hai già dati — cancella il DB per rigenerare"}
+    sid = _db.create_session(track="Le Mans", layout="GP", car="Ferrari 499P", session_type="RACE")
+    stint = _db.create_stint(session_id=sid, stint_number=1, compound_front="Medium",
+                             compound_rear="Medium", start_lap=1, start_fuel_l=100)
+    for i in range(1, 21):
+        _db.insert_lap({
+            "session_id": sid, "stint_id": stint, "lap_number": i,
+            "lap_time": 220 + i * 0.4 + (5 if i % 7 == 0 else 0),
+            "sector_1": 75, "sector_2": 80, "sector_3": 65 + i - 1,
+            "is_valid_lap": 1, "is_pit_in_lap": 0, "is_pit_out_lap": 0,
+            "compound_front": "Medium", "compound_rear": "Medium",
+            "tyre_age_laps": i,
+            "wear_pct_start_FL": 5 * i, "wear_pct_start_FR": 5 * i,
+            "wear_pct_start_RL": 4 * i, "wear_pct_start_RR": 4 * i,
+            "wear_pct_end_FL": 5 * (i + 1), "wear_pct_end_FR": 5 * (i + 1),
+            "wear_pct_end_RL": 4 * (i + 1), "wear_pct_end_RR": 4 * (i + 1),
+            "fuel_start_l": 100 - 4 * i, "fuel_end_l": 96 - 4 * i,
+            "fuel_used_l": 4, "track_temp": 28, "ambient_temp": 20,
+            "weather_state": "DRY", "rain_intensity": 0,
+            "completed_at": f"2026-01-01T10:{i:02d}:00",
+        })
+    owner = _db.get_owner_email()
+    if owner:
+        # Backfill with owner email
+        import sqlite3
+        conn = _db.get_db_connection()
+        conn.execute("UPDATE sessions SET owner_email = ? WHERE id = ?", (owner, sid))
+        conn.execute("UPDATE laps SET owner_email = ? WHERE session_id = ?", (owner, sid))
+        conn.commit()
+        conn.close()
+    return {"ok": True, "created": 20, "message": "20 giri di esempio creati! Ricarica la pagina."}
 
 
 @app.post("/api/laps/{lap_id}/delete")
@@ -788,7 +871,8 @@ async def get_strategy(
     car: str,
     track: str,
     compound: Optional[str] = None,
-    laps_remaining: int = 40,
+    laps_remaining: Optional[int] = None,
+    duration_hours: Optional[float] = None,
     current_tyre_age: int = 1,
     current_fuel: float = 100.0,
     fuel_capacity: float = 100.0,
@@ -838,6 +922,7 @@ async def get_strategy(
 
     result = strat.optimize(
         laps_remaining=laps_remaining,
+        duration_hours=duration_hours,
         current_tyre_age=current_tyre_age,
         current_fuel=current_fuel,
         max_stops=max_stops,
@@ -850,7 +935,8 @@ async def get_strategy(
         "car": car,
         "track": track,
         "compound": compound,
-        "laps_remaining": laps_remaining,
+        "laps_remaining": result.get("laps_used", laps_remaining),
+        "duration_hours": duration_hours,
         "mean_fuel_consumption": round(mean_fuel, 3),
         "pit_loss_seconds": round(pit_loss, 1),
         "current_weather": {

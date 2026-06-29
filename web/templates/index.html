@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LMU LarpTimes - Telemetry & Race Strategy</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -618,10 +619,20 @@
       <h2>Tyre Degradation Analysis</h2>
 
       <div id="owner-bar" class="card" style="display:flex;align-items:center;gap:12px;padding:10px 16px;margin-bottom:16px;">
-        <span style="color:var(--text-secondary);font-size:12px;text-transform:uppercase;letter-spacing:1px;">La tua email</span>
-        <input id="owner-email-input" type="email" placeholder="tu@example.com" style="flex:1;max-width:320px;padding:6px 10px;background:var(--bg-1);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);">
-        <button class="btn" id="owner-save-btn" onclick="saveOwner()">Salva</button>
-        <span id="owner-status" style="font-size:12px;color:var(--text-muted);"></span>
+        <span style="color:var(--text-secondary);font-size:12px;text-transform:uppercase;letter-spacing:1px;">User</span>
+        <span id="owner-display" style="flex:1;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;">—</span>
+        <button class="btn" id="owner-change-btn" onclick="window.location.href='/login'" style="font-size:11px;">Cambia</button>
+      </div>
+
+      <div id="welcome-banner" class="card" style="display:none;padding:20px;margin-bottom:16px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">🏁</div>
+        <h3 style="margin:0 0 8px;">Benvenuto in LMU LarpTimes!</h3>
+        <p style="color:var(--text-secondary);margin:0 0 16px;font-size:13px;">
+          Non hai ancora giri salvati. Crea dati di esempio per testare tutte le funzionalità.
+        </p>
+        <button class="btn btn-primary" id="seed-btn" onclick="seedData()"
+          style="padding:10px 24px;font-size:13px;">Crea 20 giri di esempio</button>
+        <span id="seed-status" style="margin-left:12px;font-size:12px;"></span>
       </div>
 
       <div class="filter-bar">
@@ -776,8 +787,19 @@
           </select>
         </div>
         <div class="filter-group">
-          <label for="strat-laps">Laps Rem.</label>
+          <label for="strat-mode">Tipo gara</label>
+          <select id="strat-mode" onchange="toggleStratMode()" style="width:100px;padding:4px 6px;background:var(--bg-1);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;">
+            <option value="laps">Giri fissi</option>
+            <option value="time">A tempo (ore)</option>
+          </select>
+        </div>
+        <div class="filter-group" id="strat-laps-group">
+          <label for="strat-laps">Laps</label>
           <input type="number" id="strat-laps" value="40" min="1" max="500" class="text-right" style="width:90px"/>
+        </div>
+        <div class="filter-group" id="strat-hours-group" style="display:none;">
+          <label for="strat-hours">Ore</label>
+          <input type="number" id="strat-hours" value="6" min="0.5" max="24" step="0.5" class="text-right" style="width:90px"/>
         </div>
         <div class="filter-group">
           <label for="strat-fuel">Current Fuel (L)</label>
@@ -806,6 +828,11 @@
 
         <div class="section-label" style="margin-top: 2rem">Execution Telemetry</div>
         <div id="strat-detail" class="table-container" style="padding: 1.5rem"></div>
+
+        <div class="section-label" style="margin-top: 2rem">Lap Time Evolution</div>
+        <div style="position:relative; width:100%; max-width:1000px; height:400px; margin-bottom:2rem;">
+          <canvas id="strat-chart"></canvas>
+        </div>
       </div>
     </section>
 
@@ -918,6 +945,6 @@
 
   </main>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=3"></script>
 </body>
 </html>
