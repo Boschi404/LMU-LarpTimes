@@ -32,6 +32,7 @@ import database
 from analysis.anomaly import detect_anomalies_for_session
 from analysis.models import fit_degradation_model, fit_fuel_model, DegradationModelFit
 from analysis.strategist import PitStrategist
+from analysis.qualifying import QualifyingAnalyst
 from analysis.weather import linear_rain_forecast, build_stint_weather_forecast
 
 import paths
@@ -945,4 +946,42 @@ async def get_strategy(
             "track_temp": track_temp,
         },
         "result": result
+    }
+
+
+@app.get("/api/qualifying")
+async def get_qualifying_analysis(
+    car: str,
+    track: str,
+    compound: Optional[str] = None,
+    fuel_capacity: float = 100.0,
+    target_hotlaps: int = 2,
+    safety_buffer_laps: float = 0.3,
+):
+    """Analisi qualifica: classifica outlap/hotlap/inlap e suggerimenti."""
+    laps = database.get_laps_for_analysis(car, track, compound_front=compound)
+    if len(laps) < 3:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": f"Dati insufficienti: servono almeno 3 giri, trovati {len(laps)}."
+            }
+        )
+
+    model = fit_degradation_model(laps)
+    _, mean_fuel = fit_fuel_model(laps)
+
+    analyst = QualifyingAnalyst(
+        fuel_consumption_lap=mean_fuel,
+        model_fit=model,
+        target_hotlaps=target_hotlaps,
+        safety_buffer_laps=safety_buffer_laps,
+    )
+    result = analyst.analyze(laps)
+
+    return {
+        "car": car,
+        "track": track,
+        "mean_fuel_consumption": round(mean_fuel, 3),
+        "result": result,
     }

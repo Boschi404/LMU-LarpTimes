@@ -31,6 +31,7 @@ import database
 from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
+from analysis.qualifying import QualifyingAnalyst
 from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRefresher
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -91,6 +92,7 @@ class TelemetryWorker(QObject):
     frame_ready = Signal(object)
     lap_completed = Signal(int)
     race_started = Signal(str, str, str)  # session_uuid, car, track
+    qualifying_started = Signal(str, str, str)  # session_uuid, car, track
 
     def __init__(self, source: TelemetrySource, db_path: str):
         super().__init__()
@@ -104,6 +106,7 @@ class TelemetryWorker(QObject):
         self._detector = LapBoundaryDetector(
             db_path=self.db_path,
             on_race_started=self._race_wrapper,
+            on_qualifying_started=self._qualifying_wrapper,
         )
         self.source.start()
         self._running = True
@@ -126,6 +129,9 @@ class TelemetryWorker(QObject):
 
     def _race_wrapper(self, session_uuid, car, track):
         self.race_started.emit(session_uuid, car, track)
+
+    def _qualifying_wrapper(self, session_uuid, car, track):
+        self.qualifying_started.emit(session_uuid, car, track)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -271,6 +277,8 @@ class OverlayWidget(QWidget):
         self._pit_plan: Optional[List[int]] = None
         self._total_race_laps: int = 0
         self._current_lap: int = 1
+        self._session_type: Optional[str] = None
+        self._qualy_data: Optional[Dict[str, Any]] = None
 
         self._user_wants_visible = True
 
@@ -416,6 +424,15 @@ class OverlayWidget(QWidget):
         self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; padding: 2px;")
         self._lbl_warning.setVisible(False)
         outer.addWidget(self._lbl_warning)
+
+        # Qualifying info (hidden by default)
+        self._lbl_qualy = QLabel("")
+        self._lbl_qualy.setFont(QFont(FONT_VALUE, 8, QFont.Weight.Bold))
+        self._lbl_qualy.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; padding: 2px;")
+        self._lbl_qualy.setVisible(False)
+        self._lbl_qualy.setWordWrap(True)
+        outer.addWidget(self._lbl_qualy)
         self.setLayout(outer)
 
     # ── Paint ───────────────────────────────────────────────────────────────
@@ -552,6 +569,10 @@ class OverlayWidget(QWidget):
         # Pit
         self._update_pit()
 
+        # Qualifying
+        if self._session_type == "QUALIFYING":
+            self._run_qualifying_analysis()
+
         # Weather
         self._lbl_weather.setText(frame.weather_state or "\u2014")
         self._lbl_track_temp.setText(f"{frame.track_temp:.0f}\u00b0")
@@ -588,13 +609,25 @@ class OverlayWidget(QWidget):
     # ── Strategy ────────────────────────────────────────────────────────────
 
     def on_lap_completed(self, _lap_id: int):
-        self._refresh_strategy()
+        if self._session_type == "QUALIFYING":
+            self._run_qualifying_analysis()
+        else:
+            self._refresh_strategy()
 
     def on_race_started(self, session_uuid: str, car: str, track: str):
-        print(f"[FullOverlay] Race/Qualifying started @ {track} [{car}]")
+        print(f"[FullOverlay] Race started @ {track} [{car}]")
+        self._session_type = "RACE"
+        self._lbl_qualy.setVisible(False)
         self.set_session_info(car=car, track=track, total_laps=60)
         self._refresh_strategy()
         self.audio_engine.play("strategy_changed")
+
+    def on_qualifying_started(self, session_uuid: str, car: str, track: str):
+        print(f"[FullOverlay] Qualifying started @ {track} [{car}]")
+        self._session_type = "QUALIFYING"
+        self._qualy_data = None
+        self._lbl_qualy.setVisible(True)
+        self.set_session_info(car=car, track=track, total_laps=60)
 
     def set_session_info(self, car: str, track: str, total_laps: int = 40):
         self._car = car
@@ -603,6 +636,49 @@ class OverlayWidget(QWidget):
 
     def set_pit_plan(self, pit_laps: List[int]):
         self._pit_plan = pit_laps
+
+    def _run_qualifying_analysis(self):
+        if not self._car or not self._track:
+            return
+        try:
+            all_laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+            if len(all_laps) < 3:
+                self._qualy_data = None
+                self._lbl_qualy.setText("⏳ collecting data…")
+                return
+            _, mean_cons = fit_fuel_model(all_laps)
+            model = fit_degradation_model(all_laps)
+            analyst = QualifyingAnalyst(fuel_consumption_lap=mean_cons, model_fit=model)
+            self._qualy_data = analyst.analyze(all_laps)
+
+            # Build display text
+            lines = []
+            best = self._qualy_data.get("best_hotlap_time")
+            hotlaps = self._qualy_data.get("num_hotlaps", 0)
+            fuel_save = self._qualy_data.get("fuel_saving_potential", 0)
+            out_delta = self._qualy_data.get("outlap_delta_from_hot")
+            in_delta = self._qualy_data.get("inlap_delta_from_hot")
+            if best:
+                lines.append(f"🎯 {best:.1f}s")
+            if hotlaps:
+                lines.append(f"🔥 {hotlaps}x")
+            if fuel_save > 0.5:
+                lines.append(f"💧 -{fuel_save:.1f}L")
+            if out_delta is not None:
+                lines.append(f"🛞 Out +{out_delta:.1f}s")
+            if in_delta is not None:
+                lines.append(f"🏁 In +{in_delta:.1f}s")
+            # Suggestions
+            for s in self._qualy_data.get("suggestions", [])[:2]:
+                lines.append(s)
+            self._lbl_qualy.setText("  ".join(lines))
+            self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; padding: 2px; font-size: 7px;")
+            for s in self._qualy_data.get("suggestions", []):
+                print(f"  [Qualy] {s}")
+        except Exception as e:
+            print(f"  [Qualy] Error: {e}")
+            self._qualy_data = None
+            self._lbl_qualy.setText("—")
 
     def _estimate_fuel_laps(self, frame: TelemetryFrame) -> float:
         fuel = frame.fuel
@@ -678,6 +754,7 @@ def run_overlay(source: TelemetrySource, db_path: str = database.DEFAULT_DB_PATH
     worker.frame_ready.connect(overlay.update_frame)
     worker.lap_completed.connect(overlay.on_lap_completed)
     worker.race_started.connect(overlay.on_race_started)
+    worker.qualifying_started.connect(overlay.on_qualifying_started)
     thread.start()
 
     overlay.refresher.start()

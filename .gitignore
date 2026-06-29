@@ -164,4 +164,3 @@ build/
 dist/
 build_env/
 *.spec
-*.bat
