@@ -58,6 +58,18 @@ class AudioEngine:
         self._last_play: Dict[str, float] = {}  # cue_name → monotonic time
         self.cooldown_sec = 5.0  # never play the same cue more than once / 5s
         self._platform = platform.system()
+        # Resolve relative audio paths to absolute (based on the app root)
+        self._cues: Dict[str, str] = {}
+        self._resolve_paths()
+
+    def _resolve_paths(self):
+        """Convert relative audio paths to absolute using paths.base_dir()."""
+        import paths as _paths
+        for cue, rel_path in self.DEFAULT_CUES.items():
+            if not os.path.isabs(rel_path):
+                self._cues[cue] = _paths.data_path(rel_path)
+            else:
+                self._cues[cue] = rel_path
 
     def play(self, cue: str, cooldown: bool = True) -> bool:
         """
@@ -70,7 +82,7 @@ class AudioEngine:
             last = self._last_play.get(cue, 0.0)
             if (time.monotonic() - last) < self.cooldown_sec:
                 return False
-        path = self.DEFAULT_CUES.get(cue, "")
+        path = self._cues.get(cue, "")
         if not path:
             return False
         # Check file exists (otherwise no-op gracefully)
