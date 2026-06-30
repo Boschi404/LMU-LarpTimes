@@ -22,13 +22,15 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, Request, Response, HTTPException, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import database
+from auth.manager import AuthManager
+from auth.db import init_auth_db, User
 from analysis.anomaly import detect_anomalies_for_session
 from analysis.models import fit_degradation_model, fit_fuel_model, DegradationModelFit
 from analysis.strategist import PitStrategist
@@ -139,6 +141,7 @@ def _validate_import_payload(payload: Any) -> Optional[str]:
 @asynccontextmanager
 async def lifespan(app):
     database.init_db()
+    init_auth_db()
     # Security audit on startup (silent — only warnings/criticals shown)
     try:
         from security.self_audit import run_audit as _run_audit
@@ -172,22 +175,91 @@ def _safe_float(v) -> Optional[float]:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Auth dependency
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def require_user(request: Request) -> User:
+    """Extract the authenticated user from the Authorization header."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Auth required")
+    token = auth[7:]
+    user = AuthManager.verify_token(token)
+    if not user:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    # Also set owner_email so all DB operations auto-tag with this user
+    if user.email:
+        database.set_owner_email(user.email, db_path=database.DEFAULT_DB_PATH)
+    return user
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Auth API
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.post("/api/auth/register")
+async def register(request: Request):
+    """Crea un account con email + password."""
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    password = body.get("password") or ""
+    display_name = (body.get("display_name") or email.split("@")[0]).strip()
+    if not email or "@" not in email:
+        return JSONResponse(status_code=400, content={"error": "Email non valida"})
+    if len(password) < 4:
+        return JSONResponse(status_code=400, content={"error": "Password troppo corta (min 4 caratteri)"})
+    try:
+        user = AuthManager.register_email(email=email, password=password, display_name=display_name)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+    token = AuthManager.get_token()
+    return {"user": user.to_dict(), "token": token}
+
+
+@app.post("/api/auth/login")
+async def login(request: Request):
+    """Login con email + password."""
+    body = await request.json()
+    email = (body.get("email") or "").strip().lower()
+    password = body.get("password") or ""
+    if not email:
+        return JSONResponse(status_code=400, content={"error": "Email richiesta"})
+    user = AuthManager.login_email(email, password)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Email o password errati"})
+    token = AuthManager.get_token()
+    return {"user": user.to_dict(), "token": token}
+
+
+@app.post("/api/auth/logout")
+async def logout(current_user: User = Depends(require_user)):
+    """Logout."""
+    AuthManager.logout()
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+async def me(current_user: User = Depends(require_user)):
+    """Restituisce i dati dell'utente loggato."""
+    return {"user": current_user.to_dict()}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Pages
 # ──────────────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Pagina principale — redirect a /login se nessuna email."""
-    email = database.get_owner_email()
-    if not email:
-        return templates.TemplateResponse(request, "login.html", {"request": request})
+    """Pagina principale — login required."""
     return templates.TemplateResponse(request, "index.html", {"request": request})
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
+    """Pagina di login/registrazione."""
     return templates.TemplateResponse(request, "login.html", {"request": request})
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # API — Sessioni
@@ -703,14 +775,15 @@ async def get_laps_chart(
 
 
 @app.get("/api/owner")
-async def get_owner():
-    """Return the current local owner email (or empty string)."""
+async def get_owner(request: Request):
+    """Return the current user's email from auth."""
+    # Fallback for backward compat
     return {"email": database.get_owner_email() or ""}
 
 
 @app.post("/api/owner")
 async def set_owner(request: Request):
-    """Set the local owner email. Body: {"email": "..."} or {"email": null}."""
+    """Set the owner email — only works if already authenticated."""
     body = await request.json()
     email = body.get("email")
     try:

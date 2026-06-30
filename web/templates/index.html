@@ -604,6 +604,10 @@
     </nav>
 
     <div class="sidebar-footer">
+      <div id="sidebar-user" style="padding: 4px 0; font-size: 11px; color: #7d8590; display: flex; align-items: center; gap: 8px;">
+        <span id="sidebar-username" style="flex: 1; overflow: hidden; text-overflow: ellipsis;"></span>
+        <button id="logout-btn" style="background: none; border: 1px solid #2d333b; color: #7d8590; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; display: none;">Esci</button>
+      </div>
       <div class="overlay-toggle-wrapper">
         <label for="overlay-in-game-toggle">In-Game Overlay</label>
         <button class="btn" id="overlay-in-game-toggle" onclick="toggleOverlayMode()" style="padding: 4px 10px; font-size:0.75rem; height: auto; min-width: 40px;">OFF</button>
@@ -945,6 +949,63 @@
 
   </main>
 
+<script>
+// ── Auth check ──────────────────────────────────────────────────────
+(function() {
+  const token = localStorage.getItem('token');
+  const userData = localStorage.getItem('user');
+
+  if (!token) {
+    window.location.href = '/login';
+    return;
+  }
+
+  // Override fetch to auto-add Bearer token
+  const origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    if (token) {
+      opts.headers['Authorization'] = 'Bearer ' + token;
+    }
+    return origFetch(url, opts).then(function(resp) {
+      if (resp.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      return resp;
+    });
+  };
+
+  // Add user info to the sidebar once DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    if (userData) {
+      try {
+        var user = JSON.parse(userData);
+        var nameEl = document.getElementById('sidebar-username');
+        var logoutBtn = document.getElementById('logout-btn');
+        if (nameEl) {
+          nameEl.textContent = user.display_name || user.email || 'utente';
+        }
+        if (logoutBtn) {
+          logoutBtn.style.display = 'inline-block';
+          logoutBtn.onclick = function() {
+            origFetch('/api/auth/logout', {
+              method: 'POST',
+              headers: {'Authorization': 'Bearer ' + localStorage.getItem('token'), 'Content-Type': 'application/json'}
+            }).finally(function() {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            });
+          };
+        }
+      } catch(e) {}
+    }
+  });
+})();
+</script>
 <script src="/static/app.js?v=3"></script>
 </body>
 </html>
