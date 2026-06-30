@@ -1,7 +1,7 @@
 @echo off
 pushd "%~dp0"
 if exist ".venv\Scripts\python.exe" (
-    .venv\Scripts\python.exe run_overlay_new.py
+    .venv\Scripts\python.exe run_overlay_live.py --modular
     exit /b %ERRORLEVEL%
 )
 echo Virtual environment not found.
@@ -10,5 +10,5 @@ echo Example:
 echo    python -m venv .venv
 echo    .\.venv\Scripts\Activate.ps1
 echo    python -m pip install -r requirements.txt
-echo    python run_overlay_new.py
+echo    python run_overlay_live.py --modular
 exit /b 1
