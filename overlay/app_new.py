@@ -44,7 +44,7 @@ import database
 from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
-from analysis.qualifying import QualifyingAnalyst, classify_qualifying_laps
+from analysis.qualifying import QualifyingAnalyst, classify_qualifying_laps, TYRE_COLD, TYRE_IN_WINDOW, TYRE_DEGRADED
 from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import (
     AudioEngine, PracticeAdvisor, StrategyRefresher,
@@ -640,10 +640,28 @@ class QualifyingOverlay(MiniOverlay):
             if hotlaps_opt is not None and hotlaps_opt > 0:
                 lines.append(f"{hotlaps_opt}x hotlap/run")
 
+        # Determine tyre window indicator color
+        indicator_color = ACCENT_GREEN
+        if tyre_window:
+            lc = tyre_window.get("laps_classified", [])
+            if lc:
+                hotlap_states = [
+                    l.get("tyre_state") for l in lc
+                    if l.get("role") == "hotlap"
+                ]
+                if not hotlap_states:
+                    hotlap_states = [l.get("tyre_state") for l in lc]
+                if TYRE_IN_WINDOW in hotlap_states:
+                    indicator_color = ACCENT_GREEN
+                elif TYRE_COLD in hotlap_states:
+                    indicator_color = ACCENT_AMBER
+                else:
+                    indicator_color = ACCENT_RED
+
         if lines:
             text = " | ".join(lines)
             self._value.setText(text)
-            self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; font-size: 10px;")
+            self._value.setStyleSheet(f"color: {qcolor_hex(indicator_color)}; font-size: 10px;")
         else:
             self._value.setText("⏳ collecting data…")
             self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")

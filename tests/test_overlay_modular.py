@@ -110,9 +110,9 @@ def test_mini_overlay_disabled_does_not_show(tmp_config_path, qt_app):
 def test_delta_overlay_rendering(tmp_config_path, qt_app):
     from overlay.app_new import DeltaOverlay, load_config
     ov = DeltaOverlay(load_config())
-    # Positive delta → red
-    ov.update_value(0.5)
-    assert "+0.500" in ov._value.text()
+    # Positive delta >= 1 → red
+    ov.update_value(1.5)
+    assert "+1.500" in ov._value.text()
     assert "rgb(255, 107, 107)" in ov._value.styleSheet() or "ff6b6b" in ov._value.styleSheet().lower()
     # Negative delta → green
     ov.update_value(-0.123)
@@ -185,9 +185,10 @@ def test_pit_overlay_past_only(tmp_config_path, qt_app):
 def test_overlay_manager_creates_all_components(tmp_config_path, qt_app):
     from overlay.app_new import OverlayManager
     mgr = OverlayManager()
-    assert set(mgr.components.keys()) == {"delta", "fuel", "cliff", "pit"}
+    expected = {"delta", "fuel", "cliff", "pit", "weather", "wear", "compound", "sectors", "qualy", "practice"}
+    assert set(mgr.components.keys()) == expected
     for ov in mgr.components.values():
-        assert ov.component_key in {"delta", "fuel", "cliff", "pit"}
+        assert ov.component_key in expected
     # Warning overlay exists
     assert mgr.warning_ov is not None
     mgr.hide_all()

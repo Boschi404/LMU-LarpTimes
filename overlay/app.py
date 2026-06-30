@@ -31,7 +31,7 @@ import database
 from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
-from analysis.qualifying import QualifyingAnalyst
+from analysis.qualifying import QualifyingAnalyst, TYRE_COLD, TYRE_IN_WINDOW, TYRE_DEGRADED
 from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRefresher
 
@@ -730,7 +730,10 @@ class OverlayWidget(QWidget):
             # Tyre temp window
             tyre_window = self._qualy_data.get("tyre_temp_window")
             if tyre_window:
+                # Message (strip duplicate emoji, app_new style)
                 msg = tyre_window.get("tyre_window_message", "")
+                if msg:
+                    lines.append(msg.replace("🛞 ", ""))
                 best_in = tyre_window.get("best_in_window")
                 best_out = tyre_window.get("best_outside_window")
                 if best_in and best_out:
@@ -740,11 +743,28 @@ class OverlayWidget(QWidget):
                 hotlaps_opt = tyre_window.get("optimal_hotlaps_count")
                 if hotlaps_opt is not None and hotlaps_opt > 0:
                     lines.append(f"{hotlaps_opt}x/run")
+            # Tyre window indicator color
+            indicator_color = ACCENT_GREEN
+            if tyre_window:
+                lc = tyre_window.get("laps_classified", [])
+                if lc:
+                    hotlap_states = [
+                        l.get("tyre_state") for l in lc
+                        if l.get("role") == "hotlap"
+                    ]
+                    if not hotlap_states:
+                        hotlap_states = [l.get("tyre_state") for l in lc]
+                    if TYRE_IN_WINDOW in hotlap_states:
+                        indicator_color = ACCENT_GREEN
+                    elif TYRE_COLD in hotlap_states:
+                        indicator_color = ACCENT_AMBER
+                    else:
+                        indicator_color = ACCENT_RED
             # Suggestions
             for s in self._qualy_data.get("suggestions", [])[:2]:
                 lines.append(s)
             self._lbl_qualy.setText("  ".join(lines))
-            self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; padding: 2px; font-size: 7px;")
+            self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(indicator_color)}; padding: 2px; font-size: 7px;")
             for s in self._qualy_data.get("suggestions", []):
                 print(f"  [Qualy] {s}")
         except Exception as e:

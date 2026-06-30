@@ -743,10 +743,14 @@ async def get_laps(
 
 
 @app.get("/api/laps/compare")
-async def get_laps_compare(car: str, track: str):
-    """Return all valid laps for a given car+track combo, ordered by lap_number ASC."""
+async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = None):
+    """Return all valid laps, optionally filtered by car+track, ordered by lap_number ASC."""
     laps = database.get_all_laps_for_archive(include_deleted=False)
-    filtered = [l for l in laps if l.get("car") == car and l.get("track") == track]
+    filtered = laps
+    if car:
+        filtered = [l for l in filtered if l.get("car") == car]
+    if track:
+        filtered = [l for l in filtered if l.get("track") == track]
     valid = [l for l in filtered if l.get("is_valid_lap") == 1 and not l.get("anomaly_flag")]
     valid.sort(key=lambda l: l.get("lap_number", 0))
     return [

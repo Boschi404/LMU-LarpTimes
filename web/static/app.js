@@ -4,6 +4,7 @@ function showPage(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('btn-' + name).classList.add('active');
+  restoreFilters(name);
   if (name === 'archivio') {
     loadLaps(true);
     startLapAutoRefresh();
@@ -14,6 +15,7 @@ function showPage(name) {
   } else {
     stopLapAutoRefresh();
   }
+  saveFilters(name);
 }
 
 async function populateFilters() {
@@ -48,12 +50,30 @@ async function populateFilters() {
     fillSelect('strat-track', tracks);
     fillSelect('comp-car', cars);
     fillSelect('comp-track', tracks);
+
+    // Restore saved filter values
+    restoreFilters('all');
+
+    // Wire up filter change listeners for auto-save
+    var filterSelectors = ['prof-car','prof-track','prof-compound','arch-car','arch-track','arch-compound','arch-deleted','strat-car','strat-track','setup-car','setup-track','comp-car','comp-track'];
+    filterSelectors.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('change', function() {
+          // Determine which page this filter belongs to
+          var prefix = id.split('-')[0];
+          var pageMap = {prof:'profilo', arch:'archivio', strat:'strategia', setup:'setup', comp:'compare'};
+          saveFilters(pageMap[prefix] || 'all');
+        });
+      }
+    });
   } catch (e) {
     console.error('Failed to populate filters:', e);
   }
 }
 
 populateFilters();
+startOfflineDetection();
 
 let _overlayInGameOnly = false;
 
@@ -80,7 +100,7 @@ async function toggleOverlayMode() {
     _overlayInGameOnly = d.in_game_only;
     updateOverlayToggleUI();
   } catch (e) {
-    alert('Errore salvataggio impostazioni overlay: ' + e.message);
+    showToast('Errore salvataggio impostazioni overlay: ' + e.message, 'error');
     _overlayInGameOnly = !_overlayInGameOnly;
     updateOverlayToggleUI();
   }
@@ -104,6 +124,144 @@ function fmtTime(secs) {
   const m = Math.floor(secs / 60);
   const s = (secs % 60).toFixed(3).padStart(6, '0');
   return m > 0 ? m + ':' + s : s + ' s';
+}
+
+/* ─── Toast Notifications ───────────────────────────────────────── */
+function showToast(message, type) {
+  type = type || 'info';
+  var container = document.getElementById('toast-container');
+  if (!container) return;
+  var toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  toast.textContent = message;
+  toast.addEventListener('click', function() {
+    toast.classList.add('toast-out');
+    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+  });
+  container.appendChild(toast);
+  var delay = type === 'error' ? 6000 : 4000;
+  setTimeout(function() {
+    if (toast.parentNode) {
+      toast.classList.add('toast-out');
+      setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+    }
+  }, delay);
+}
+
+/* ─── Loading Spinner ───────────────────────────────────────────── */
+function showLoading(containerId, message) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  // Remove any existing overlay first
+  hideLoading(containerId);
+  // Save original display state
+  if (!el.getAttribute('data-orig-display')) {
+    el.setAttribute('data-orig-display', el.style.display || '');
+  }
+  var overlay = document.createElement('div');
+  overlay.className = 'loading-overlay';
+  overlay.id = containerId + '-loading';
+  overlay.innerHTML = '<div class="spinner"></div><div class="spinner-text">' + (message || 'Caricamento...') + '</div>';
+  el.appendChild(overlay);
+  el.style.display = 'block';
+}
+
+function hideLoading(containerId) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  var overlay = document.getElementById(containerId + '-loading');
+  if (overlay && overlay.parentNode) {
+    overlay.parentNode.removeChild(overlay);
+  }
+  // Restore original display state
+  var origDisplay = el.getAttribute('data-orig-display');
+  if (origDisplay !== null) {
+    el.style.display = origDisplay;
+    el.removeAttribute('data-orig-display');
+  }
+}
+
+/* ─── Pagination State ──────────────────────────────────────────── */
+var _pageSize = 50;
+var _currentPage = 1;
+
+/* ─── Persistent Filters via localStorage ───────────────────────── */
+function saveFilters(page) {
+  var selectors = [];
+  if (page === 'profilo' || page === 'all') selectors.push('prof-car', 'prof-track', 'prof-compound');
+  if (page === 'archivio' || page === 'all') selectors.push('arch-car', 'arch-track', 'arch-compound', 'arch-deleted');
+  if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track');
+  if (page === 'setup' || page === 'all') selectors.push('setup-car', 'setup-track');
+  if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track');
+  selectors.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      try { localStorage.setItem('filter_' + id, el.value); } catch(e) {}
+    }
+  });
+}
+
+function restoreFilters(page) {
+  var selectors = [];
+  if (page === 'profilo' || page === 'all') selectors.push('prof-car', 'prof-track', 'prof-compound');
+  if (page === 'archivio' || page === 'all') selectors.push('arch-car', 'arch-track', 'arch-compound', 'arch-deleted');
+  if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track');
+  if (page === 'setup' || page === 'all') selectors.push('setup-car', 'setup-track');
+  if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track');
+  selectors.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      try {
+        var saved = localStorage.getItem('filter_' + id);
+        if (saved !== null) el.value = saved;
+      } catch(e) {}
+    }
+  });
+}
+
+/* ─── Offline Detection ─────────────────────────────────────────── */
+var _offlineCheckTimer = null;
+
+function isOnline() {
+  return new Promise(function(resolve) {
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 3000);
+    fetch('/api/laps?limit=1', { signal: controller.signal })
+      .then(function(r) {
+        clearTimeout(timeoutId);
+        resolve(true);
+      })
+      .catch(function() {
+        clearTimeout(timeoutId);
+        resolve(false);
+      });
+  });
+}
+
+function showOfflineBanner() {
+  var banner = document.getElementById('offline-banner');
+  if (banner) banner.style.display = 'block';
+}
+
+function hideOfflineBanner() {
+  var banner = document.getElementById('offline-banner');
+  if (banner) banner.style.display = 'none';
+}
+
+function checkOnlineStatus() {
+  isOnline().then(function(online) {
+    if (online) {
+      hideOfflineBanner();
+    } else {
+      showOfflineBanner();
+    }
+  });
+}
+
+function startOfflineDetection() {
+  if (_offlineCheckTimer) clearInterval(_offlineCheckTimer);
+  checkOnlineStatus();
+  _offlineCheckTimer = setInterval(checkOnlineStatus, 15000);
 }
 
 /* ─── Degradation Chart ──────────────────────────────────────────── */
@@ -182,7 +340,9 @@ async function loadProfile() {
   const car   = document.getElementById('prof-car').value.trim();
   const track = document.getElementById('prof-track').value.trim();
   const comp  = document.getElementById('prof-compound').value.trim();
-  if (!car || !track) { alert('Inserisci auto e pista.'); return; }
+  if (!car || !track) { showToast('Inserisci auto e pista.', 'warning'); return; }
+
+  showLoading('prof-stats-area', 'Analisi in corso...');
 
   let url = '/api/profile?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track);
   if (comp) url += '&compound=' + encodeURIComponent(comp);
@@ -190,6 +350,8 @@ async function loadProfile() {
   try {
     const res = await fetch(url);
     const d   = await res.json();
+
+    hideLoading('prof-stats-area');
 
     const warnDiv = document.getElementById('prof-warning');
     if (d.warning) {
@@ -225,7 +387,8 @@ async function loadProfile() {
       buildDegradChart(d.degradation_curve, d.raw_points);
     }
   } catch (e) {
-    alert('Errore fetch profilo: ' + e.message);
+    hideLoading('prof-stats-area');
+    showToast('Errore fetch profilo: ' + e.message, 'error');
   }
 }
 
@@ -265,16 +428,17 @@ async function loadLaps(silent) {
 
   const tbody = document.getElementById('laps-tbody');
   if (!silent) {
-    tbody.innerHTML = '<tr><td colspan="19" class="text-mono" style="color:var(--ink-muted); text-align:center;">Fetching...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="19"><div class="spinner-container"><div class="spinner"></div><div class="spinner-text">Fetching laps...</div></div></td></tr>';
   }
 
   try {
     const res = await fetch(url);
     _lapsData = await res.json();
+    _currentPage = 1;
     renderLapsTable();
   } catch (e) {
     if (!silent) {
-      tbody.innerHTML = '<tr><td colspan="17" class="text-mono" style="color:var(--status-invalid); text-align:center;">Error: ' + e.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="19" class="text-mono" style="color:var(--accent-red); text-align:center;">Error: ' + e.message + '</td></tr>';
     }
   }
 }
@@ -293,20 +457,26 @@ function renderLapsTable() {
     return _sortAsc ? (av < bv ? -1 : 1) : (av > bv ? -1 : 1);
   });
 
+  var totalPages = Math.max(1, Math.ceil(data.length / _pageSize));
+  if (_currentPage > totalPages) _currentPage = totalPages;
+  var startIdx = (_currentPage - 1) * _pageSize;
+  var pageData = data.slice(startIdx, startIdx + _pageSize);
+
   var tbody = document.getElementById('laps-tbody');
-  if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="19" class="text-mono" style="color:var(--ink-muted); text-align:center;">Nessun giro trovato.</td></tr>';
+  if (!pageData.length) {
+    tbody.innerHTML = '<tr><td colspan="19" class="text-mono" style="color:var(--text-muted); text-align:center;">Nessun giro trovato.</td></tr>';
+    renderPagination(0, 0);
     return;
   }
 
   var html = '';
-  for (var i = 0; i < data.length; i++) {
-    var l = data[i];
+  for (var i = 0; i < pageData.length; i++) {
+    var l = pageData[i];
     var deleted = l.is_deleted === 1;
     var cls = deleted ? ' class="deleted"' : '';
     var validBadge = l.is_valid_lap ? '<span class="badge badge-valid">VALID</span>' : '<span class="badge badge-invalid">INVALID</span>';
     var pitBadge = l.is_pit_in_lap ? '<span class="badge badge-pit">IN</span> ' : (l.is_pit_out_lap ? '<span class="badge badge-pit">OUT</span> ' : '');
-    var anomStr = l.anomaly_flag ? '<span style="color:var(--status-warn); cursor:help;" title="' + (l.anomaly_reason || 'Anomalia rilevata') + '">\u26a0\ufe0f</span>' : '';
+    var anomStr = l.anomaly_flag ? '<span style="color:var(--accent-orange); cursor:help;" title="' + (l.anomaly_reason || 'Anomalia rilevata') + '">\u26a0\ufe0f</span>' : '';
 
     var action = deleted
       ? '<button class="btn btn-restore" onclick="restoreLap(' + l.id + ')">Restore</button>'
@@ -316,7 +486,7 @@ function renderLapsTable() {
     var wearEnd = l.wear_pct_end_FL != null ? l.wear_pct_end_FL.toFixed(0) + '%' : '—';
     var wearBadge = '—';
     if (l.wear_pct_start_FL != null && l.wear_pct_end_FL != null) {
-      var wColor = l.wear_pct_end_FL > 50 ? 'var(--status-invalid)' : 'var(--ink-secondary)';
+      var wColor = l.wear_pct_end_FL > 50 ? 'var(--accent-red)' : 'var(--text-secondary)';
       wearBadge = '<span style="font-size:0.75rem; color:' + wColor + '">' + wearStart + ' \u2192 ' + wearEnd + '</span>';
     }
 
@@ -350,6 +520,55 @@ function renderLapsTable() {
   }
 
   tbody.innerHTML = html;
+  renderPagination(data.length, totalPages);
+}
+
+function renderPagination(totalItems, totalPages) {
+  var container = document.getElementById('laps-pagination');
+  if (!container) return;
+  if (totalItems === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  var html = '';
+  // Prev button
+  html += '<button class="page-btn" onclick="goToPage(' + (_currentPage - 1) + ')"' + (_currentPage <= 1 ? ' disabled' : '') + '>‹ Prev</button>';
+
+  // Page numbers
+  var startPage = Math.max(1, _currentPage - 2);
+  var endPage = Math.min(totalPages, _currentPage + 2);
+  if (endPage - startPage < 4) {
+    if (startPage === 1) endPage = Math.min(totalPages, startPage + 4);
+    else startPage = Math.max(1, endPage - 4);
+  }
+
+  if (startPage > 1) {
+    html += '<button class="page-btn" onclick="goToPage(1)">1</button>';
+    if (startPage > 2) html += '<span class="page-info">…</span>';
+  }
+
+  for (var p = startPage; p <= endPage; p++) {
+    html += '<button class="page-btn' + (p === _currentPage ? ' active' : '') + '" onclick="goToPage(' + p + ')">' + p + '</button>';
+  }
+
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) html += '<span class="page-info">…</span>';
+    html += '<button class="page-btn" onclick="goToPage(' + totalPages + ')">' + totalPages + '</button>';
+  }
+
+  // Next button
+  html += '<button class="page-btn" onclick="goToPage(' + (_currentPage + 1) + ')"' + (_currentPage >= totalPages ? ' disabled' : '') + '>Next ›</button>';
+
+  // Info
+  html += '<span class="page-info">' + ((_currentPage - 1) * _pageSize + 1) + '–' + Math.min(_currentPage * _pageSize, totalItems) + ' of ' + totalItems + '</span>';
+
+  container.innerHTML = html;
+}
+
+function goToPage(page) {
+  _currentPage = page;
+  renderLapsTable();
 }
 
 async function deleteLap(id) {
@@ -374,10 +593,11 @@ async function calculateStrategy() {
   var formation = document.getElementById('strat-formation').checked;
   var mode = document.getElementById('strat-mode').value;
 
-  if (!car || !track) { alert('Inserisci auto e pista.'); return; }
+  if (!car || !track) { showToast('Inserisci auto e pista.', 'warning'); return; }
 
   document.getElementById('strat-error').style.display = 'none';
   document.getElementById('strat-results').style.display = 'none';
+  showLoading('strat-results', 'Calcolo strategia...');
 
   var url = '/api/strategy?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track) +
     '&current_fuel=' + fuel + '&fuel_capacity=' + capacity + '&max_stops=' + maxstops;
@@ -391,6 +611,8 @@ async function calculateStrategy() {
   try {
     var res = await fetch(url);
     var d   = await res.json();
+
+    hideLoading('strat-results');
 
     if (!res.ok) {
       document.getElementById('strat-error-text').textContent = d.error || 'Errore sconosciuto.';
@@ -445,6 +667,7 @@ async function calculateStrategy() {
 
     document.getElementById('strat-results').style.display = 'block';
   } catch (e) {
+    hideLoading('strat-results');
     document.getElementById('strat-error-text').textContent = 'Network error: ' + e.message;
     document.getElementById('strat-error').style.display = 'flex';
   }
@@ -456,22 +679,23 @@ async function loadSetupAdvice() {
   var track = document.getElementById('setup-track').value.trim();
 
   if (!car || !track) {
-    alert('Inserisci auto e pista.');
+    showToast('Inserisci auto e pista.', 'warning');
     return;
   }
 
   document.getElementById('setup-error').style.display = 'none';
   document.getElementById('setup-content').style.display = 'none';
-  document.getElementById('setup-loading').style.display = 'flex';
+  showLoading('setup-loading', 'Analyzing telemetry data...');
 
   try {
     var res = await fetch('/api/setup?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track));
     var d = await res.json();
 
+    hideLoading('setup-loading');
+
     if (!res.ok || d.insufficient_data) {
       document.getElementById('setup-error-text').textContent = d.message || 'Insufficient data for setup analysis.';
       document.getElementById('setup-error').style.display = 'flex';
-      document.getElementById('setup-loading').style.display = 'none';
       return;
     }
 
@@ -544,11 +768,11 @@ async function loadSetupAdvice() {
     tempTbody.innerHTML = tHtml;
 
     document.getElementById('setup-content').style.display = 'block';
-    document.getElementById('setup-loading').style.display = 'none';
+    hideLoading('setup-loading');
   } catch (e) {
+    hideLoading('setup-loading');
     document.getElementById('setup-error-text').textContent = 'Network error: ' + e.message;
     document.getElementById('setup-error').style.display = 'flex';
-    document.getElementById('setup-loading').style.display = 'none';
   }
 }
 
@@ -874,13 +1098,17 @@ async function loadLapComparison() {
   const track = document.getElementById('comp-track').value.trim();
 
   if (!car || !track) {
-    alert('Select car and track.');
+    showToast('Select car and track.', 'warning');
     return;
   }
+
+  showLoading('comp-results', 'Caricamento giri...');
 
   try {
     const res = await fetch('/api/laps/compare?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track));
     _compLapsData = await res.json();
+
+    hideLoading('comp-results');
 
     const selA = document.getElementById('comp-lap-a');
     const selB = document.getElementById('comp-lap-b');
@@ -907,8 +1135,9 @@ async function loadLapComparison() {
       renderLapComparison();
     }
   } catch (e) {
+    hideLoading('comp-results');
     console.error('loadLapComparison:', e);
-    alert('Error loading laps: ' + e.message);
+    showToast('Error loading laps: ' + e.message, 'error');
   }
 }
 
