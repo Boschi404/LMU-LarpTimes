@@ -169,16 +169,32 @@ def _wait_for_server(timeout: float = 10.0) -> bool:
 
 
 def _launch_overlay_subprocess():
-    """Launch overlay as a separate process so PySide6 errors don't kill the launcher."""
+    """Launch overlay as a separate process, respecting the overlay_mode setting."""
+    # Check the overlay config for the desired mode
+    overlay_mode = "full"  # default
+    try:
+        import json as _json
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "overlay", "overlay_config.json")
+        if os.path.exists(config_path):
+            with open(config_path) as _f:
+                _cfg = _json.load(_f)
+                overlay_mode = _cfg.get("overlay_mode", "full")
+    except Exception:
+        pass
+
     if getattr(sys, 'frozen', False):
         overlay_path = os.path.join(os.path.dirname(sys.executable), "LMU Overlay.exe")
         cmd = [overlay_path]
+        if overlay_mode == "modular":
+            cmd.append("--modular")
     else:
         script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_overlay_live.py")
         python_exe = sys.executable
         cmd = [python_exe, script_path]
+        if overlay_mode == "modular":
+            cmd.append("--modular")
 
-    print(f"[Launcher] Launching overlay: {' '.join(cmd)}")
+    print(f"[Launcher] Launching overlay ({overlay_mode} mode): {' '.join(cmd)}")
     try:
         proc = subprocess.Popen(
             cmd,
