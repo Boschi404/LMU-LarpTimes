@@ -132,66 +132,17 @@ class AudioEngine:
 
 class PracticeAdvisor:
     """
-    Suggests practice actions when there isn't enough data to make a
-    reliable strategy call.
+    Suggests practice actions based on data coverage analysis.
 
-    For each (car, track, compound) we want at least N clean laps before
-    we trust the degradation model. If the count is below the threshold,
-    we return a list of human-readable suggestions.
+    Uses the `analyze_practice_data()` function from `analysis.practice`
+    to determine what data is still needed.
     """
-
-    MIN_LAPS_PER_COMPOUND = 8
-    MIN_LAPS_PER_CAR_TRACK = 12
 
     @staticmethod
     def advise(laps_for_car_track: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        suggestions: List[Dict[str, Any]] = []
-
-        if not laps_for_car_track:
-            return [{
-                "type": "no_data",
-                "priority": "high",
-                "title": "Nessun dato per questa combinazione",
-                "message": (
-                    "Fai 12-15 giri di pratica con mescola Media per "
-                    "iniziare a costruire il modello di degrado."
-                ),
-            }]
-
-        # Per-compound counts
-        by_compound: Dict[str, int] = {}
-        for l in laps_for_car_track:
-            c = l.get("compound_front") or l.get("compound") or "Unknown"
-            by_compound[c] = by_compound.get(c, 0) + 1
-
-        # Total
-        total = len(laps_for_car_track)
-        if total < PracticeAdvisor.MIN_LAPS_PER_CAR_TRACK:
-            suggestions.append({
-                "type": "few_laps",
-                "priority": "high" if total < 5 else "medium",
-                "title": f"Solo {total} giri registrati",
-                "message": (
-                    f"Servono almeno {PracticeAdvisor.MIN_LAPS_PER_CAR_TRACK} giri "
-                    "per stime affidabili. Continua a guidare in pratica."
-                ),
-            })
-
-        # Missing compounds
-        for c, threshold in [("Soft", 6), ("Medium", 8), ("Hard", 6)]:
-            if by_compound.get(c, 0) < threshold:
-                suggestions.append({
-                    "type": "missing_compound",
-                    "priority": "low",
-                    "title": f"Pochi dati su {c}",
-                    "message": (
-                        f"Hai solo {by_compound.get(c, 0)} giri con {c}. "
-                        f"Prova uno stint di {threshold - by_compound.get(c, 0)} giri "
-                        f"per migliorare le stime su questa mescola."
-                    ),
-                })
-
-        return suggestions
+        from analysis.practice import analyze_practice_data
+        result = analyze_practice_data(laps_for_car_track)
+        return result.get("suggestions", [])
 
 
 # ══════════════════════════════════════════════════════════════════════════════

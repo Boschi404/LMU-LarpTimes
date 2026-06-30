@@ -45,6 +45,7 @@ from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst, classify_qualifying_laps
+from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import (
     AudioEngine, PracticeAdvisor, StrategyRefresher,
 )
@@ -78,15 +79,17 @@ DEFAULT_POSITIONS = {
     "cliff": (390, 50),
     "pit":   (560, 50),
     "qualy": (50, 120),
+    "practice": (50, 190),
 }
 # Logical order of components
-COMPONENT_ORDER = ["delta", "fuel", "cliff", "pit", "qualy"]
+COMPONENT_ORDER = ["delta", "fuel", "cliff", "pit", "qualy", "practice"]
 COMPONENT_LABELS = {
     "delta": "Delta",
     "fuel":  "Carburante",
     "cliff": "Cliff gomme",
     "pit":   "Pit stop",
     "qualy": "Qualifica",
+    "practice": "Pratica",
 }
 
 
@@ -110,6 +113,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "cliff_x": 390, "cliff_y": 50,  "cliff_vis": True, "cliff_enabled": True,
     "pit_x":   560, "pit_y": 50,  "pit_vis":   True, "pit_enabled":   True,
     "qualy_x": 50,  "qualy_y": 120, "qualy_vis": True, "qualy_enabled": True,
+    "practice_x": 50, "practice_y": 190, "practice_vis": True, "practice_enabled": True,
     # Global toggles
     "in_game_only": False,
     # Audio
@@ -428,6 +432,44 @@ class PitOverlay(MiniOverlay):
         self._value.setStyleSheet(f"color: {color};")
 
 
+class PracticeOverlay(MiniOverlay):
+    """Shows practice data analysis: fuel range, tyre age, compound coverage."""
+    component_key = "practice"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText("PRATICA".upper())
+        self._value.setFont(QFont(FONT_VALUE, 10, QFont.Weight.Bold))
+
+    def update_value(self, practice_data: Optional[Dict[str, Any]] = None, **_unused):
+        if practice_data is None:
+            self._value.setText("⏳")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")
+            return
+
+        total = practice_data.get("total_laps", 0)
+        fuel = practice_data.get("fuel", {})
+        tyre = practice_data.get("tyre", {})
+        compounds = practice_data.get("compounds", [])
+        suggestions = practice_data.get("suggestions", [])
+
+        lines = [f"{total} giri"]
+        if fuel.get("range_lap", 0) > 0:
+            lines.append(f"⛽ {fuel['min_l']}-{fuel['max_l']}L")
+        if tyre.get("range_laps", 0) > 0:
+            lines.append(f"🛞 gomme {tyre['min_age']}-{tyre['max_age']}g")
+        if compounds:
+            lines.append(f"🔘 {'/'.join(compounds)}")
+
+        if suggestions:
+            # Show the most important suggestion
+            top = max(suggestions, key=lambda s: {"high": 3, "medium": 2, "low": 1}.get(s.get("priority", "low"), 0))
+            lines.append(f"▶ {top.get('message', '')[:60]}")
+
+        text = " | ".join(lines)
+        self._value.setText(text)
+        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; font-size: 9px;")
+
 class QualifyingOverlay(MiniOverlay):
     """Shows qualifying-specific info: best hotlap, fuel saving, outlap/inlap delta."""
     component_key = "qualy"
@@ -535,12 +577,14 @@ class OverlayManager(QObject):
         self.cliff_ov = CliffOverlay(self._cfg, db_path)
         self.pit_ov   = PitOverlay(self._cfg, db_path)
         self.qualy_ov = QualifyingOverlay(self._cfg, db_path)
+        self.practice_ov = PracticeOverlay(self._cfg, db_path)
         self.components: Dict[str, MiniOverlay] = {
             "delta": self.delta_ov,
             "fuel":  self.fuel_ov,
             "cliff": self.cliff_ov,
             "pit":   self.pit_ov,
             "qualy": self.qualy_ov,
+            "practice": self.practice_ov,
         }
         self.warning_ov = WarningOverlay(self._cfg)
 
@@ -802,6 +846,10 @@ class OverlayManager(QObject):
         if self._session_type == "QUALIFYING":
             self._run_qualifying_analysis()
 
+        # Practice overlay
+        if self._session_type is None or self._session_type == "PRACTICE":
+            self._update_practice_analysis()
+
         # Warning
         if fuel_laps < 2 and not frame.in_pits:
             self.warning_ov.show_warning("LOW FUEL", critical=True)
@@ -914,6 +962,18 @@ class OverlayManager(QObject):
             print(f"  [Qualy] Error: {e}")
             self._qualy_data = None
             self.qualy_ov.update_value(None)
+
+    def _update_practice_analysis(self):
+        """Analyse practice data and show coverage gaps in the overlay."""
+        if not self._car or not self._track:
+            return
+        try:
+            all_laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+            result = analyze_practice_data(all_laps)
+            self.practice_ov.update_value(result)
+        except Exception as e:
+            print(f"  [Practice] Error: {e}")
+            self.practice_ov.update_value(None)
 
     def set_session_info(self, car: str, track: str, total_laps: int = 40):
         self._car = car

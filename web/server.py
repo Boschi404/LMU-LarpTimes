@@ -985,3 +985,21 @@ async def get_qualifying_analysis(
         "mean_fuel_consumption": round(mean_fuel, 3),
         "result": result,
     }
+
+
+@app.get("/api/practice")
+async def get_practice_analysis(
+    car: str,
+    track: str,
+    compound: Optional[str] = None,
+):
+    """Analisi dati di pratica: copertura carburante, gomme, mescole."""
+    from analysis.practice import analyze_practice_data
+
+    laps = database.get_laps_for_analysis(car, track, compound_front=compound)
+    result = analyze_practice_data(laps)
+    return {
+        "car": car,
+        "track": track,
+        "result": result,
+    }

@@ -32,6 +32,7 @@ from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst
+from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRefresher
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -573,6 +574,10 @@ class OverlayWidget(QWidget):
         if self._session_type == "QUALIFYING":
             self._run_qualifying_analysis()
 
+        # Practice
+        if self._session_type is None or self._session_type == "PRACTICE":
+            self._update_practice_analysis()
+
         # Weather
         self._lbl_weather.setText(frame.weather_state or "\u2014")
         self._lbl_track_temp.setText(f"{frame.track_temp:.0f}\u00b0")
@@ -735,6 +740,37 @@ class OverlayWidget(QWidget):
             nxt = next((l for l in self._pit_plan if l >= self._current_lap), None)
             if nxt is not None and (nxt - self._current_lap) <= 2:
                 self.audio_engine.play("pit_soon")
+
+    def _update_practice_analysis(self):
+        """Analyse practice data coverage and show in the qualy label."""
+        if not self._car or not self._track:
+            return
+        try:
+            all_laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+            result = analyze_practice_data(all_laps)
+            fuel = result.get("fuel", {})
+            tyre = result.get("tyre", {})
+            comps = result.get("compounds", [])
+            total = result.get("total_laps", 0)
+            suggestions = result.get("suggestions", [])
+
+            lines = [f"{total} giri"]
+            if fuel.get("range_l", 0) > 0:
+                lines.append(f"⛽{fuel['min_l']}-{fuel['max_l']}L")
+            if tyre.get("range_laps", 0) > 0:
+                lines.append(f"🛞{tyre['min_age']}-{tyre['max_age']}g")
+            if comps:
+                lines.append(f"{'/'.join(comps)}")
+            if suggestions:
+                top = max(suggestions, key=lambda s: {"high": 3, "medium": 2, "low": 1}.get(s.get("priority", "low"), 0))
+                lines.append(f"→ {top.get('message', '')[:50]}")
+
+            self._lbl_qualy.setText("  ".join(lines))
+            self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; padding: 2px; font-size: 7px;")
+            if not self._lbl_qualy.isVisible():
+                self._lbl_qualy.setVisible(True)
+        except Exception as e:
+            print(f"  [Practice] Error: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
