@@ -24,7 +24,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
-    QSizePolicy, QMenu, QDialog, QCheckBox, QSlider, QPushButton
+    QSizePolicy, QMenu, QDialog, QCheckBox, QSlider, QPushButton, QRadioButton
 )
 
 import database
@@ -223,6 +223,26 @@ class SettingsDialog(QDialog):
         self._cb_pr.toggled.connect(lambda s: self._save("practice_mode", s))
         layout.addWidget(self._cb_pr)
 
+        # Overlay mode toggle
+        mode_label = QLabel("MODO OVERLAY")
+        mode_label.setStyleSheet("color: #7d8590; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
+        layout.addWidget(mode_label)
+        mode_layout = QHBoxLayout()
+        self._rb_full = QRadioButton("Full (1 finestra)")
+        self._rb_modular = QRadioButton("Modulare (finestre multiple)")
+        full_mode = self._cfg.get("overlay_mode", "full") == "full"
+        self._rb_full.setChecked(full_mode)
+        self._rb_modular.setChecked(not full_mode)
+        for rb in [self._rb_full, self._rb_modular]:
+            rb.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; font-family: Geist; font-size: 12px;")
+            rb.toggled.connect(self._on_mode_change)
+        mode_layout.addWidget(self._rb_full)
+        mode_layout.addWidget(self._rb_modular)
+        layout.addLayout(mode_layout)
+        mode_hint = QLabel("Il cambio modalità richiede il riavvio dell'overlay")
+        mode_hint.setStyleSheet("color: #505664; font-size: 10px;")
+        layout.addWidget(mode_hint)
+
         # Buttons
         bh = QHBoxLayout()
         rp = QPushButton("Reset posizione")
@@ -257,6 +277,11 @@ class SettingsDialog(QDialog):
 
     def _save(self, k, v):
         self._cfg[k] = v
+        save_config(self._cfg)
+
+    def _on_mode_change(self):
+        new_mode = "full" if self._rb_full.isChecked() else "modular"
+        self._cfg["overlay_mode"] = new_mode
         save_config(self._cfg)
 
 
@@ -362,8 +387,26 @@ class OverlayWidget(QWidget):
         self._lbl_track_car.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
         self._lbl_track_car.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; letter-spacing: 1px;")
         self._lbl_track_car.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        # Settings gear button
+        self._btn_settings = QPushButton("⚙")
+        self._btn_settings.setFixedSize(22, 22)
+        self._btn_settings.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
+                border-radius: 4px; color: {qcolor_hex(TEXT_SECONDARY)};
+                font-size: 12px; padding: 0;
+            }}
+            QPushButton:hover {{
+                background: {qcolor_hex(BG_2)}; color: {qcolor_hex(TEXT_PRIMARY)};
+            }}
+        """)
+        self._btn_settings.clicked.connect(self.open_settings_dialog)
+
         hdr.addWidget(self._lbl_brand)
         hdr.addStretch()
+        hdr.addWidget(self._btn_settings)
+        hdr.addSpacing(6)
         hdr.addWidget(self._lbl_track_car)
         outer.addLayout(hdr)
 

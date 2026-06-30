@@ -37,7 +37,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMenu,
-    QWidgetAction, QCheckBox, QDialog, QSlider, QPushButton
+    QWidgetAction, QCheckBox, QDialog, QSlider, QPushButton, QRadioButton
 )
 
 import database
@@ -78,16 +78,24 @@ DEFAULT_POSITIONS = {
     "fuel":  (220, 50),
     "cliff": (390, 50),
     "pit":   (560, 50),
-    "qualy": (50, 120),
-    "practice": (50, 190),
+    "weather": (50, 120),
+    "wear": (220, 120),
+    "compound": (390, 120),
+    "sectors": (560, 120),
+    "qualy": (50, 190),
+    "practice": (50, 260),
 }
 # Logical order of components
-COMPONENT_ORDER = ["delta", "fuel", "cliff", "pit", "qualy", "practice"]
+COMPONENT_ORDER = ["delta", "fuel", "cliff", "pit", "weather", "wear", "compound", "sectors", "qualy", "practice"]
 COMPONENT_LABELS = {
     "delta": "Delta",
     "fuel":  "Carburante",
     "cliff": "Cliff gomme",
     "pit":   "Pit stop",
+    "weather": "Meteo",
+    "wear": "Usura gomme",
+    "compound": "Mescola",
+    "sectors": "Settori",
     "qualy": "Qualifica",
     "practice": "Pratica",
 }
@@ -112,8 +120,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "fuel_x":  220, "fuel_y": 50,  "fuel_vis":  True, "fuel_enabled":  True,
     "cliff_x": 390, "cliff_y": 50,  "cliff_vis": True, "cliff_enabled": True,
     "pit_x":   560, "pit_y": 50,  "pit_vis":   True, "pit_enabled":   True,
-    "qualy_x": 50,  "qualy_y": 120, "qualy_vis": True, "qualy_enabled": True,
-    "practice_x": 50, "practice_y": 190, "practice_vis": True, "practice_enabled": True,
+    "weather_x": 50,  "weather_y": 120, "weather_vis": True, "weather_enabled": True,
+    "wear_x": 220, "wear_y": 120, "wear_vis": True, "wear_enabled": True,
+    "compound_x": 390, "compound_y": 120, "compound_vis": True, "compound_enabled": True,
+    "sectors_x": 560, "sectors_y": 120, "sectors_vis": True, "sectors_enabled": True,
+    "qualy_x": 50,  "qualy_y": 190, "qualy_vis": True, "qualy_enabled": True,
+    "practice_x": 50, "practice_y": 260, "practice_vis": True, "practice_enabled": True,
     # Global toggles
     "in_game_only": False,
     # Audio
@@ -432,6 +444,92 @@ class PitOverlay(MiniOverlay):
         self._value.setStyleSheet(f"color: {color};")
 
 
+class WeatherOverlay(MiniOverlay):
+    """Shows weather, track temp, ambient temp."""
+    component_key = "weather"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText("METEO".upper())
+        self._value.setFont(QFont(FONT_VALUE, 12, QFont.Weight.Bold))
+
+    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+        if frame is None or not frame.weather_state:
+            self._value.setText("—")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            return
+        w = frame.weather_state or "—"
+        tt = f"{frame.track_temp:.0f}°" if frame.track_temp else "—"
+        at = f"{frame.ambient_temp:.0f}°" if frame.ambient_temp else "—"
+        rain = f"🌧{frame.rain_intensity:.0%}" if frame.rain_intensity > 0 else ""
+        parts = [w, f"pista {tt}", f"aria {at}"]
+        if rain:
+            parts.append(rain)
+        self._value.setText(" | ".join(parts))
+        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; font-size: 9px;")
+
+
+class WearOverlay(MiniOverlay):
+    """Shows tyre wear percentages."""
+    component_key = "wear"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText("USURA GOMME".upper())
+        self._value.setFont(QFont(FONT_VALUE, 11, QFont.Weight.Bold))
+
+    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+        if frame is None:
+            self._value.setText("—")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            return
+        w = [(1.0 - w) * 100.0 for w in frame.tyre_wear]
+        text = f"FL {w[0]:.0f}%  FR {w[1]:.0f}%  RL {w[2]:.0f}%  RR {w[3]:.0f}%"
+        color = qcolor_hex(ACCENT_AMBER) if min(w) < 40 else qcolor_hex(TEXT_PRIMARY)
+        self._value.setText(text)
+        self._value.setStyleSheet(f"color: {color}; font-size: 9px;")
+
+
+class CompoundOverlay(MiniOverlay):
+    """Shows current tyre compound."""
+    component_key = "compound"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText("MESCOLA".upper())
+        self._value.setFont(QFont(FONT_VALUE, 12, QFont.Weight.Bold))
+
+    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+        if frame is None:
+            self._value.setText("—")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            return
+        compound = frame.tyre_compounds[0] or "—"
+        self._value.setText(compound)
+        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)};")
+
+
+class SectorsOverlay(MiniOverlay):
+    """Shows sector times for the current lap."""
+    component_key = "sectors"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText("SETTORI".upper())
+        self._value.setFont(QFont(FONT_VALUE, 11, QFont.Weight.Bold))
+
+    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+        if frame is None:
+            self._value.setText("—")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            return
+        s1 = frame.last_sector1 if frame.last_sector1 else 0
+        s2 = frame.last_sector2 - frame.last_sector1 if (frame.last_sector2 and frame.last_sector1) else 0
+        s3 = frame.last_lap_time - frame.last_sector2 if (frame.last_lap_time and frame.last_sector2) else 0
+        self._value.setText(f"S1 {s1:.1f}s  S2 {s2:.1f}s  S3 {s3:.1f}s")
+        self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; font-size: 9px;")
+
+
 class PracticeOverlay(MiniOverlay):
     """Shows practice data analysis: fuel range, tyre age, compound coverage."""
     component_key = "practice"
@@ -578,11 +676,19 @@ class OverlayManager(QObject):
         self.pit_ov   = PitOverlay(self._cfg, db_path)
         self.qualy_ov = QualifyingOverlay(self._cfg, db_path)
         self.practice_ov = PracticeOverlay(self._cfg, db_path)
+        self.weather_ov = WeatherOverlay(self._cfg, db_path)
+        self.wear_ov = WearOverlay(self._cfg, db_path)
+        self.compound_ov = CompoundOverlay(self._cfg, db_path)
+        self.sectors_ov = SectorsOverlay(self._cfg, db_path)
         self.components: Dict[str, MiniOverlay] = {
             "delta": self.delta_ov,
             "fuel":  self.fuel_ov,
             "cliff": self.cliff_ov,
             "pit":   self.pit_ov,
+            "weather": self.weather_ov,
+            "wear": self.wear_ov,
+            "compound": self.compound_ov,
+            "sectors": self.sectors_ov,
             "qualy": self.qualy_ov,
             "practice": self.practice_ov,
         }
@@ -838,6 +944,18 @@ class OverlayManager(QObject):
         # Cliff
         cliff_laps = self._estimate_cliff_laps(frame)
         self.cliff_ov.update_value(cliff_laps)
+
+        # Weather
+        self.weather_ov.update_value(frame)
+
+        # Wear
+        self.wear_ov.update_value(frame)
+
+        # Compound
+        self.compound_ov.update_value(frame)
+
+        # Sectors
+        self.sectors_ov.update_value(frame)
 
         # Pit
         self._update_pit_display()
@@ -1169,6 +1287,26 @@ class SettingsDialog(QDialog):
         self._cb_practice.toggled.connect(self._on_practice_toggle)
         layout.addWidget(self._cb_practice)
 
+        # ── Overlay mode ──────────────────────────────────────────────
+        mode_label = QLabel("MODO OVERLAY")
+        mode_label.setStyleSheet("color: #7d8590; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
+        layout.addWidget(mode_label)
+        mode_layout = QHBoxLayout()
+        self._rb_full = QRadioButton("Full (1 finestra)")
+        self._rb_modular = QRadioButton("Modulare (finestre multiple)")
+        full_mode = self._cfg.get("overlay_mode", "full") == "full"
+        self._rb_full.setChecked(full_mode)
+        self._rb_modular.setChecked(not full_mode)
+        for rb in [self._rb_full, self._rb_modular]:
+            rb.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; font-family: Geist; font-size: 12px;")
+            rb.toggled.connect(self._on_mode_change)
+        mode_layout.addWidget(self._rb_full)
+        mode_layout.addWidget(self._rb_modular)
+        layout.addLayout(mode_layout)
+        mode_hint = QLabel("Il cambio modalità richiede il riavvio dell'overlay")
+        mode_hint.setStyleSheet("color: #505664; font-size: 10px;")
+        layout.addWidget(mode_hint)
+
         # ── Reset buttons ───────────────────────────────────────────────
         btn_layout = QHBoxLayout()
         reset_pos = QPushButton("↺ Reset Posizioni")
@@ -1220,6 +1358,11 @@ class SettingsDialog(QDialog):
 
     def _on_practice_toggle(self, state):
         self._cfg["practice_mode"] = state
+        save_config(self._cfg)
+
+    def _on_mode_change(self):
+        new_mode = "full" if self._rb_full.isChecked() else "modular"
+        self._cfg["overlay_mode"] = new_mode
         save_config(self._cfg)
 
     def _on_reset_positions(self):
