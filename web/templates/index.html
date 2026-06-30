@@ -818,6 +818,12 @@
           <input type="number" id="strat-maxstops" value="3" min="0" max="10" class="text-right" style="width:80px"/>
         </div>
         <div class="filter-group">
+          <label class="checkbox-label" style="display:flex; align-items:center; gap:6px; padding-top:18px;">
+            <input type="checkbox" id="strat-formation" checked style="width:16px;height:16px;">
+            <span style="font-size:12px;color:var(--text-secondary);">Formation Lap</span>
+          </label>
+        </div>
+        <div class="filter-group">
           <button class="btn btn-primary" onclick="calculateStrategy()">Calculate</button>
         </div>
       </div>

@@ -954,6 +954,7 @@ async def get_strategy(
     track_temp: Optional[float] = None,
     weather_state: Optional[str] = "DRY",
     rain_intensity: float = 0.0,
+    formation_lap: bool = False,
 ):
     """Calcola la strategia di pit stop ottimale.
 
@@ -1000,6 +1001,7 @@ async def get_strategy(
         current_tyre_age=current_tyre_age,
         current_fuel=current_fuel,
         max_stops=max_stops,
+        formation_lap=formation_lap,
         laps_history=clean_laps if weather_forecast else None,
         weather_forecast=weather_forecast,
         track_temp=track_temp,

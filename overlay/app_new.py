@@ -384,25 +384,47 @@ class MiniOverlay(QWidget):
 class DeltaOverlay(MiniOverlay):
     component_key = "delta"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._value.setFont(QFont(FONT_VALUE, 14, QFont.Weight.Bold))
+
     def update_value(self, delta: float, **_unused):
         sign = "+" if delta > 0 else ""
-        text = f"{sign}{delta:.3f}"
-        color = qcolor_hex(ACCENT_RED) if delta > 0 else qcolor_hex(ACCENT_GREEN)
-        self._value.setText(text)
+        color = qcolor_hex(ACCENT_GREEN) if delta <= 0 else qcolor_hex(ACCENT_AMBER) if delta < 1 else qcolor_hex(ACCENT_RED)
+        self._value.setText(f"{sign}{delta:.3f}")
         self._value.setStyleSheet(f"color: {color};")
+
+        # Visual bar via background opacity based on delta magnitude
+        intensity = min(abs(delta) * 20, 100)
+        if delta > 0:
+            bar_color = f"rgba(255, 107, 107, {intensity / 300.0})"
+        else:
+            bar_color = f"rgba(29, 209, 161, {intensity / 300.0})"
+        self.setStyleSheet(f"background-color: {bar_color};")
 
 
 class FuelOverlay(MiniOverlay):
     component_key = "fuel"
 
-    def update_value(self, fuel_laps: float, **_unused):
-        text = f"{fuel_laps:.1f}"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._value.setFont(QFont(FONT_VALUE, 13, QFont.Weight.Bold))
+
+    def update_value(self, fuel_laps: float, refuel_l: Optional[float] = None, **_unused):
         if fuel_laps < 2:
             color = qcolor_hex(ACCENT_RED)
         elif fuel_laps < 3:
             color = qcolor_hex(ACCENT_AMBER)
         else:
             color = qcolor_hex(TEXT_PRIMARY)
+
+        if refuel_l is not None and refuel_l > 0:
+            text = f"{fuel_laps:.1f}L / +{refuel_l:.1f}L"
+            self._value.setFont(QFont(FONT_VALUE, 10, QFont.Weight.Bold))
+        else:
+            text = f"{fuel_laps:.1f}"
+            self._value.setFont(QFont(FONT_VALUE, 13, QFont.Weight.Bold))
+
         self._value.setText(text)
         self._value.setStyleSheet(f"color: {color};")
 
@@ -939,7 +961,8 @@ class OverlayManager(QObject):
 
         # Fuel
         fuel_laps = self._estimate_fuel_laps(frame)
-        self.fuel_ov.update_value(fuel_laps)
+        refuel = self._calculate_refuel(frame)
+        self.fuel_ov.update_value(fuel_laps, refuel_l=refuel)
 
         # Cliff
         cliff_laps = self._estimate_cliff_laps(frame)
@@ -1015,6 +1038,46 @@ class OverlayManager(QObject):
                 if mean_cons > 0:
                     return fuel / mean_cons
         return fuel / 3.2
+
+    def _calculate_refuel(self, frame: TelemetryFrame) -> Optional[float]:
+        """Calculate how much fuel to add at next pit stop."""
+        if not self._car or not self._track:
+            return None
+        try:
+            laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+            if not laps:
+                return None
+            _, mean_cons = fit_fuel_model(laps)
+            if mean_cons <= 0:
+                return None
+
+            # If we have a pit plan, refuel for the next stint
+            if self._pit_plan:
+                nxt = next((l for l in self._pit_plan if l >= self._current_lap), None)
+                if nxt is not None:
+                    # Next stint: from nxt to next pit or race end
+                    remaining_laps = (self._total_race_laps or 60) - nxt
+                    next_stint_laps = remaining_laps
+                    # Check if there's another pit after this
+                    remaining_pits = [l for l in self._pit_plan if l > nxt]
+                    if remaining_pits:
+                        next_stint_laps = remaining_pits[0] - nxt
+                    stint_fuel = next_stint_laps * mean_cons
+                    current = frame.fuel
+                    if stint_fuel > current:
+                        return round(stint_fuel - current, 1)
+                    return None
+
+            # In pits → refuel to full
+            if frame.in_pits or frame.pit_state in [2, 3]:
+                if frame.fuel_capacity > 0:
+                    to_full = frame.fuel_capacity - frame.fuel
+                    if to_full > 1:
+                        return round(to_full, 1)
+
+            return None
+        except Exception:
+            return None
 
     def _estimate_cliff_laps(self, frame: TelemetryFrame) -> int:
         if self._car and self._track:

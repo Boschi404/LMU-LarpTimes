@@ -29,6 +29,7 @@ class PitStrategist:
         current_tyre_age: int = 1,
         current_fuel: float = 100.0,
         max_stops: int = 3,
+        formation_lap: bool = False,
         # Time-based race support
         duration_hours: Optional[float] = None,
         avg_pace: Optional[float] = None,
@@ -68,6 +69,11 @@ class PitStrategist:
         # Convert current fuel level to integer laps remaining
         # Use / not // to avoid FP floor issues (32.0 // 3.2 = 9.0 on some builds)
         fuel_curr_laps = max(0, int(round(current_fuel / self.fuel_consumption)))
+
+        # Account for formation lap fuel consumption
+        if formation_lap and fuel_curr_laps > 0:
+            fuel_curr_laps -= 1
+            fuel_curr_laps = max(0, fuel_curr_laps)
 
         results = {}
         

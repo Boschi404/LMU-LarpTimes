@@ -593,6 +593,17 @@ class OverlayWidget(QWidget):
             f"color: {qcolor_hex(ACCENT_AMBER) if f_laps < 3 else qcolor_hex(TEXT_PRIMARY)};"
         )
 
+        # Refuel suggestion
+        refuel = self._calculate_refuel(frame)
+        if refuel is not None and refuel > 0:
+            self._lbl_fuel.setText(f"{frame.fuel:.0f}L / +{refuel:.0f}L")
+            self._lbl_fuel.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)};")
+        else:
+            self._lbl_fuel.setText(f"{frame.fuel:.0f}L")
+            self._lbl_fuel.setStyleSheet(
+                f"color: {qcolor_hex(ACCENT_AMBER) if frame.fuel < 10 else qcolor_hex(TEXT_PRIMARY)};"
+            )
+
         # Wear
         wf = (1.0 - frame.tyre_wear[0]) * 100.0
         self._lbl_wear.setText(f"{wf:.0f}%")

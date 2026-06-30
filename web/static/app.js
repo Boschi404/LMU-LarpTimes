@@ -367,6 +367,7 @@ async function calculateStrategy() {
   var fuel  = document.getElementById('strat-fuel').value;
   var capacity = document.getElementById('strat-capacity').value;
   var maxstops = document.getElementById('strat-maxstops').value;
+  var formation = document.getElementById('strat-formation').checked;
   var mode = document.getElementById('strat-mode').value;
 
   if (!car || !track) { alert('Inserisci auto e pista.'); return; }
@@ -376,6 +377,7 @@ async function calculateStrategy() {
 
   var url = '/api/strategy?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track) +
     '&current_fuel=' + fuel + '&fuel_capacity=' + capacity + '&max_stops=' + maxstops;
+  if (formation) url += '&formation_lap=true';
   if (mode === 'time') {
     url += '&duration_hours=' + document.getElementById('strat-hours').value;
   } else {
