@@ -17,6 +17,12 @@ LAP_HOTLAP = "hotlap"
 LAP_INLAP = "inlap"
 LAP_UNKNOWN = "unknown"
 
+# ── Tyre temperature states ──────────────────────────────────────────────
+
+TYRE_COLD = "cold"
+TYRE_IN_WINDOW = "in_window"
+TYRE_DEGRADED = "degraded"
+
 
 def classify_qualifying_laps(laps: List[Dict[str, Any]]) -> List[str]:
     """Classify each lap in a qualifying session by its role.
@@ -63,6 +69,158 @@ def classify_qualifying_laps(laps: List[Dict[str, Any]]) -> List[str]:
         types[in_idx] = LAP_INLAP
 
     return types
+
+
+# ── Tyre temperature window estimation ──────────────────────────────────
+
+_COMPOUND_WINDOW_END: Dict[str, int] = {
+    "Soft": 2,
+    "Medium": 3,
+    "Hard": 4,
+}
+_WET_COMPOUNDS = {"Wet", "Intermediate", "FullWet", "Wet"}
+
+
+def estimate_tyre_temp_window(
+    laps: List[Dict[str, Any]],
+    types: List[str],
+) -> Dict[str, Any]:
+    """Estimate tyre temperature window for qualifying laps.
+
+    Uses ``tyre_age_laps`` as a proxy for tyre temperature, adjusted by
+    ``compound_front`` and ``track_temp`` from the database.
+
+    Parameters
+    ----------
+    laps:
+        List of lap dicts as returned by ``database.get_laps_for_analysis``.
+    types:
+        Lap role classification from :func:`classify_qualifying_laps`.
+
+    Returns
+    -------
+    dict with keys:
+        - **laps_classified** — per-lap tyre state annotations
+        - **best_in_window** — fastest lap when tyres were optimal
+        - **best_outside_window** — fastest lap when cold or degraded
+        - **window_lost_time** — gap between best in-window and outside
+        - **optimal_hotlaps_count** — consecutive hotlaps before deg
+        - **tyre_window_message** — human-readable summary
+    """
+    if not laps or not types:
+        return {
+            "laps_classified": [],
+            "best_in_window": None,
+            "best_outside_window": None,
+            "window_lost_time": None,
+            "optimal_hotlaps_count": 0,
+            "tyre_window_message": "No lap data available.",
+        }
+
+    # Determine compound and track temperature (use first lap as reference)
+    compound: str = laps[0].get("compound_front", "Medium") or "Medium"
+    track_temp: Optional[float] = laps[0].get("track_temp")
+
+    is_wet: bool = compound in _WET_COMPOUNDS
+
+    if is_wet:
+        # Wet/Intermediate tyres never reach optimal temperature window
+        window_start: int = 999
+        window_end: int = -1
+    else:
+        window_start = 2
+        window_end = _COMPOUND_WINDOW_END.get(compound, 3)
+
+        # Temperature adjustments
+        if track_temp is not None:
+            if track_temp < 20:
+                window_start += 1  # slower warmup on cold track
+            if track_temp > 35:
+                window_end -= 1  # faster degradation on hot track
+
+        # Clamp to sensible bounds
+        window_start = max(2, window_start)
+        window_end = max(window_start, window_end)
+
+    # Classify each lap
+    laps_classified: List[Dict[str, Any]] = []
+    best_in_window: Optional[float] = None
+    best_outside_window: Optional[float] = None
+
+    for lap, typ in zip(laps, types):
+        lap_number: int = lap.get("lap_number", 0)
+        lap_time: Optional[float] = lap.get("lap_time")
+        tyre_age: int = lap.get("tyre_age_laps", 1)
+
+        # Determine tyre state
+        if is_wet:
+            tyre_state: str = TYRE_DEGRADED
+        elif tyre_age < window_start:
+            tyre_state = TYRE_COLD
+        elif tyre_age <= window_end:
+            tyre_state = TYRE_IN_WINDOW
+        else:
+            tyre_state = TYRE_DEGRADED
+
+        laps_classified.append({
+            "lap_number": lap_number,
+            "role": typ,
+            "tyre_state": tyre_state,
+            "lap_time": lap_time,
+        })
+
+        # Track best times
+        if lap_time is not None:
+            if tyre_state == TYRE_IN_WINDOW:
+                if best_in_window is None or lap_time < best_in_window:
+                    best_in_window = lap_time
+            else:
+                if best_outside_window is None or lap_time < best_outside_window:
+                    best_outside_window = lap_time
+
+    # Window lost time (how much slower you are outside the window)
+    window_lost_time: Optional[float] = None
+    if best_in_window is not None and best_outside_window is not None:
+        delta = best_outside_window - best_in_window
+        window_lost_time = max(0.0, delta)
+
+    # How many consecutive hotlaps you can do before falling out of window
+    if is_wet:
+        optimal_hotlaps_count: int = 0
+    else:
+        optimal_hotlaps_count = max(0, window_end - window_start + 1)
+
+    # ── Human-readable message ─────────────────────────────────────────
+    if is_wet:
+        compound_label = compound or "Wet"
+        tyre_window_message = (
+            f"🌧 {compound_label} tyres — optimal window N/A, "
+            f"consider pit strategy based on track conditions"
+        )
+    else:
+        compound_label = compound or "Medium"
+        temp_note = ""
+        if track_temp is not None:
+            if track_temp < 20:
+                temp_note = f" (cold track {track_temp:.0f}°C → +1 lap warmup)"
+            elif track_temp > 35:
+                temp_note = f" (hot track {track_temp:.0f}°C → faster deg)"
+
+        hotlap_plural = "s" if optimal_hotlaps_count != 1 else ""
+        tyre_window_message = (
+            f"🛞 {compound_label} tyres: optimal laps {window_start}-{window_end} "
+            f"({optimal_hotlaps_count} hotlap{hotlap_plural} per run)"
+            f"{temp_note}"
+        )
+
+    return {
+        "laps_classified": laps_classified,
+        "best_in_window": best_in_window,
+        "best_outside_window": best_outside_window,
+        "window_lost_time": window_lost_time,
+        "optimal_hotlaps_count": optimal_hotlaps_count,
+        "tyre_window_message": tyre_window_message,
+    }
 
 
 # ── Qualifying analyst ───────────────────────────────────────────────────
@@ -138,6 +296,10 @@ class QualifyingAnalyst:
         # ── Fuel analysis ───────────────────────────────────────────────
         fuel_data = self._fuel_analysis(laps, types)
         result.update(fuel_data)
+
+        # ── Tyre temperature window analysis ─────────────────────────
+        tyre_data = estimate_tyre_temp_window(laps, types)
+        result["tyre_temp_window"] = tyre_data
 
         # ── Suggestions ────────────────────────────────────────────────
         result["suggestions"] = self._build_suggestions(result, laps)

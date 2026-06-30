@@ -742,6 +742,35 @@ async def get_laps(
     return laps
 
 
+@app.get("/api/laps/compare")
+async def get_laps_compare(car: str, track: str):
+    """Return all valid laps for a given car+track combo, ordered by lap_number ASC."""
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    filtered = [l for l in laps if l.get("car") == car and l.get("track") == track]
+    valid = [l for l in filtered if l.get("is_valid_lap") == 1 and not l.get("anomaly_flag")]
+    valid.sort(key=lambda l: l.get("lap_number", 0))
+    return [
+        {
+            "id": l["id"],
+            "lap_number": l["lap_number"],
+            "session_id": l["session_id"],
+            "lap_time": l["lap_time"],
+            "sector_1": l.get("sector_1"),
+            "sector_2": l.get("sector_2"),
+            "sector_3": l.get("sector_3"),
+            "fuel_start_l": l.get("fuel_start_l"),
+            "fuel_end_l": l.get("fuel_end_l"),
+            "fuel_used_l": l.get("fuel_used_l"),
+            "tyre_age_laps": l.get("tyre_age_laps"),
+            "compound_front": l.get("compound_front"),
+            "track_temp": l.get("track_temp"),
+            "weather_state": l.get("weather_state"),
+            "stint_number": l.get("stint_number"),
+        }
+        for l in valid
+    ]
+
+
 @app.get("/api/laps/chart")
 async def get_laps_chart(
     car: str,

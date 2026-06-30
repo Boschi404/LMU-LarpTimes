@@ -9,6 +9,8 @@ function showPage(name) {
     startLapAutoRefresh();
   } else if (name === 'setup') {
     loadSetupAdvice();
+  } else if (name === 'compare') {
+    loadLapComparison();
   } else {
     stopLapAutoRefresh();
   }
@@ -44,6 +46,8 @@ async function populateFilters() {
     fillSelect('prof-compound', compounds);
     fillSelect('strat-car', cars);
     fillSelect('strat-track', tracks);
+    fillSelect('comp-car', cars);
+    fillSelect('comp-track', tracks);
   } catch (e) {
     console.error('Failed to populate filters:', e);
   }
@@ -859,4 +863,224 @@ function toggleStratMode() {
   var mode = document.getElementById('strat-mode').value;
   document.getElementById('strat-laps-group').style.display = mode === 'laps' ? '' : 'none';
   document.getElementById('strat-hours-group').style.display = mode === 'time' ? '' : 'none';
+}
+
+/* ─── LAP COMPARISON ──────────────────────────────────────────── */
+let _compLapsData = [];
+let _compChart = null;
+
+async function loadLapComparison() {
+  const car = document.getElementById('comp-car').value.trim();
+  const track = document.getElementById('comp-track').value.trim();
+
+  if (!car || !track) {
+    alert('Select car and track.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/laps/compare?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track));
+    _compLapsData = await res.json();
+
+    const selA = document.getElementById('comp-lap-a');
+    const selB = document.getElementById('comp-lap-b');
+    selA.innerHTML = '<option value="">Select Lap A...</option>';
+    selB.innerHTML = '<option value="">Select Lap B...</option>';
+
+    _compLapsData.forEach(function(lap) {
+      var optA = document.createElement('option');
+      optA.value = lap.id;
+      optA.textContent = 'Lap ' + lap.lap_number + ' \u2014 ' + fmtTime(lap.lap_time) + (lap.stint_number ? ' (Stint ' + lap.stint_number + ')' : '');
+      selA.appendChild(optA);
+
+      var optB = document.createElement('option');
+      optB.value = lap.id;
+      optB.textContent = 'Lap ' + lap.lap_number + ' \u2014 ' + fmtTime(lap.lap_time) + (lap.stint_number ? ' (Stint ' + lap.stint_number + ')' : '');
+      selB.appendChild(optB);
+    });
+
+    document.getElementById('comp-lap-selectors').style.display = 'flex';
+    document.getElementById('comp-results').style.display = 'none';
+    document.getElementById('comp-empty').style.display = 'none';
+
+    if (selA.value && selB.value) {
+      renderLapComparison();
+    }
+  } catch (e) {
+    console.error('loadLapComparison:', e);
+    alert('Error loading laps: ' + e.message);
+  }
+}
+
+function renderLapComparison() {
+  var idA = parseInt(document.getElementById('comp-lap-a').value);
+  var idB = parseInt(document.getElementById('comp-lap-b').value);
+
+  if (!idA || !idB) {
+    document.getElementById('comp-results').style.display = 'none';
+    return;
+  }
+
+  var lapA = null, lapB = null;
+  for (var i = 0; i < _compLapsData.length; i++) {
+    if (_compLapsData[i].id === idA) lapA = _compLapsData[i];
+    if (_compLapsData[i].id === idB) lapB = _compLapsData[i];
+  }
+
+  if (!lapA || !lapB) return;
+
+  var aFaster = lapA.lap_time <= lapB.lap_time;
+
+  // Render cards
+  function renderCard(lap, isFaster) {
+    var cls = isFaster ? 'faster' : 'slower';
+    var badge = isFaster ? 'FASTER' : 'SLOWER';
+    var hours = Math.floor(lap.lap_time / 3600);
+    var mins = Math.floor((lap.lap_time % 3600) / 60);
+    var secs = (lap.lap_time % 60).toFixed(3);
+    var timeStr = hours > 0 ? hours + ':' + (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs : (mins > 0 ? mins + ':' + (secs < 10 ? '0' : '') + secs : secs + 's');
+    return '<div class="comp-card-header">' +
+      '<div class="comp-card-title">Lap ' + lap.lap_number + (lap.stint_number ? ' <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(Stint ' + lap.stint_number + ')</span>' : '') + '</div>' +
+      '<div class="comp-badge ' + cls + '">' + badge + '</div>' +
+      '</div>' +
+      '<div class="comp-row"><span class="comp-row-label">Lap Time</span><span class="comp-row-value ' + cls + '">' + timeStr + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Sector 1</span><span class="comp-row-value">' + (lap.sector_1 != null ? lap.sector_1.toFixed(3) : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Sector 2</span><span class="comp-row-value">' + (lap.sector_2 != null ? lap.sector_2.toFixed(3) : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Sector 3</span><span class="comp-row-value">' + (lap.sector_3 != null ? lap.sector_3.toFixed(3) : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Fuel Start</span><span class="comp-row-value">' + (lap.fuel_start_l != null ? lap.fuel_start_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Fuel End</span><span class="comp-row-value">' + (lap.fuel_end_l != null ? lap.fuel_end_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Fuel Used</span><span class="comp-row-value">' + (lap.fuel_used_l != null ? lap.fuel_used_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Tyre Age</span><span class="comp-row-value">' + (lap.tyre_age_laps != null ? lap.tyre_age_laps + ' laps' : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Compound</span><span class="comp-row-value">' + (lap.compound_front || '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Track Temp</span><span class="comp-row-value">' + (lap.track_temp != null ? lap.track_temp.toFixed(1) + '\u00b0C' : '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Weather</span><span class="comp-row-value">' + (lap.weather_state || '\u2014') + '</span></div>';
+  }
+
+  document.getElementById('comp-card-a').className = 'comp-card' + (aFaster ? ' faster' : ' slower');
+  document.getElementById('comp-card-b').className = 'comp-card' + (!aFaster ? ' faster' : ' slower');
+  document.getElementById('comp-card-a').innerHTML = renderCard(lapA, aFaster);
+  document.getElementById('comp-card-b').innerHTML = renderCard(lapB, !aFaster);
+
+  // Sector comparison bars
+  var sectors = ['sector_1', 'sector_2', 'sector_3'];
+  var sectorLabels = ['S1', 'S2', 'S3'];
+  var sectorsHtml = '';
+
+  for (var si = 0; si < sectors.length; si++) {
+    var key = sectors[si];
+    var tA = lapA[key];
+    var tB = lapB[key];
+
+    if (tA != null && tB != null) {
+      var diff = Math.abs(tA - tB);
+      var aIsFaster = tA <= tB;
+      var maxTime = Math.max(tA, tB);
+      var barWidthA = Math.max(2, Math.round((tA / maxTime) * 200));
+      var barWidthB = Math.max(2, Math.round((tB / maxTime) * 200));
+
+      sectorsHtml += '<div class="sector-bar-row">' +
+        '<div class="sector-label">' + sectorLabels[si] + '</div>' +
+        '<div class="sector-bar-container">' +
+          '<div class="sector-bar ' + (aIsFaster ? 'faster' : 'slower') + '" style="width:' + barWidthA + 'px;"></div>' +
+          '<span class="sector-time">' + tA.toFixed(3) + '</span>' +
+        '</div>' +
+        '<div class="sector-bar-container">' +
+          '<div class="sector-bar ' + (!aIsFaster ? 'faster' : 'slower') + '" style="width:' + barWidthB + 'px;"></div>' +
+          '<span class="sector-time">' + tB.toFixed(3) + '</span>' +
+        '</div>' +
+        '<div class="sector-delta" style="color:' + (aIsFaster ? 'var(--accent-green)' : 'var(--accent-red)') + '">' + (aIsFaster ? '-' : '+') + diff.toFixed(3) + '</div>' +
+      '</div>';
+    } else {
+      sectorsHtml += '<div class="sector-bar-row">' +
+        '<div class="sector-label">' + sectorLabels[si] + '</div>' +
+        '<div class="sector-bar-container" style="justify-content:center;color:var(--text-muted);">N/A</div>' +
+        '<div class="sector-bar-container" style="justify-content:center;color:var(--text-muted);">N/A</div>' +
+        '<div class="sector-delta">\u2014</div>' +
+      '</div>';
+    }
+  }
+
+  document.getElementById('comp-sectors').innerHTML = sectorsHtml;
+
+  // Build chart
+  buildCompChart(lapA, lapB, aFaster);
+
+  document.getElementById('comp-results').style.display = 'block';
+}
+
+function buildCompChart(lapA, lapB, aFaster) {
+  var ctx = document.getElementById('comp-chart').getContext('2d');
+  if (_compChart) _compChart.destroy();
+
+  var labels = ['Lap Time', 'Sector 1', 'Sector 2', 'Sector 3', 'Fuel Used', 'Tyre Age', 'Track Temp'];
+  var aColor = aFaster ? '#2ea043' : '#ff4d4d';
+  var bColor = aFaster ? '#ff4d4d' : '#2ea043';
+
+  function extract(lap, key) {
+    var val = lap[key];
+    return val != null ? val : 0;
+  }
+
+  _compChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Lap A (Lap ' + lapA.lap_number + ')',
+        data: [
+          extract(lapA, 'lap_time'),
+          extract(lapA, 'sector_1'),
+          extract(lapA, 'sector_2'),
+          extract(lapA, 'sector_3'),
+          extract(lapA, 'fuel_used_l'),
+          extract(lapA, 'tyre_age_laps'),
+          extract(lapA, 'track_temp'),
+        ],
+        backgroundColor: aColor + '99',
+        borderColor: aColor,
+        borderWidth: 1,
+      }, {
+        label: 'Lap B (Lap ' + lapB.lap_number + ')',
+        data: [
+          extract(lapB, 'lap_time'),
+          extract(lapB, 'sector_1'),
+          extract(lapB, 'sector_2'),
+          extract(lapB, 'sector_3'),
+          extract(lapB, 'fuel_used_l'),
+          extract(lapB, 'tyre_age_laps'),
+          extract(lapB, 'track_temp'),
+        ],
+        backgroundColor: bColor + '99',
+        borderColor: bColor,
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#7d8590', font: { family: 'Inter, sans-serif', size: 11 } }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15, 15, 15, 0.95)',
+          titleFont: { family: "'Geist', sans-serif" },
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+          cornerRadius: 4,
+          borderColor: '#262c35',
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+          ticks: { color: '#7d8590', font: { family: "'JetBrains Mono', monospace" } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+          ticks: { color: '#7d8590', font: { family: "'JetBrains Mono', monospace" } }
+        }
+      }
+    }
+  });
 }

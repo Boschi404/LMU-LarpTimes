@@ -562,6 +562,147 @@
       padding-right: 2rem !important;
     }
 
+    /* ─── LAP COMPARISON ──────────────────────────────────────────── */
+    .comp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .comp-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      position: relative;
+    }
+
+    .comp-card.faster {
+      border-color: var(--accent-green);
+      box-shadow: 0 0 12px rgba(46, 160, 67, 0.15);
+    }
+
+    .comp-card.slower {
+      border-color: var(--accent-red);
+      box-shadow: 0 0 12px rgba(255, 77, 77, 0.1);
+    }
+
+    .comp-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-dim);
+    }
+
+    .comp-card-title {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .comp-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 2px;
+      letter-spacing: 0.05em;
+    }
+
+    .comp-badge.faster {
+      background: rgba(46, 160, 67, 0.15);
+      color: var(--accent-green);
+    }
+
+    .comp-badge.slower {
+      background: rgba(255, 77, 77, 0.15);
+      color: var(--accent-red);
+    }
+
+    .comp-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-size: 0.85rem;
+    }
+
+    .comp-row:last-child { border-bottom: none; }
+
+    .comp-row-label {
+      color: var(--text-secondary);
+    }
+
+    .comp-row-value {
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .comp-row-value.faster { color: var(--accent-green); }
+    .comp-row-value.slower { color: var(--accent-red); }
+
+    .comp-sectors {
+      background: var(--surface-1);
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .sector-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .sector-bar-row:last-child { margin-bottom: 0; }
+
+    .sector-label {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      min-width: 30px;
+    }
+
+    .sector-bar-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .sector-bar {
+      height: 24px;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+      min-width: 2px;
+    }
+
+    .sector-bar.faster { background: var(--accent-green); }
+    .sector-bar.slower { background: var(--accent-red); }
+
+    .sector-time {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 600;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .sector-delta {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      min-width: 60px;
+      text-align: right;
+    }
+
     /* Responsive collapse for mobile */
     @media (max-width: 768px) {
       body { flex-direction: column; }
@@ -600,6 +741,10 @@
       <button class="nav-btn" id="btn-setup" onclick="showPage('setup')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Setup Advisor
+      </button>
+      <button class="nav-btn" id="btn-compare" onclick="showPage('compare')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        Lap Compare
       </button>
     </nav>
 
@@ -950,6 +1095,66 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- PAGE: LAP COMPARISON -->
+    <section class="page" id="page-compare">
+      <h2>Lap Comparison</h2>
+      <p class="description">Select a car and track combination, then choose two laps to compare side by side. Green highlights indicate faster performance; red indicates slower.</p>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label for="comp-car">macchina</label>
+          <select id="comp-car">
+            <option value="">Seleziona...</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="comp-track">pista</label>
+          <select id="comp-track">
+            <option value="">Seleziona...</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <button class="btn btn-primary" onclick="loadLapComparison()">Load Laps</button>
+        </div>
+      </div>
+
+      <div id="comp-lap-selectors" class="filter-bar" style="display:none;">
+        <div class="filter-group">
+          <label for="comp-lap-a">Lap A</label>
+          <select id="comp-lap-a" onchange="renderLapComparison()">
+            <option value="">Select Lap A...</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="comp-lap-b">Lap B</label>
+          <select id="comp-lap-b" onchange="renderLapComparison()">
+            <option value="">Select Lap B...</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="comp-results" style="display:none;">
+        <div class="comp-grid">
+          <div class="comp-card" id="comp-card-a"></div>
+          <div class="comp-card" id="comp-card-b"></div>
+        </div>
+
+        <div class="section-label">Sector Comparison</div>
+        <div id="comp-sectors" class="comp-sectors">
+          <div style="text-align:center;color:var(--text-muted);padding:1rem;">Select two laps to see sector comparison.</div>
+        </div>
+
+        <div class="section-label">Field Comparison Chart</div>
+        <div class="chart-wrapper">
+          <canvas id="comp-chart"></canvas>
+        </div>
+      </div>
+
+      <div id="comp-empty" style="display:block; text-align:center; padding:3rem; color:var(--text-muted);">
+        Select a car and track, then load laps and pick two to compare.
       </div>
     </section>
 

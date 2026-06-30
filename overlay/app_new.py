@@ -624,6 +624,22 @@ class QualifyingOverlay(MiniOverlay):
         if in_delta is not None:
             lines.append(f"🏁 In +{in_delta:.1f}s")
 
+        # Tyre temperature window
+        tyre_window = qualy_data.get("tyre_temp_window")
+        if tyre_window:
+            msg = tyre_window.get("tyre_window_message", "")
+            if msg:
+                lines.append(msg.replace("🛞 ", ""))
+            best_in = tyre_window.get("best_in_window")
+            best_out = tyre_window.get("best_outside_window")
+            if best_in and best_out:
+                lost = best_in - best_out
+                if lost > 0:
+                    lines.append(f"🌡 fuori finestra +{lost:.2f}s")
+            hotlaps_opt = tyre_window.get("optimal_hotlaps_count")
+            if hotlaps_opt is not None and hotlaps_opt > 0:
+                lines.append(f"{hotlaps_opt}x hotlap/run")
+
         if lines:
             text = " | ".join(lines)
             self._value.setText(text)

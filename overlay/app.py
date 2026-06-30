@@ -727,6 +727,19 @@ class OverlayWidget(QWidget):
                 lines.append(f"🛞 Out +{out_delta:.1f}s")
             if in_delta is not None:
                 lines.append(f"🏁 In +{in_delta:.1f}s")
+            # Tyre temp window
+            tyre_window = self._qualy_data.get("tyre_temp_window")
+            if tyre_window:
+                msg = tyre_window.get("tyre_window_message", "")
+                best_in = tyre_window.get("best_in_window")
+                best_out = tyre_window.get("best_outside_window")
+                if best_in and best_out:
+                    lost = best_in - best_out
+                    if lost > 0:
+                        lines.append(f"🌡 fuori +{lost:.2f}s")
+                hotlaps_opt = tyre_window.get("optimal_hotlaps_count")
+                if hotlaps_opt is not None and hotlaps_opt > 0:
+                    lines.append(f"{hotlaps_opt}x/run")
             # Suggestions
             for s in self._qualy_data.get("suggestions", [])[:2]:
                 lines.append(s)
