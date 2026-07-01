@@ -26,6 +26,9 @@ REQUIRED_MODULES = {
     "psutil": "psutil",
     "PySide6": "PySide6",
     "scipy": "scipy",
+    "bcrypt": "bcrypt",
+    "jwt": "PyJWT",
+    "httpx": "httpx",
 }
 
 
