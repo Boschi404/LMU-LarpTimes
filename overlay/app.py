@@ -34,6 +34,7 @@ from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst, TYRE_COLD, TYRE_IN_WINDOW, TYRE_DEGRADED
 from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRefresher
+from overlay.icons import settings_icon, icon_pixmap, clean_action_text
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Design System
@@ -393,7 +394,11 @@ class OverlayWidget(QWidget):
         self._lbl_track_car.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         # Settings gear button
-        self._btn_settings = QPushButton("⚙")
+        from PySide6.QtGui import QIcon
+        self._btn_settings = QPushButton()
+        pix = icon_pixmap(settings_icon(), size=14, color=qcolor_hex(TEXT_SECONDARY))
+        self._btn_settings.setIcon(QIcon(pix))
+        self._btn_settings.setIconSize(pix.size())
         self._btn_settings.setFixedSize(22, 22)
         self._btn_settings.setStyleSheet(f"""
             QPushButton {{
@@ -740,7 +745,7 @@ class OverlayWidget(QWidget):
             all_laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
             if len(all_laps) < 3:
                 self._qualy_data = None
-                self._lbl_qualy.setText("⏳ collecting data…")
+                self._lbl_qualy.setText("Collecting data\u2026")
                 return
             _, mean_cons = fit_fuel_model(all_laps)
             model = fit_degradation_model(all_laps)
@@ -755,28 +760,28 @@ class OverlayWidget(QWidget):
             out_delta = self._qualy_data.get("outlap_delta_from_hot")
             in_delta = self._qualy_data.get("inlap_delta_from_hot")
             if best:
-                lines.append(f"🎯 {best:.1f}s")
+                lines.append(f"Miglior {best:.1f}s")
             if hotlaps:
-                lines.append(f"🔥 {hotlaps}x")
+                lines.append(f"{hotlaps}x hot lap(s)")
             if fuel_save > 0.5:
-                lines.append(f"💧 -{fuel_save:.1f}L")
+                lines.append(f"-{fuel_save:.1f}L risparmio")
             if out_delta is not None:
-                lines.append(f"🛞 Out +{out_delta:.1f}s")
+                lines.append(f"Out +{out_delta:.1f}s")
             if in_delta is not None:
-                lines.append(f"🏁 In +{in_delta:.1f}s")
+                lines.append(f"In +{in_delta:.1f}s")
             # Tyre temp window
             tyre_window = self._qualy_data.get("tyre_temp_window")
             if tyre_window:
                 # Message (strip duplicate emoji, app_new style)
                 msg = tyre_window.get("tyre_window_message", "")
                 if msg:
-                    lines.append(msg.replace("🛞 ", ""))
+                    lines.append(clean_action_text(msg))
                 best_in = tyre_window.get("best_in_window")
                 best_out = tyre_window.get("best_outside_window")
                 if best_in and best_out:
                     lost = best_in - best_out
                     if lost > 0:
-                        lines.append(f"🌡 fuori +{lost:.2f}s")
+                        lines.append(f"Fuori +{lost:.2f}s")
                 hotlaps_opt = tyre_window.get("optimal_hotlaps_count")
                 if hotlaps_opt is not None and hotlaps_opt > 0:
                     lines.append(f"{hotlaps_opt}x/run")
@@ -880,9 +885,9 @@ class OverlayWidget(QWidget):
 
             lines = [f"{total} giri"]
             if fuel.get("range_l", 0) > 0:
-                lines.append(f"⛽{fuel['min_l']}-{fuel['max_l']}L")
+                lines.append(f"Carb. {fuel['min_l']}-{fuel['max_l']}L")
             if tyre.get("range_laps", 0) > 0:
-                lines.append(f"🛞{tyre['min_age']}-{tyre['max_age']}g")
+                lines.append(f"Gomme {tyre['min_age']}-{tyre['max_age']}g")
             if comps:
                 lines.append(f"{'/'.join(comps)}")
             if suggestions:

@@ -11,7 +11,7 @@ Stesse regole di app.py (PySide6 frameless, always-on-top, drag-to-move,
 auto-hide when in_game_only=True, persistenza in overlay_config.json).
 
 NOVITÀ rispetto alla versione precedente:
-  - Menu di configurazione (tasto destro / pulsante ⚙) per
+  - Menu di configurazione (tasto destro / pulsante ingranaggio) per
     attivare/disattivare ciascun componente, riordinare, resettare posizioni.
   - Hotkey globali: Ctrl+Shift+O toggle full, Ctrl+Shift+M toggle modulare.
 
@@ -49,6 +49,7 @@ from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import (
     AudioEngine, PracticeAdvisor, StrategyRefresher,
 )
+from overlay.icons import settings_icon, icon_pixmap, clean_action_text
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Design System (aligned with web UI & app.py)
@@ -310,7 +311,7 @@ class MiniOverlay(QWidget):
             QMenu::separator {{ height: 1px; background: {qcolor_hex(BORDER_BRIGHT)}; margin: 4px 8px; }}
         """)
 
-        header = menu.addAction(f"⚙  {COMPONENT_LABELS[self.component_key]}")
+        header = menu.addAction(f"  {COMPONENT_LABELS[self.component_key]}")
         header.setEnabled(False)
         menu.addSeparator()
 
@@ -323,8 +324,8 @@ class MiniOverlay(QWidget):
             .setEnabled(False)
         menu.addSeparator()
 
-        act_reset = menu.addAction("↺  Reset posizione")
-        act_hide = menu.addAction("✕  Nascondi questa finestra")
+        act_reset = menu.addAction("Reset posizione")
+        act_hide = menu.addAction("Nascondi questa finestra")
 
         chosen = menu.exec(event.globalPos())
         if chosen is act_toggle:
@@ -503,7 +504,7 @@ class WeatherOverlay(MiniOverlay):
         w = frame.weather_state or "—"
         tt = f"{frame.track_temp:.0f}°" if frame.track_temp else "—"
         at = f"{frame.ambient_temp:.0f}°" if frame.ambient_temp else "—"
-        rain = f"🌧{frame.rain_intensity:.0%}" if frame.rain_intensity > 0 else ""
+        rain = f"pioggia {frame.rain_intensity:.0%}" if frame.rain_intensity > 0 else ""
         parts = [w, f"pista {tt}", f"aria {at}"]
         if rain:
             parts.append(rain)
@@ -583,7 +584,7 @@ class PracticeOverlay(MiniOverlay):
 
     def update_value(self, practice_data: Optional[Dict[str, Any]] = None, **_unused):
         if practice_data is None:
-            self._value.setText("⏳")
+            self._value.setText("\u2014")
             self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")
             return
 
@@ -595,16 +596,16 @@ class PracticeOverlay(MiniOverlay):
 
         lines = [f"{total} giri"]
         if fuel.get("range_lap", 0) > 0:
-            lines.append(f"⛽ {fuel['min_l']}-{fuel['max_l']}L")
+            lines.append(f"Carb. {fuel['min_l']}-{fuel['max_l']}L")
         if tyre.get("range_laps", 0) > 0:
-            lines.append(f"🛞 gomme {tyre['min_age']}-{tyre['max_age']}g")
+            lines.append(f"Gomme {tyre['min_age']}-{tyre['max_age']}g")
         if compounds:
-            lines.append(f"🔘 {'/'.join(compounds)}")
+            lines.append(f"{'/'.join(compounds)}")
 
         if suggestions:
             # Show the most important suggestion
             top = max(suggestions, key=lambda s: {"high": 3, "medium": 2, "low": 1}.get(s.get("priority", "low"), 0))
-            lines.append(f"▶ {top.get('message', '')[:60]}")
+            lines.append(f"{top.get('message', '')[:60]}")
 
         text = " | ".join(lines)
         self._value.setText(text)
@@ -634,28 +635,28 @@ class QualifyingOverlay(MiniOverlay):
 
         lines = []
         if best:
-            lines.append(f"🎯 {best:.1f}s")
+            lines.append(f"Miglior {best:.1f}s")
         if hotlaps:
-            lines.append(f"🔥 {hotlaps} hot lap(s)")
+            lines.append(f"{hotlaps} hot lap(s)")
         if fuel_save > 0.5:
-            lines.append(f"💧 -{fuel_save:.1f}L")
+            lines.append(f"-{fuel_save:.1f}L risparmio")
         if out_delta is not None:
-            lines.append(f"🛞 Out +{out_delta:.1f}s")
+            lines.append(f"Out +{out_delta:.1f}s")
         if in_delta is not None:
-            lines.append(f"🏁 In +{in_delta:.1f}s")
+            lines.append(f"In +{in_delta:.1f}s")
 
         # Tyre temperature window
         tyre_window = qualy_data.get("tyre_temp_window")
         if tyre_window:
             msg = tyre_window.get("tyre_window_message", "")
             if msg:
-                lines.append(msg.replace("🛞 ", ""))
+                lines.append(clean_action_text(msg))
             best_in = tyre_window.get("best_in_window")
             best_out = tyre_window.get("best_outside_window")
             if best_in and best_out:
                 lost = best_in - best_out
                 if lost > 0:
-                    lines.append(f"🌡 fuori finestra +{lost:.2f}s")
+                    lines.append(f"Fuori finestra +{lost:.2f}s")
             hotlaps_opt = tyre_window.get("optimal_hotlaps_count")
             if hotlaps_opt is not None and hotlaps_opt > 0:
                 lines.append(f"{hotlaps_opt}x hotlap/run")
@@ -683,7 +684,7 @@ class QualifyingOverlay(MiniOverlay):
             self._value.setText(text)
             self._value.setStyleSheet(f"color: {qcolor_hex(indicator_color)}; font-size: 10px;")
         else:
-            self._value.setText("⏳ collecting data…")
+            self._value.setText("Collecting data\u2026")
             self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")
 
 
@@ -857,7 +858,7 @@ class OverlayManager(QObject):
         The "config menu" the user can open to toggle which components are active.
         Triggered by:
           - right-click on the manager tray (or on a specific component, see below)
-          - the ⚙ button (in the dedicated manager widget)
+          - the gear button (in the dedicated manager widget)
         """
         menu = QMenu()
         menu.setStyleSheet(f"""
@@ -869,7 +870,7 @@ class OverlayManager(QObject):
             QMenu::indicator {{ width: 14px; height: 14px; }}
         """)
 
-        title = menu.addAction("⚙  COMPONENTI MODULARI")
+        title = menu.addAction("  COMPONENTI MODULARI")
         title.setEnabled(False)
         menu.addSeparator()
 
@@ -908,20 +909,20 @@ class OverlayManager(QObject):
             menu.addAction(act)
 
         menu.addSeparator()
-        act_show = menu.addAction("👁  Mostra tutti")
-        act_hide = menu.addAction("🚫  Nascondi tutti")
+        act_show = menu.addAction("Mostra tutti")
+        act_hide = menu.addAction("Nascondi tutti")
         menu.addSeparator()
-        act_reset = menu.addAction("↺  Reset posizioni di tutti i componenti")
+        act_reset = menu.addAction("Reset posizioni di tutti i componenti")
         menu.addSeparator()
         act_audio_toggle = menu.addAction(
-            "🔊  Disattiva audio" if self.audio_engine.enabled
-            else "🔇  Attiva audio"
+            "Disattiva audio" if self.audio_engine.enabled
+            else "Attiva audio"
         )
-        act_audio_test = menu.addAction("▶  Test suono 'pit_now'")
-        act_refresh = menu.addAction("🔄  Ricalcola strategia adesso")
+        act_audio_test = menu.addAction("Test suono 'pit_now'")
+        act_refresh = menu.addAction("Ricalcola strategia adesso")
         act_practice = menu.addAction(
-            "🎓  Disattiva practice mode" if self._cfg.get("practice_mode", True)
-            else "🎓  Attiva practice mode"
+            "Disattiva practice mode" if self._cfg.get("practice_mode", True)
+            else "Attiva practice mode"
         )
         menu.addSeparator()
         # Community DB section
@@ -932,14 +933,14 @@ class OverlayManager(QObject):
         act_cloud_sync = None
         act_cloud_pull = None
         if _user.get("opt_in_global"):
-            act_cloud_sync = menu.addAction(f"☁️  Sync ora ({_user.get('display_name', '?')})")
-            act_cloud_pull = menu.addAction("☁️  Pull community data")
-            act_cloud_optout = menu.addAction("☁️  Disattiva community DB")
+            act_cloud_sync = menu.addAction(f"Sync community data ({_user.get('display_name', '?')})")
+            act_cloud_pull = menu.addAction("Pull community data")
+            act_cloud_optout = menu.addAction("Disattiva community DB")
         else:
-            act_cloud_optin = menu.addAction("☁️  Attiva community DB (opt-in)")
+            act_cloud_optin = menu.addAction("Attiva community DB (opt-in)")
         menu.addSeparator()
-        act_open_web = menu.addAction("🌐  Apri UI web (browser)")
-        act_quit = menu.addAction("❌  Esci")
+        act_open_web = menu.addAction("Apri UI web (browser)")
+        act_quit = menu.addAction("Esci")
 
         chosen = menu.exec(global_pos)
         if chosen is act_show:
@@ -1345,7 +1346,7 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(20, 16, 20, 16)
 
         # ── Title ───────────────────────────────────────────────────────
-        title = QLabel("⚙  Impostazioni")
+        title = QLabel("Impostazioni")
         title.setFont(QFont(FONT_TITLE, 14, QFont.Weight.Bold))
         layout.addWidget(title)
 
@@ -1377,7 +1378,7 @@ class SettingsDialog(QDialog):
         vol_layout.addWidget(self._vol_value)
         layout.addLayout(vol_layout)
 
-        test_btn = QPushButton("▶ Test suono")
+        test_btn = QPushButton("Test suono")
         test_btn.clicked.connect(self._on_test_sound)
         layout.addWidget(test_btn)
 
@@ -1432,9 +1433,9 @@ class SettingsDialog(QDialog):
 
         # ── Reset buttons ───────────────────────────────────────────────
         btn_layout = QHBoxLayout()
-        reset_pos = QPushButton("↺ Reset Posizioni")
+        reset_pos = QPushButton("Reset Posizioni")
         reset_pos.clicked.connect(self._on_reset_positions)
-        hide_all = QPushButton("✕ Nascondi Tutti")
+        hide_all = QPushButton("Nascondi Tutti")
         hide_all.clicked.connect(self._on_hide_all)
         btn_layout.addWidget(reset_pos)
         btn_layout.addWidget(hide_all)
@@ -1497,11 +1498,11 @@ class SettingsDialog(QDialog):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Manager tray widget (small ⚙ button that opens the settings menu/dialog)
+# Manager tray widget (small gear button that opens the settings menu/dialog)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class ManagerTray(QWidget):
-    """A tiny always-on-top widget with a single ⚙ button to open the settings macro-menu.
+    """A tiny always-on-top widget with a single gear button to open the settings macro-menu.
     Left-click → quick menu.  Right-click → drag.  Double-click → settings dialog.
     """
     menu_requested = Signal(QPoint)  # global position to open menu at
@@ -1522,10 +1523,11 @@ class ManagerTray(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._btn = QLabel("⚙")
+        self._btn = QLabel()
         self._btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._btn.setFont(QFont(FONT_TITLE, 20, QFont.Weight.Bold))
-        self._btn.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)};")
+        pix = icon_pixmap(settings_icon(), size=22, color=qcolor_hex(ACCENT_BLUE))
+        self._btn.setPixmap(pix)
+        self._btn.setFixedSize(44, 44)
         layout.addWidget(self._btn)
 
         x = cfg.get("tray_x", 50)
