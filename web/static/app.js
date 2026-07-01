@@ -1104,7 +1104,15 @@ async function renderLapChart(car, track) {
               font: { family: "'JetBrains Mono', monospace", size: 10 },
               callback: function(v) { return v.toFixed(1); }
             },
-            grid: { color: 'rgba(255,255,255,0.04)' }
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            // Scale Y from best-0.5 to worst+0.5 for focus on relevant range
+            afterDataLimits: function(scale) {
+              var min = scale.min, max = scale.max;
+              var range = max - min;
+              if (range < 1) range = 1;
+              scale.min = min - 0.5;
+              scale.max = max + 0.5;
+            }
           }
         }
       }
