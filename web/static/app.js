@@ -909,15 +909,10 @@ async function renderLapChart(car, track) {
     var canvas = document.getElementById('strat-chart');
     var ctx = canvas.getContext('2d');
 
-    // Sort laps by lap_number
+    // Sort by stint then lap for display order
     var laps = data.laps.slice().sort(function(a, b) {
-      if (a.stint_id !== b.stint_id) return a.stint_id - b.stint_id;
+      if ((a.stint_id || 0) !== (b.stint_id || 0)) return (a.stint_id || 0) - (b.stint_id || 0);
       return a.lap_number - b.lap_number;
-    });
-
-    // Use sequential index as X (lap numbers can repeat across stints)
-    var lapLabels = laps.map(function(l, i) {
-      return (l.stint_id ? 'S' + l.stint_id + 'L' : '') + l.lap_number;
     });
 
     // Find best lap
@@ -930,7 +925,7 @@ async function renderLapChart(car, track) {
       }
     }
 
-    // Compute Y axis range
+    // Compute Y axis range from actual data
     var yMin = Infinity, yMax = -Infinity;
     for (var i = 0; i < laps.length; i++) {
       if (laps[i].lap_time > 0 && laps[i].lap_time < yMin) yMin = laps[i].lap_time;
@@ -941,11 +936,11 @@ async function renderLapChart(car, track) {
     // Build datasets array
     var datasets = [];
 
-    // 1) Scatter: every lap time, using array index as X for unique positioning
+    // 1) Scatter: lap time per lap number
     datasets.push({
       label: 'Lap Time',
-      data: laps.map(function(l, i) {
-        return { x: i + 1, y: l.lap_time || 0 };
+      data: laps.map(function(l) {
+        return { x: l.lap_number, y: l.lap_time || 0 };
       }),
       backgroundColor: function(ctx) {
         return ctx.dataIndex === bestIdx ? 'rgba(0, 255, 136, 0.9)' : 'rgba(255, 107, 0, 0.6)';
@@ -992,8 +987,8 @@ async function renderLapChart(car, track) {
     datasets.push({
       label: 'Best: ' + bestTime.toFixed(3) + 's',
       data: [
-        { x: 1, y: bestTime },
-        { x: laps.length, y: bestTime }
+        { x: laps[0].lap_number, y: bestTime },
+        { x: laps[laps.length - 1].lap_number, y: bestTime }
       ],
       type: 'line',
       borderColor: 'rgba(0, 255, 136, 0.3)',
@@ -1006,24 +1001,13 @@ async function renderLapChart(car, track) {
       order: 3,
     });
 
-    // Pit stop annotations (use array index for X)
+    // Pit stop annotations
     var pitAnnotations = {};
     if (data.pit_stops && data.pit_stops.length > 0) {
       data.pit_stops.forEach(function(ps) {
-        // Find the array index for this pit lap
-        var pitIdx = 0;
-        for (var k = 0; k < laps.length; k++) {
-          if (laps[k].lap_number === ps.lap_number && laps[k].is_pit_in_lap) {
-            pitIdx = k + 1;
-            break;
-          }
-        }
-        if (pitIdx === 0) {
-          pitIdx = ps.lap_number; // fallback
-        }
         pitAnnotations['pit-' + ps.lap_number] = {
           type: 'line',
-          xMin: pitIdx, xMax: pitIdx,
+          xMin: ps.lap_number, xMax: ps.lap_number,
           yMin: 0, yMax: 999,
           borderColor: '#FF2200',
           borderWidth: 2,
@@ -1101,22 +1085,16 @@ async function renderLapChart(car, track) {
             type: 'linear',
             title: {
               display: true,
-              text: 'Lap (sequential)',
+              text: 'Lap Number',
               color: '#5A6A7A',
               font: { size: 11, family: 'Inter, sans-serif' }
             },
             min: 0,
-            max: laps.length + 1,
             ticks: {
               color: '#5A6A7A',
               stepSize: 1,
               precision: 0,
               font: { family: "'JetBrains Mono', monospace", size: 10 },
-              callback: function(v) {
-                var idx = Math.round(v) - 1;
-                if (idx >= 0 && idx < lapLabels.length) return lapLabels[idx];
-                return '';
-              }
             },
             grid: { color: 'rgba(255,255,255,0.04)' }
           },
