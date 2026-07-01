@@ -39,23 +39,24 @@ from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRef
 # Design System
 # ══════════════════════════════════════════════════════════════════════════════
 
-BG_0 = QColor(10, 14, 24, 230)
-BG_1 = QColor(17, 21, 31, 220)
-BG_2 = QColor(22, 29, 46, 220)
-BORDER_DIM = QColor(28, 33, 40, 255)
-BORDER_BRIGHT = QColor(45, 51, 59, 255)
+BG_0 = QColor(5, 7, 9, 240)        # --bg-app with alpha
+BG_1 = QColor(13, 17, 23, 230)     # --surface-1
+BG_2 = QColor(20, 26, 33, 230)     # --surface-2
+BORDER_DIM = QColor(28, 33, 40)    # --border-dim (keep)
+BORDER_BRIGHT = QColor(45, 51, 59) # --border-bright (keep)
 
-ACCENT_GREEN = QColor(29, 209, 161)
-ACCENT_BLUE = QColor(74, 158, 255)
-ACCENT_RED = QColor(255, 107, 107)
-ACCENT_AMBER = QColor(255, 169, 77)
+ACCENT_GREEN = QColor(46, 160, 67)   # --accent-green #2ea043
+ACCENT_BLUE = QColor(0, 161, 255)    # --accent-blue #00a1ff
+ACCENT_RED = QColor(255, 77, 77)     # --accent-red #ff4d4d
+ACCENT_AMBER = QColor(247, 129, 102) # --accent-orange #f78166
+ACCENT_PURPLE = QColor(188, 140, 255) # --accent-purple #bc8cff
 
-TEXT_PRIMARY = QColor(240, 244, 255)
-TEXT_SECONDARY = QColor(125, 133, 144)
-TEXT_MUTED = QColor(156, 163, 175)
+TEXT_PRIMARY = QColor(230, 237, 243)   # --text-primary
+TEXT_SECONDARY = QColor(125, 133, 144) # --text-secondary
+TEXT_MUTED = QColor(72, 79, 88)       # --text-muted
 
-FONT_TITLE = "Geist"
-FONT_VALUE = "JetBrains Mono"
+FONT_TITLE = "Rajdhani"   # change from Geist to Rajdhani
+FONT_VALUE = "JetBrains Mono"  # keep for numeric values
 
 
 def qcolor_hex(c: QColor) -> str:
@@ -156,7 +157,7 @@ class SettingsDialog(QDialog):
         self.setStyleSheet(f"""
             QDialog {{ background-color: {qcolor_hex(BG_0)}; color: {qcolor_hex(TEXT_PRIMARY)};
                        border: 1px solid {qcolor_hex(BORDER_BRIGHT)}; border-radius: 8px; }}
-            QLabel {{ color: {qcolor_hex(TEXT_PRIMARY)}; font-family: Geist; }}
+            QLabel {{ color: {qcolor_hex(TEXT_PRIMARY)}; font-family: 'Rajdhani', 'Inter', sans-serif; }}
             QCheckBox {{ color: {qcolor_hex(TEXT_PRIMARY)}; font-family: 'JetBrains Mono';
                          spacing: 8px; padding: 4px 0; }}
             QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
@@ -167,10 +168,14 @@ class SettingsDialog(QDialog):
             QSlider::handle:horizontal {{ background: {qcolor_hex(ACCENT_BLUE)}; width: 14px; height: 14px;
                                           margin: -5px 0; border-radius: 7px; }}
             QSlider::sub-page:horizontal {{ background: {qcolor_hex(ACCENT_BLUE)}; border-radius: 2px; }}
-            QPushButton {{ background: {qcolor_hex(ACCENT_BLUE)}; color: {qcolor_hex(TEXT_PRIMARY)};
+            QPushButton {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                           stop:0 {qcolor_hex(ACCENT_BLUE)}, stop:1 #0072cc);
+                           color: {qcolor_hex(TEXT_PRIMARY)};
                            border: none; padding: 6px 16px; border-radius: 4px;
-                           font-family: Geist; font-weight: bold; font-size: 11px; }}
-            QPushButton:hover {{ background: {qcolor_hex(QColor(33, 55, 99))}; }}
+                           font-family: 'Rajdhani', 'Inter', sans-serif; font-weight: bold; font-size: 11px; }}
+            QPushButton:hover {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                 stop:0 #00b8ff, stop:1 #0088dd); }}
+            QRadioButton {{ color: {qcolor_hex(TEXT_PRIMARY)}; font-family: 'Rajdhani', 'Inter', sans-serif; font-size: 12px; }}
         """)
 
         layout = QVBoxLayout(self)
@@ -234,7 +239,6 @@ class SettingsDialog(QDialog):
         self._rb_full.setChecked(full_mode)
         self._rb_modular.setChecked(not full_mode)
         for rb in [self._rb_full, self._rb_modular]:
-            rb.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; font-family: Geist; font-size: 12px;")
             rb.toggled.connect(self._on_mode_change)
         mode_layout.addWidget(self._rb_full)
         mode_layout.addWidget(self._rb_modular)
@@ -416,17 +420,26 @@ class OverlayWidget(QWidget):
         grid.setContentsMargins(0, 4, 0, 4)
 
         def cell(label, default="\u2014", fs=10):
-            w = QVBoxLayout()
+            container = QWidget()
+            container.setStyleSheet(f"""
+                QWidget {{
+                    background: transparent;
+                    border-left: 3px solid {qcolor_hex(ACCENT_BLUE)};
+                    padding-left: 6px;
+                }}
+            """)
+            w = QVBoxLayout(container)
+            w.setContentsMargins(0, 0, 0, 0)
             w.setSpacing(2)
             lbl = QLabel(label)
             lbl.setFont(QFont(FONT_TITLE, 7, QFont.Weight.Bold))
-            lbl.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; letter-spacing: 1px;")
+            lbl.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; letter-spacing: 1px; background: transparent;")
             val = QLabel(default)
             val.setFont(QFont(FONT_VALUE, fs, QFont.Weight.Bold))
-            val.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)};")
+            val.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; background: transparent;")
             w.addWidget(lbl)
             w.addWidget(val)
-            return w, val
+            return container, val
 
         c1, self._lbl_delta    = cell("DELTA", "+0.000", 11)
         c2, self._lbl_lap_time = cell("GIRO", "\u2014", 11)
@@ -438,15 +451,15 @@ class OverlayWidget(QWidget):
         c8, self._lbl_compound = cell("MESCOLA", "\u2014", 10)
         c9, self._lbl_pit      = cell("BOX", "\u2014", 11)
 
-        grid.addLayout(c1, 0, 0)
-        grid.addLayout(c2, 0, 1)
-        grid.addLayout(c3, 0, 2)
-        grid.addLayout(c4, 1, 0)
-        grid.addLayout(c5, 1, 1)
-        grid.addLayout(c6, 1, 2)
-        grid.addLayout(c7, 2, 0)
-        grid.addLayout(c8, 2, 1)
-        grid.addLayout(c9, 2, 2)
+        grid.addWidget(c1, 0, 0)
+        grid.addWidget(c2, 0, 1)
+        grid.addWidget(c3, 0, 2)
+        grid.addWidget(c4, 1, 0)
+        grid.addWidget(c5, 1, 1)
+        grid.addWidget(c6, 1, 2)
+        grid.addWidget(c7, 2, 0)
+        grid.addWidget(c8, 2, 1)
+        grid.addWidget(c9, 2, 2)
         outer.addLayout(grid)
 
         # Weather row
@@ -456,9 +469,9 @@ class OverlayWidget(QWidget):
         c10, self._lbl_weather   = cell("METEO", "\u2014", 10)
         c11, self._lbl_track_temp = cell("PISTA", "\u2014", 10)
         c12, self._lbl_ambient   = cell("ARIA", "\u2014", 10)
-        wg.addLayout(c10, 0, 0)
-        wg.addLayout(c11, 0, 1)
-        wg.addLayout(c12, 0, 2)
+        wg.addWidget(c10, 0, 0)
+        wg.addWidget(c11, 0, 1)
+        wg.addWidget(c12, 0, 2)
         outer.addLayout(wg)
 
         # Warning
@@ -485,15 +498,39 @@ class OverlayWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect()
-        painter.setBrush(QBrush(BG_0))
-        painter.setPen(QPen(ACCENT_GREEN.darker(150), 1))
-        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
-        grad = QLinearGradient(0, 0, rect.width(), 0)
-        grad.setColorAt(0.0, ACCENT_GREEN)
-        grad.setColorAt(1.0, ACCENT_BLUE)
-        painter.setBrush(QBrush(grad))
+
+        # Shadow / depth effect
+        painter.setBrush(QBrush(QColor(0, 0, 0, 50)))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(0, 0, rect.width(), 2, 2, 2)
+        painter.drawRoundedRect(rect.adjusted(2, 2, 0, 0), 8, 8)
+
+        # Background
+        painter.setBrush(QBrush(BG_0))
+        pen = QPen(BORDER_BRIGHT, 1)
+        painter.setPen(pen)
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
+
+        # Grid dot pattern
+        painter.setPen(QPen(QColor(255, 255, 255, 6), 1))
+        dot_spacing = 24
+        for x in range(dot_spacing, rect.width(), dot_spacing):
+            for y in range(dot_spacing, rect.height(), dot_spacing):
+                painter.drawPoint(x, y)
+
+        # Top accent bar (6px blue with glow)
+        painter.setBrush(QBrush(ACCENT_BLUE))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(0, 0, rect.width(), 6, 3, 3)
+        glow = QLinearGradient(0, 0, 0, 24)
+        glow.setColorAt(0.0, QColor(0, 161, 255, 80))
+        glow.setColorAt(1.0, QColor(0, 161, 255, 0))
+        painter.setBrush(QBrush(glow))
+        painter.drawRoundedRect(0, 0, rect.width(), 24, 3, 3)
+
+        # Left accent bar (3px blue)
+        painter.setBrush(QBrush(ACCENT_BLUE))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(2, 14, 3, rect.height() - 28, 1, 1)
 
     # ── Drag ────────────────────────────────────────────────────────────────
 
@@ -583,14 +620,14 @@ class OverlayWidget(QWidget):
         fl = frame.fuel
         self._lbl_fuel.setText(f"{fl:.0f}L")
         self._lbl_fuel.setStyleSheet(
-            f"color: {qcolor_hex(ACCENT_AMBER) if fl < 10 else qcolor_hex(TEXT_PRIMARY)};"
+            f"color: {qcolor_hex(ACCENT_RED) if fl < 10 else qcolor_hex(TEXT_PRIMARY)};"
         )
 
         # Fuel laps
         f_laps = self._estimate_fuel_laps(frame)
         self._lbl_fuel_laps.setText(f"{f_laps:.1f}")
         self._lbl_fuel_laps.setStyleSheet(
-            f"color: {qcolor_hex(ACCENT_AMBER) if f_laps < 3 else qcolor_hex(TEXT_PRIMARY)};"
+            f"color: {qcolor_hex(ACCENT_RED) if f_laps < 3 else qcolor_hex(TEXT_PRIMARY)};"
         )
 
         # Refuel suggestion
@@ -601,7 +638,7 @@ class OverlayWidget(QWidget):
         else:
             self._lbl_fuel.setText(f"{frame.fuel:.0f}L")
             self._lbl_fuel.setStyleSheet(
-                f"color: {qcolor_hex(ACCENT_AMBER) if frame.fuel < 10 else qcolor_hex(TEXT_PRIMARY)};"
+                f"color: {qcolor_hex(ACCENT_RED) if frame.fuel < 10 else qcolor_hex(TEXT_PRIMARY)};"
             )
 
         # Wear
@@ -640,7 +677,7 @@ class OverlayWidget(QWidget):
         # Warning
         if f_laps < 2 and not frame.in_pits:
             self._lbl_warning.setText("CARBURANTE CRITICO")
-            self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)}; padding: 2px;")
+            self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; padding: 2px;")
             self._lbl_warning.setVisible(True)
         elif self._pit_plan and self._current_lap in self._pit_plan:
             self._lbl_warning.setText("BOX QUESTO GIRO")

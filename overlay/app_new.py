@@ -54,23 +54,24 @@ from overlay.strategy_refresher import (
 # Design System (aligned with web UI & app.py)
 # ══════════════════════════════════════════════════════════════════════════════
 
-BG_0 = QColor(10, 14, 24, 230)
-BG_1 = QColor(17, 21, 31, 220)
-BG_2 = QColor(22, 29, 46, 220)
-BORDER_DIM = QColor(28, 33, 40, 255)
-BORDER_BRIGHT = QColor(45, 51, 59, 255)
+BG_0 = QColor(5, 7, 9, 240)        # --bg-app with alpha
+BG_1 = QColor(13, 17, 23, 230)     # --surface-1
+BG_2 = QColor(20, 26, 33, 230)     # --surface-2
+BORDER_DIM = QColor(28, 33, 40)    # --border-dim (keep)
+BORDER_BRIGHT = QColor(45, 51, 59) # --border-bright (keep)
 
-ACCENT_GREEN = QColor(29, 209, 161)
-ACCENT_BLUE = QColor(74, 158, 255)
-ACCENT_RED = QColor(255, 107, 107)
-ACCENT_AMBER = QColor(255, 169, 77)
+ACCENT_GREEN = QColor(46, 160, 67)   # --accent-green #2ea043
+ACCENT_BLUE = QColor(0, 161, 255)    # --accent-blue #00a1ff
+ACCENT_RED = QColor(255, 77, 77)     # --accent-red #ff4d4d
+ACCENT_AMBER = QColor(247, 129, 102) # --accent-orange #f78166
+ACCENT_PURPLE = QColor(188, 140, 255) # --accent-purple #bc8cff
 
-TEXT_PRIMARY = QColor(240, 244, 255)
-TEXT_SECONDARY = QColor(125, 133, 144)
-TEXT_MUTED = QColor(156, 163, 175)
+TEXT_PRIMARY = QColor(230, 237, 243)   # --text-primary
+TEXT_SECONDARY = QColor(125, 133, 144) # --text-secondary
+TEXT_MUTED = QColor(72, 79, 88)       # --text-muted
 
-FONT_TITLE = "Geist"
-FONT_VALUE = "JetBrains Mono"
+FONT_TITLE = "Rajdhani"   # change from Geist to Rajdhani
+FONT_VALUE = "JetBrains Mono"  # keep for numeric values
 
 # Default positions per component
 DEFAULT_POSITIONS = {
@@ -362,19 +363,38 @@ class MiniOverlay(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect()
 
+        # Shadow / depth effect
+        painter.setBrush(QBrush(QColor(0, 0, 0, 50)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(rect.adjusted(2, 2, 0, 0), 8, 8)
+
         # Background
         painter.setBrush(QBrush(BG_0))
         pen = QPen(BORDER_BRIGHT, 1)
         painter.setPen(pen)
         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
 
-        # Top gradient accent
-        grad = QLinearGradient(0, 0, rect.width(), 0)
-        grad.setColorAt(0.0, ACCENT_GREEN)
-        grad.setColorAt(1.0, ACCENT_BLUE)
-        painter.setBrush(QBrush(grad))
+        # Grid dot pattern
+        painter.setPen(QPen(QColor(255, 255, 255, 6), 1))
+        dot_spacing = 24
+        for x in range(dot_spacing, rect.width(), dot_spacing):
+            for y in range(dot_spacing, rect.height(), dot_spacing):
+                painter.drawPoint(x, y)
+
+        # Top accent bar (6px blue with glow)
+        painter.setBrush(QBrush(ACCENT_BLUE))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(0, 0, rect.width(), 2, 2, 2)
+        painter.drawRoundedRect(0, 0, rect.width(), 6, 3, 3)
+        glow = QLinearGradient(0, 0, 0, 24)
+        glow.setColorAt(0.0, QColor(0, 161, 255, 80))
+        glow.setColorAt(1.0, QColor(0, 161, 255, 0))
+        painter.setBrush(QBrush(glow))
+        painter.drawRoundedRect(0, 0, rect.width(), 24, 3, 3)
+
+        # Left accent bar (3px blue)
+        painter.setBrush(QBrush(ACCENT_BLUE))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(2, 14, 3, rect.height() - 28, 1, 1)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -390,16 +410,16 @@ class DeltaOverlay(MiniOverlay):
 
     def update_value(self, delta: float, **_unused):
         sign = "+" if delta > 0 else ""
-        color = qcolor_hex(ACCENT_GREEN) if delta <= 0 else qcolor_hex(ACCENT_AMBER) if delta < 1 else qcolor_hex(ACCENT_RED)
+        color = qcolor_hex(ACCENT_GREEN) if delta <= 0 else qcolor_hex(ACCENT_RED)
         self._value.setText(f"{sign}{delta:.3f}")
         self._value.setStyleSheet(f"color: {color};")
 
         # Visual bar via background opacity based on delta magnitude
         intensity = min(abs(delta) * 20, 100)
         if delta > 0:
-            bar_color = f"rgba(255, 107, 107, {intensity / 300.0})"
+            bar_color = f"rgba(255, 77, 77, {intensity / 300.0})"
         else:
-            bar_color = f"rgba(29, 209, 161, {intensity / 300.0})"
+            bar_color = f"rgba(46, 160, 67, {intensity / 300.0})"
         self.setStyleSheet(f"background-color: {bar_color};")
 
 
@@ -414,7 +434,7 @@ class FuelOverlay(MiniOverlay):
         if fuel_laps < 2:
             color = qcolor_hex(ACCENT_RED)
         elif fuel_laps < 3:
-            color = qcolor_hex(ACCENT_AMBER)
+            color = qcolor_hex(ACCENT_RED)
         else:
             color = qcolor_hex(TEXT_PRIMARY)
 
@@ -1259,7 +1279,7 @@ class SettingsDialog(QDialog):
             }}
             QLabel {{
                 color: {qcolor_hex(TEXT_PRIMARY)};
-                font-family: Geist;
+                font-family: 'Rajdhani', 'Inter', sans-serif;
             }}
             .section-label {{
                 color: {qcolor_hex(TEXT_MUTED)};
@@ -1299,17 +1319,24 @@ class SettingsDialog(QDialog):
                 border-radius: 2px;
             }}
             QPushButton {{
-                background: {qcolor_hex(ACCENT_BLUE)};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {qcolor_hex(ACCENT_BLUE)}, stop:1 #0072cc);
                 color: {qcolor_hex(TEXT_PRIMARY)};
                 border: none;
                 padding: 6px 16px;
                 border-radius: 4px;
-                font-family: Geist;
+                font-family: 'Rajdhani', 'Inter', sans-serif;
                 font-weight: bold;
                 font-size: 11px;
             }}
             QPushButton:hover {{
-                background: {qcolor_hex(QColor(33, 55, 99))};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00b8ff, stop:1 #0088dd);
+            }}
+            QRadioButton {{
+                color: {qcolor_hex(TEXT_PRIMARY)};
+                font-family: 'Rajdhani', 'Inter', sans-serif;
+                font-size: 12px;
             }}
         """)
 
@@ -1395,7 +1422,6 @@ class SettingsDialog(QDialog):
         self._rb_full.setChecked(full_mode)
         self._rb_modular.setChecked(not full_mode)
         for rb in [self._rb_full, self._rb_modular]:
-            rb.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; font-family: Geist; font-size: 12px;")
             rb.toggled.connect(self._on_mode_change)
         mode_layout.addWidget(self._rb_full)
         mode_layout.addWidget(self._rb_modular)
@@ -1533,9 +1559,22 @@ class ManagerTray(QWidget):
     def paintEvent(self, _event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect()
+
+        # Shadow / depth effect
+        painter.setBrush(QBrush(QColor(0, 0, 0, 50)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(rect.adjusted(2, 2, 0, 0), 8, 8)
+
+        # Background
         painter.setBrush(QBrush(BG_0))
         painter.setPen(QPen(BORDER_BRIGHT, 1))
-        painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 8, 8)
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
+
+        # Top accent bar (6px blue)
+        painter.setBrush(QBrush(ACCENT_BLUE))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(0, 0, rect.width(), 6, 3, 3)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
