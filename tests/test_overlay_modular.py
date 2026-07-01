@@ -113,7 +113,7 @@ def test_delta_overlay_rendering(tmp_config_path, qt_app):
     # Positive delta >= 1 → red
     ov.update_value(1.5)
     assert "+1.500" in ov._value.text()
-    assert "rgb(255, 77, 77)" in ov._value.styleSheet() or "ff4d4d" in ov._value.styleSheet().lower()
+    assert "rgb(255, 34, 0)" in ov._value.styleSheet() or "ff2200" in ov._value.styleSheet().lower()
     # Negative delta → green
     ov.update_value(-0.123)
     assert "-0.123" in ov._value.text()

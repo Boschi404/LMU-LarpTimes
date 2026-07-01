@@ -56,27 +56,33 @@ from overlay.voice_engine import VoiceEngine
 from analysis.race_engineer import RaceEngineer
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Design System (aligned with web UI & app.py)
+# Design System — v2 Cockpit (aligned with web UI & app.py)
 # ══════════════════════════════════════════════════════════════════════════════
 
-BG_0 = QColor(5, 7, 9, 240)        # --bg-app with alpha
-BG_1 = QColor(13, 17, 23, 230)     # --surface-1
-BG_2 = QColor(20, 26, 33, 230)     # --surface-2
-BORDER_DIM = QColor(28, 33, 40)    # --border-dim (keep)
-BORDER_BRIGHT = QColor(45, 51, 59) # --border-bright (keep)
+BG_DEEP = QColor(7, 8, 9)
+BG_APP = QColor(10, 12, 14)
+BG_SURFACE = QColor(15, 19, 23)
+BG_ELEVATED = QColor(22, 27, 32)
+BG_INSET = QColor(30, 37, 44)
+BORDER = QColor(30, 37, 44)
+BORDER_STRONG = QColor(40, 48, 56)
 
-ACCENT_GREEN = QColor(46, 160, 67)   # --accent-green #2ea043
-ACCENT_BLUE = QColor(0, 161, 255)    # --accent-blue #00a1ff
-ACCENT_RED = QColor(255, 77, 77)     # --accent-red #ff4d4d
-ACCENT_AMBER = QColor(247, 129, 102) # --accent-orange #f78166
-ACCENT_PURPLE = QColor(188, 140, 255) # --accent-purple #bc8cff
+ACCENT_AMBER = QColor(255, 107, 0)
+ACCENT_AMBER_BRIGHT = QColor(255, 136, 0)
+ACCENT_RED = QColor(255, 34, 0)
+ACCENT_GREEN = QColor(0, 255, 136)
+ACCENT_BLUE = QColor(0, 136, 255)
+ACCENT_PURPLE = QColor(170, 102, 255)
+ACCENT_CYAN = QColor(0, 200, 255)
 
-TEXT_PRIMARY = QColor(230, 237, 243)   # --text-primary
-TEXT_SECONDARY = QColor(125, 133, 144) # --text-secondary
-TEXT_MUTED = QColor(72, 79, 88)       # --text-muted
+TEXT_PRIMARY = QColor(240, 244, 248)
+TEXT_SECONDARY = QColor(200, 212, 224)
+TEXT_TERTIARY = QColor(90, 106, 122)
+TEXT_MUTED = QColor(53, 64, 74)
 
-FONT_TITLE = "Rajdhani"   # change from Geist to Rajdhani
-FONT_VALUE = "JetBrains Mono"  # keep for numeric values
+FONT_DISPLAY = "Rajdhani"
+FONT_MONO = "JetBrains Mono"
+FONT_UI = "Inter"
 
 # Default positions per component
 DEFAULT_POSITIONS = {
@@ -338,10 +344,10 @@ class MiniOverlay(QWidget):
         layout.setContentsMargins(14, 10, 14, 10)
         layout.setSpacing(2)
         self._title = QLabel(COMPONENT_LABELS[self.component_key].upper())
-        self._title.setFont(QFont(FONT_TITLE, 7, QFont.Weight.Bold))
+        self._title.setFont(QFont(FONT_DISPLAY, 7, QFont.Weight.Bold))
         self._title.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)}; letter-spacing: 1px;")
         self._value = QLabel("—")
-        self._value.setFont(QFont(FONT_VALUE, 18, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 18, QFont.Weight.Bold))
         self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)};")
         self._value.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self._title)
@@ -384,11 +390,11 @@ class MiniOverlay(QWidget):
     def contextMenuEvent(self, event):
         menu = QMenu(self)
         menu.setStyleSheet(f"""
-            QMenu {{ background-color: {qcolor_hex(BG_0)}; color: {qcolor_hex(TEXT_PRIMARY)};
-                     border: 1px solid {qcolor_hex(BORDER_BRIGHT)}; padding: 4px; }}
+            QMenu {{ background-color: {qcolor_hex(BG_DEEP)}; color: {qcolor_hex(TEXT_PRIMARY)};
+                     border: 1px solid {qcolor_hex(BORDER_STRONG)}; padding: 4px; }}
             QMenu::item {{ padding: 6px 24px; }}
-            QMenu::item:selected {{ background-color: {qcolor_hex(ACCENT_BLUE)}; }}
-            QMenu::separator {{ height: 1px; background: {qcolor_hex(BORDER_BRIGHT)}; margin: 4px 8px; }}
+            QMenu::item:selected {{ background-color: {qcolor_hex(ACCENT_AMBER)}; }}
+            QMenu::separator {{ height: 1px; background: {qcolor_hex(BORDER_STRONG)}; margin: 4px 8px; }}
         """)
 
         header = menu.addAction(f"  {COMPONENT_LABELS[self.component_key]}")
@@ -449,31 +455,32 @@ class MiniOverlay(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect.adjusted(2, 2, 0, 0), 8, 8)
 
-        # Background
-        painter.setBrush(QBrush(BG_0))
-        pen = QPen(BORDER_BRIGHT, 1)
+        # Background — BG_DEEP
+        painter.setBrush(QBrush(BG_DEEP))
+        pen = QPen(BORDER, 1)
         painter.setPen(pen)
         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
 
-        # Grid dot pattern
+        # Carbon fiber texture dots
         painter.setPen(QPen(QColor(255, 255, 255, 6), 1))
         dot_spacing = 24
         for x in range(dot_spacing, rect.width(), dot_spacing):
             for y in range(dot_spacing, rect.height(), dot_spacing):
                 painter.drawPoint(x, y)
 
-        # Top accent bar (6px blue with glow)
-        painter.setBrush(QBrush(ACCENT_BLUE))
+        # Top accent bar — SOLID amber (ACCENT_AMBER) 6px
+        painter.setBrush(QBrush(ACCENT_AMBER))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(0, 0, rect.width(), 6, 3, 3)
+        # Amber glow
         glow = QLinearGradient(0, 0, 0, 24)
-        glow.setColorAt(0.0, QColor(0, 161, 255, 80))
-        glow.setColorAt(1.0, QColor(0, 161, 255, 0))
+        glow.setColorAt(0.0, QColor(255, 107, 0, 80))
+        glow.setColorAt(1.0, QColor(255, 107, 0, 0))
         painter.setBrush(QBrush(glow))
         painter.drawRoundedRect(0, 0, rect.width(), 24, 3, 3)
 
-        # Left accent bar (3px blue)
-        painter.setBrush(QBrush(ACCENT_BLUE))
+        # Left accent bar (3px amber)
+        painter.setBrush(QBrush(ACCENT_AMBER))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(2, 14, 3, rect.height() - 28, 1, 1)
 
@@ -487,7 +494,7 @@ class DeltaOverlay(MiniOverlay):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._value.setFont(QFont(FONT_VALUE, 14, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 14, QFont.Weight.Bold))
 
     def update_value(self, delta: float, **_unused):
         sign = "+" if delta > 0 else ""
@@ -509,22 +516,22 @@ class FuelOverlay(MiniOverlay):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._value.setFont(QFont(FONT_VALUE, 13, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 13, QFont.Weight.Bold))
 
     def update_value(self, fuel_laps: float, refuel_l: Optional[float] = None, **_unused):
         if fuel_laps < 2:
             color = qcolor_hex(ACCENT_RED)
         elif fuel_laps < 3:
-            color = qcolor_hex(ACCENT_RED)
+            color = qcolor_hex(ACCENT_AMBER)
         else:
             color = qcolor_hex(TEXT_PRIMARY)
 
         if refuel_l is not None and refuel_l > 0:
             text = f"{fuel_laps:.1f}L / +{refuel_l:.1f}L"
-            self._value.setFont(QFont(FONT_VALUE, 10, QFont.Weight.Bold))
+            self._value.setFont(QFont(FONT_MONO, 10, QFont.Weight.Bold))
         else:
             text = f"{fuel_laps:.1f}"
-            self._value.setFont(QFont(FONT_VALUE, 13, QFont.Weight.Bold))
+            self._value.setFont(QFont(FONT_MONO, 13, QFont.Weight.Bold))
 
         self._value.setText(text)
         self._value.setStyleSheet(f"color: {color};")
@@ -536,7 +543,7 @@ class CliffOverlay(MiniOverlay):
     def update_value(self, cliff_laps: int, **_unused):
         if cliff_laps >= 999:
             text = "—"
-            color = qcolor_hex(TEXT_MUTED)
+            color = qcolor_hex(TEXT_TERTIARY)
         else:
             text = str(cliff_laps)
             color = qcolor_hex(ACCENT_AMBER) if cliff_laps < 5 else qcolor_hex(TEXT_PRIMARY)
@@ -549,15 +556,15 @@ class PitOverlay(MiniOverlay):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._value.setFont(QFont(FONT_VALUE, 14, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 14, QFont.Weight.Bold))
 
     def update_value(self, pit_plan: Optional[List[int]], current_lap: int, **_unused):
         if not pit_plan:
-            text, color = "—", qcolor_hex(TEXT_MUTED)
+            text, color = "—", qcolor_hex(TEXT_TERTIARY)
         else:
             next_pit = next((l for l in pit_plan if l >= current_lap), None)
             if next_pit is None:
-                text, color = "—", qcolor_hex(TEXT_MUTED)
+                text, color = "—", qcolor_hex(TEXT_TERTIARY)
             elif next_pit == current_lap:
                 text, color = "BOX", qcolor_hex(ACCENT_RED)
             else:
@@ -574,12 +581,12 @@ class WeatherOverlay(MiniOverlay):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("METEO".upper())
-        self._value.setFont(QFont(FONT_VALUE, 12, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 12, QFont.Weight.Bold))
 
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None or not frame.weather_state:
             self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             return
         w = frame.weather_state or "—"
         tt = f"{frame.track_temp:.0f}°" if frame.track_temp else "—"
@@ -589,8 +596,7 @@ class WeatherOverlay(MiniOverlay):
         if rain:
             parts.append(rain)
         self._value.setText(" | ".join(parts))
-        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; font-size: 9px;")
-
+        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_CYAN)}; font-size: 9px;")
 
 class WearOverlay(MiniOverlay):
     """Shows tyre wear percentages and live remaining-life prediction."""
@@ -599,10 +605,10 @@ class WearOverlay(MiniOverlay):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("USURA GOMME".upper())
-        self._value.setFont(QFont(FONT_VALUE, 11, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
         # Status line for tyre prediction
         self._status = QLabel("")
-        self._status.setFont(QFont(FONT_VALUE, 7, QFont.Weight.Medium))
+        self._status.setFont(QFont(FONT_MONO, 7, QFont.Weight.Medium))
         self._status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
         self._status.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self._status.setWordWrap(False)
@@ -619,7 +625,7 @@ class WearOverlay(MiniOverlay):
     ):
         if frame is None:
             self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             self._status.setText("")
             return
 
@@ -693,12 +699,12 @@ class CompoundOverlay(MiniOverlay):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("MESCOLA".upper())
-        self._value.setFont(QFont(FONT_VALUE, 12, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 12, QFont.Weight.Bold))
 
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None:
             self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             return
         compound = frame.tyre_compounds[0] or "—"
         self._value.setText(compound)
@@ -712,12 +718,12 @@ class SectorsOverlay(MiniOverlay):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("SETTORI".upper())
-        self._value.setFont(QFont(FONT_VALUE, 11, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
 
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None:
             self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             return
         s1 = frame.last_sector1 if frame.last_sector1 else 0
         s2 = frame.last_sector2 - frame.last_sector1 if (frame.last_sector2 and frame.last_sector1) else 0
@@ -733,12 +739,12 @@ class PracticeOverlay(MiniOverlay):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("PRATICA".upper())
-        self._value.setFont(QFont(FONT_VALUE, 10, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 10, QFont.Weight.Bold))
 
     def update_value(self, practice_data: Optional[Dict[str, Any]] = None, **_unused):
         if practice_data is None:
             self._value.setText("\u2014")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px;")
             return
 
         total = practice_data.get("total_laps", 0)
@@ -762,7 +768,7 @@ class PracticeOverlay(MiniOverlay):
 
         text = " | ".join(lines)
         self._value.setText(text)
-        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; font-size: 9px;")
+        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)}; font-size: 9px;")
 
 class QualifyingOverlay(MiniOverlay):
     """Shows qualifying-specific info: best hotlap, fuel saving, outlap/inlap delta."""
@@ -771,12 +777,12 @@ class QualifyingOverlay(MiniOverlay):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("QUALIFICA".upper())
-        self._value.setFont(QFont(FONT_VALUE, 11, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
 
     def update_value(self, qualy_data: Optional[Dict[str, Any]] = None, **_unused):
         if qualy_data is None:
             self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             return
 
         best = qualy_data.get("best_hotlap_time")
@@ -838,7 +844,7 @@ class QualifyingOverlay(MiniOverlay):
             self._value.setStyleSheet(f"color: {qcolor_hex(indicator_color)}; font-size: 10px;")
         else:
             self._value.setText("Collecting data\u2026")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px;")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -858,7 +864,7 @@ class WarningOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setFixedHeight(38)
         self._text = QLabel("")
-        self._text.setFont(QFont(FONT_TITLE, 10, QFont.Weight.Bold))
+        self._text.setFont(QFont(FONT_DISPLAY, 10, QFont.Weight.Bold))
         self._text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 6, 16, 6)
@@ -1040,11 +1046,11 @@ class OverlayManager(QObject):
         """
         menu = QMenu()
         menu.setStyleSheet(f"""
-            QMenu {{ background-color: {qcolor_hex(BG_0)}; color: {qcolor_hex(TEXT_PRIMARY)};
-                     border: 1px solid {qcolor_hex(BORDER_BRIGHT)}; padding: 6px; }}
+            QMenu {{ background-color: {qcolor_hex(BG_DEEP)}; color: {qcolor_hex(TEXT_PRIMARY)};
+                     border: 1px solid {qcolor_hex(BORDER_STRONG)}; padding: 6px; }}
             QMenu::item {{ padding: 6px 28px 6px 8px; }}
-            QMenu::item:selected {{ background-color: {qcolor_hex(ACCENT_BLUE)}; }}
-            QMenu::separator {{ height: 1px; background: {qcolor_hex(BORDER_BRIGHT)}; margin: 4px 8px; }}
+            QMenu::item:selected {{ background-color: {qcolor_hex(ACCENT_AMBER)}; }}
+            QMenu::separator {{ height: 1px; background: {qcolor_hex(BORDER_STRONG)}; margin: 4px 8px; }}
             QMenu::indicator {{ width: 14px; height: 14px; }}
         """)
 
@@ -1063,12 +1069,12 @@ class OverlayManager(QObject):
                 QCheckBox {{ color: {qcolor_hex(TEXT_PRIMARY)}; padding: 4px 8px; }}
                 QCheckBox::indicator {{ width: 14px; height: 14px; }}
                 QCheckBox::indicator:unchecked {{
-                    border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
-                    background: {qcolor_hex(BG_1)};
+                    border: 1px solid {qcolor_hex(BORDER_STRONG)};
+                    background: {qcolor_hex(BG_ELEVATED)};
                 }}
                 QCheckBox::indicator:checked {{
-                    border: 1px solid {qcolor_hex(ACCENT_BLUE)};
-                    background: {qcolor_hex(ACCENT_BLUE)};
+                    border: 1px solid {qcolor_hex(ACCENT_AMBER)};
+                    background: {qcolor_hex(ACCENT_AMBER)};
                 }}
             """)
             # Connect the toggle
@@ -1648,9 +1654,9 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(420)
         self.setStyleSheet(f"""
             QDialog {{
-                background-color: {qcolor_hex(BG_0)};
+                background-color: {qcolor_hex(BG_DEEP)};
                 color: {qcolor_hex(TEXT_PRIMARY)};
-                border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
+                border: 1px solid {qcolor_hex(BORDER_STRONG)};
                 border-radius: 8px;
             }}
             QLabel {{
@@ -1658,7 +1664,7 @@ class SettingsDialog(QDialog):
                 font-family: 'Rajdhani', 'Inter', sans-serif;
             }}
             .section-label {{
-                color: {qcolor_hex(TEXT_MUTED)};
+                color: {qcolor_hex(TEXT_TERTIARY)};
                 font-size: 10px;
                 text-transform: uppercase;
                 letter-spacing: 1px;
@@ -1671,32 +1677,32 @@ class SettingsDialog(QDialog):
             }}
             QCheckBox::indicator {{
                 width: 16px; height: 16px;
-                border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
-                background: {qcolor_hex(BG_1)};
+                border: 1px solid {qcolor_hex(BORDER_STRONG)};
+                background: {qcolor_hex(BG_ELEVATED)};
                 border-radius: 3px;
             }}
             QCheckBox::indicator:checked {{
-                background: {qcolor_hex(ACCENT_BLUE)};
-                border-color: {qcolor_hex(ACCENT_BLUE)};
+                background: {qcolor_hex(ACCENT_AMBER)};
+                border-color: {qcolor_hex(ACCENT_AMBER)};
             }}
             QSlider::groove:horizontal {{
                 height: 4px;
-                background: {qcolor_hex(BG_1)};
+                background: {qcolor_hex(BG_ELEVATED)};
                 border-radius: 2px;
             }}
             QSlider::handle:horizontal {{
-                background: {qcolor_hex(ACCENT_BLUE)};
+                background: {qcolor_hex(ACCENT_AMBER)};
                 width: 14px; height: 14px;
                 margin: -5px 0;
                 border-radius: 7px;
             }}
             QSlider::sub-page:horizontal {{
-                background: {qcolor_hex(ACCENT_BLUE)};
+                background: {qcolor_hex(ACCENT_AMBER)};
                 border-radius: 2px;
             }}
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {qcolor_hex(ACCENT_BLUE)}, stop:1 #0072cc);
+                    stop:0 {qcolor_hex(ACCENT_AMBER)}, stop:1 #CC5500);
                 color: {qcolor_hex(TEXT_PRIMARY)};
                 border: none;
                 padding: 6px 16px;
@@ -1707,7 +1713,7 @@ class SettingsDialog(QDialog):
             }}
             QPushButton:hover {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #00b8ff, stop:1 #0088dd);
+                    stop:0 #FF8800, stop:1 #CC5500);
             }}
             QRadioButton {{
                 color: {qcolor_hex(TEXT_PRIMARY)};
@@ -1722,12 +1728,12 @@ class SettingsDialog(QDialog):
 
         # ── Title ───────────────────────────────────────────────────────
         title = QLabel("Impostazioni")
-        title.setFont(QFont(FONT_TITLE, 14, QFont.Weight.Bold))
+        title.setFont(QFont(FONT_DISPLAY, 14, QFont.Weight.Bold))
         layout.addWidget(title)
 
         # ── Audio section ───────────────────────────────────────────────
         audio_label = QLabel("SUONI")
-        audio_label.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px; "
+        audio_label.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px; "
                                   "text-transform: uppercase; letter-spacing: 1px;")
         layout.addWidget(audio_label)
 
@@ -1739,14 +1745,14 @@ class SettingsDialog(QDialog):
         vol_layout = QHBoxLayout()
         vol_layout.setContentsMargins(24, 0, 0, 0)
         vol_label = QLabel("Volume:")
-        vol_label.setFont(QFont(FONT_VALUE, 10))
+        vol_label.setFont(QFont(FONT_MONO, 10))
         vol_label.setFixedWidth(60)
         self._volume_slider = QSlider(Qt.Orientation.Horizontal)
         self._volume_slider.setRange(0, 100)
         self._volume_slider.setValue(int(self._cfg.get("audio_volume", 1.0) * 100))
         self._volume_slider.valueChanged.connect(self._on_volume_change)
         self._vol_value = QLabel(f"{self._volume_slider.value()}%")
-        self._vol_value.setFont(QFont(FONT_VALUE, 10))
+        self._vol_value.setFont(QFont(FONT_MONO, 10))
         self._vol_value.setFixedWidth(40)
         vol_layout.addWidget(vol_label)
         vol_layout.addWidget(self._volume_slider, 1)
@@ -1759,7 +1765,7 @@ class SettingsDialog(QDialog):
 
         # ── Components section ──────────────────────────────────────────
         comp_label = QLabel("COMPONENTI VISIBILI")
-        comp_label.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px; "
+        comp_label.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px; "
                                  "text-transform: uppercase; letter-spacing: 1px;")
         layout.addWidget(comp_label)
 
@@ -1773,7 +1779,7 @@ class SettingsDialog(QDialog):
 
         # ── Mode toggles ────────────────────────────────────────────────
         mode_label = QLabel("MODALITÀ")
-        mode_label.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px; "
+        mode_label.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px; "
                                  "text-transform: uppercase; letter-spacing: 1px;")
         layout.addWidget(mode_label)
 
@@ -1789,7 +1795,7 @@ class SettingsDialog(QDialog):
 
         # ── Overlay mode ──────────────────────────────────────────────
         mode_label = QLabel("MODO OVERLAY")
-        mode_label.setStyleSheet("color: #7d8590; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
+        mode_label.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
         layout.addWidget(mode_label)
         mode_layout = QHBoxLayout()
         self._rb_full = QRadioButton("Full (1 finestra)")
@@ -1803,7 +1809,7 @@ class SettingsDialog(QDialog):
         mode_layout.addWidget(self._rb_modular)
         layout.addLayout(mode_layout)
         mode_hint = QLabel("Il cambio modalità richiede il riavvio dell'overlay")
-        mode_hint.setStyleSheet("color: #505664; font-size: 10px;")
+        mode_hint.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")
         layout.addWidget(mode_hint)
 
         # ── Reset buttons ───────────────────────────────────────────────
@@ -1906,7 +1912,7 @@ class ManagerTray(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self._btn = QLabel()
         self._btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pix = icon_pixmap(settings_icon(), size=22, color=qcolor_hex(ACCENT_BLUE))
+        pix = icon_pixmap(settings_icon(), size=22, color=qcolor_hex(ACCENT_AMBER))
         self._btn.setPixmap(pix)
         self._btn.setFixedSize(44, 44)
         layout.addWidget(self._btn)
@@ -1955,12 +1961,12 @@ class ManagerTray(QWidget):
         painter.drawRoundedRect(rect.adjusted(2, 2, 0, 0), 8, 8)
 
         # Background
-        painter.setBrush(QBrush(BG_0))
-        painter.setPen(QPen(BORDER_BRIGHT, 1))
+        painter.setBrush(QBrush(BG_DEEP))
+        painter.setPen(QPen(BORDER_STRONG, 1))
         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
 
-        # Top accent bar (6px blue)
-        painter.setBrush(QBrush(ACCENT_BLUE))
+        # Top accent bar (6px amber)
+        painter.setBrush(QBrush(ACCENT_AMBER))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(0, 0, rect.width(), 6, 3, 3)
 

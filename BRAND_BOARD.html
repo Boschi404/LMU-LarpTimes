@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LMU LarpTimes — Brand Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Design Tokens ── */
+:root {
+  --bg-deep: #030507;
+  --bg-app: #05080C;
+  --bg-surface: #0B1017;
+  --bg-elevated: #111A24;
+  --bg-inset: #182230;
+
+  --data-fast: #00E5A0;
+  --data-slow: #FF4466;
+  --data-neutral: #6B7D8F;
+  --data-blue: #0088FF;
+  --data-amber: #FF9000;
+  --data-purple: #8860FF;
+  --data-cyan: #00C8FF;
+  --data-surface: #1A2A3A;
+  --data-line: #2A3A4A;
+
+  --text-primary: #E8EDF2;
+  --text-secondary: #8A9BAB;
+  --text-tertiary: #4A5A6A;
+  --text-inverse: #05080C;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+  --space-10: 64px;
+
+  --radius-none: 0;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-full: 9999px;
+
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+}
+
+body { padding: var(--space-8); max-width: 1400px; margin: 0 auto; }
+
+/* ── Typography helpers ── */
+.font-display { font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+.font-ui { font-family: 'Inter', sans-serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ── Layout ── */
+.section { margin-bottom: var(--space-10); }
+.section:last-child { margin-bottom: 0; }
+
+.section-header {
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--data-surface);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.section-header h2 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.section-header .section-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.section-header .section-tagline {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  margin-left: auto;
+}
+
+/* ── Grid ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-5); }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--space-5); }
+.grid-6 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: var(--space-4); }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-5); }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5);
+  position: relative;
+}
+
+.card--accent-fast { border-left: 3px solid var(--data-fast); }
+.card--accent-slow { border-left: 3px solid var(--data-slow); }
+.card--accent-blue { border-left: 3px solid var(--data-blue); }
+.card--accent-amber { border-left: 3px solid var(--data-amber); }
+.card--accent-purple { border-left: 3px solid var(--data-purple); }
+.card--accent-cyan { border-left: 3px solid var(--data-cyan); }
+
+.card-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.card-value {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.card-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: var(--space-2);
+}
+
+/* ── Swatch ── */
+.swatch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.swatch-preview {
+  width: 100%;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--data-surface);
+}
+
+.swatch-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swatch-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.swatch-hex {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.625rem;
+  color: var(--text-tertiary);
+}
+
+.swatch-usage {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* ── Typography samples ── */
+.type-sample {
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5);
+  border: 1px solid var(--data-surface);
+}
+
+.type-sample + .type-sample { margin-top: var(--space-4); }
+
+.type-sample .type-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-3);
+  display: flex;
+  gap: var(--space-3);
+}
+
+.type-sample .type-label span {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.type-sample .type-content {
+  line-height: 1.4;
+}
+
+/* ── Components ── */
+.component-preview {
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5);
+  border: 1px solid var(--data-surface);
+}
+
+.component-preview .component-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+/* Buttons */
+.btn-row { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--space-4);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: default;
+  transition: none;
+}
+
+.btn--primary { background: var(--data-blue); color: var(--text-inverse); }
+.btn--secondary { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--data-line); }
+.btn--danger { background: var(--data-slow); color: var(--text-inverse); }
+.btn--ghost { background: transparent; color: var(--text-secondary); }
+.btn--disabled { background: var(--data-surface); color: var(--text-tertiary); cursor: not-allowed; }
+
+/* Filter bar */
+.filter-bar-demo {
+  background: var(--bg-surface);
+  border: 1px solid var(--data-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-group { display: flex; flex-direction: column; gap: var(--space-1); }
+
+.filter-group .filter-label {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+}
+
+.filter-group .filter-select {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: 1px solid var(--data-line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  min-width: 130px;
+  height: 32px;
+  appearance: none;
+}
+
+/* Badge */
+.badge-demo { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+.badge {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  line-height: 1.3;
+}
+
+.badge--hypercar { background: rgba(0,136,255,0.15); color: var(--data-blue); }
+.badge--lmp2 { background: rgba(0,229,160,0.15); color: var(--data-fast); }
+.badge--gt3 { background: rgba(255,68,102,0.15); color: var(--data-slow); }
+.badge--fast { background: rgba(0,229,160,0.15); color: var(--data-fast); }
+.badge--slow { background: rgba(255,68,102,0.15); color: var(--data-slow); }
+.badge--pit { background: rgba(255,144,0,0.15); color: var(--data-amber); }
+.badge--wet { background: rgba(0,136,255,0.15); color: var(--data-blue); }
+
+/* Table */
+.table-demo {
+  background: var(--bg-surface);
+  border: 1px solid var(--data-surface);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.table-demo table { width: 100%; border-collapse: collapse; }
+
+.table-demo th {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--data-surface);
+}
+
+.table-demo td {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid rgba(11,16,23,0.5);
+}
+
+.table-demo tr:last-child td { border-bottom: none; }
+.table-demo .num { text-align: right; font-feature-settings: "tnum"; }
+
+/* Toast */
+.toast-demo {
+  max-width: 400px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--bg-elevated);
+  border-left: 4px solid var(--data-amber);
+  padding: var(--space-2) var(--space-3);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.toast + .toast { margin-top: var(--space-2); }
+.toast.toast--critical { border-left-color: var(--data-slow); }
+.toast.toast--ok { border-left-color: var(--data-fast); }
+
+/* Chart mock */
+.chart-mock {
+  background: var(--bg-surface);
+  border: 1px solid var(--data-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  height: 200px;
+  position: relative;
+  overflow: hidden;
+}
+
+.chart-mock .chart-header {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-3);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-mock .chart-grid {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  right: 16px;
+  bottom: 24px;
+  border-left: 1px solid var(--data-surface);
+  border-bottom: 1px solid var(--data-surface);
+}
+
+.chart-mock .chart-grid::before {
+  content: '';
+  position: absolute;
+  top: 33%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--data-surface) 0, var(--data-surface) 4px, transparent 4px, transparent 8px);
+}
+.chart-mock .chart-grid::after {
+  content: '';
+  position: absolute;
+  top: 66%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--data-surface) 0, var(--data-surface) 4px, transparent 4px, transparent 8px);
+}
+
+.chart-line {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  right: 16px;
+  bottom: 24px;
+}
+
+.chart-line svg { width: 100%; height: 100%; }
+
+/* Sidebar mock */
+.sidebar-mock {
+  width: 200px;
+  background: var(--bg-deep);
+  border-right: 1px solid var(--data-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-mock .sidebar-brand {
+  padding: 0 var(--space-3) var(--space-4);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--data-surface);
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.03em;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sidebar-mock .sidebar-brand svg { flex-shrink: 0; }
+
+.sidebar-mock .sidebar-item {
+  padding: var(--space-2) var(--space-3);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  border-left: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: default;
+}
+
+.sidebar-mock .sidebar-item svg { width: 14px; height: 14px; stroke: var(--text-tertiary); flex-shrink: 0; }
+
+.sidebar-mock .sidebar-item.active {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border-left-color: var(--data-blue);
+}
+
+.sidebar-mock .sidebar-item.active svg { stroke: var(--data-blue); }
+
+/* Usage grid */
+.usage-item {
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.usage-item .usage-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.usage-item .usage-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Do / Don't */
+.do-dont {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.do-dont .do, .do-dont .dont {
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+}
+
+.do-dont .do {
+  background: rgba(0,229,160,0.05);
+  border: 1px solid rgba(0,229,160,0.15);
+}
+
+.do-dont .dont {
+  background: rgba(255,68,102,0.05);
+  border: 1px solid rgba(255,68,102,0.15);
+}
+
+.do-dont .tag {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-2);
+}
+
+.do-dont .do .tag { color: var(--data-fast); }
+.do-dont .dont .tag { color: var(--data-slow); }
+
+.do-dont p {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ── Intro ── */
+.intro {
+  margin-bottom: var(--space-10);
+  padding: var(--space-8);
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--data-surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.intro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--data-blue), var(--data-fast), var(--data-slow));
+}
+
+.intro h1 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 2.5rem;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.intro .subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  max-width: 640px;
+  line-height: 1.5;
+  margin-bottom: var(--space-5);
+}
+
+.intro .meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  display: flex;
+  gap: var(--space-5);
+}
+
+.intro .meta span { display: flex; align-items: center; gap: var(--space-2); }
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: var(--data-surface);
+  margin: var(--space-8) 0;
+}
+
+/* ── Motivation ── */
+.motivation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+
+.motivation-item {
+  background: var(--bg-surface);
+  padding: var(--space-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--data-surface);
+}
+
+.motivation-item .motivation-icon {
+  font-size: 1.5rem;
+  margin-bottom: var(--space-3);
+}
+
+.motivation-item h3 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+  letter-spacing: -0.01em;
+}
+
+.motivation-item p {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  body { padding: var(--space-4); }
+  .grid-2, .grid-3, .grid-4, .grid-6 { grid-template-columns: 1fr; }
+  .do-dont { grid-template-columns: 1fr; }
+  .motivation-grid { grid-template-columns: 1fr; }
+  .intro h1 { font-size: 1.75rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ INTRO ═══════════ -->
+<div class="intro">
+  <h1>LMU LarpTimes</h1>
+  <div class="subtitle">
+    Brand Board &mdash; Design System v1.0<br>
+    Pit wall engineering &mdash; ogni pixel lavora per il pilota.
+  </div>
+  <div class="meta">
+    <span>⏱ v1.0 &middot; Bozza di revisione</span>
+    <span>🎯 Target: Sim-racer endurance multiclasse</span>
+    <span>🏎 Filosofia: Signal over noise</span>
+  </div>
+</div>
+
+<!-- ═══════════ MANIFESTO ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">00</span>
+    <h2>Anti-AI-Slop Manifesto</h2>
+    <span class="section-tagline">Cosa rende professionale vs generato</span>
+  </div>
+
+  <div class="motivation-grid">
+    <div class="motivation-item">
+      <div class="motivation-icon">⛔</div>
+      <h3>Niente glassmorphism</h3>
+      <p>Superfici solide, opache, con purpose. Il vetro in telemetria &egrave; rumore cognitivo senza beneficio.</p>
+    </div>
+    <div class="motivation-item">
+      <div class="motivation-icon">🎨</div>
+      <h3>Ogni colore &egrave; un dato</h3>
+      <p>Verde = pi&ugrave; veloce, rosso = pi&ugrave; lento, blu = selezionato. Mai colori decorativi senza significato.</p>
+    </div>
+    <div class="motivation-item">
+      <div class="motivation-icon">🔤</div>
+      <h3>Tre font, tre ruoli</h3>
+      <p>Aktiv Grotesk per display, JetBrains Mono per dati, Inter per UI. Ognuno con un lavoro specifico.</p>
+    </div>
+    <div class="motivation-item">
+      <div class="motivation-icon">📊</div>
+      <h3>Il dato &egrave; la UI</h3>
+      <p>Ogni elemento decorativo che non veicola informazione &egrave; rumore. Massimo data-ink ratio.</p>
+    </div>
+    <div class="motivation-item">
+      <div class="motivation-icon">⚡</div>
+      <h3>Motion al millisecondo</h3>
+      <p>80ms tooltip, 100ms data flash, 150ms page transition. Mai animationi decorative.</p>
+    </div>
+    <div class="motivation-item">
+      <div class="motivation-icon">🎙</div>
+      <h3>Race Engineer, non coach</h3>
+      <p>"Box this lap. Fuel critical." Non "Great job, keep pushing!" Meno parole, pi&ugrave; dati.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ COLOR SYSTEM ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">01</span>
+    <h2>Color System</h2>
+    <span class="section-tagline">Ogni colore ha un significato funzionale</span>
+  </div>
+
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Background &mdash; Gerarchia di profondit&agrave;</h3>
+  <div class="grid-6" style="margin-bottom:var(--space-6);">
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--bg-deep);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--bg-deep</span>
+        <span class="swatch-hex">#030507</span>
+        <span class="swatch-usage">Sidebar, fondale assoluto</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--bg-app);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--bg-app</span>
+        <span class="swatch-hex">#05080C</span>
+        <span class="swatch-usage">Main background</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--bg-surface);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--bg-surface</span>
+        <span class="swatch-hex">#0B1017</span>
+        <span class="swatch-usage">Card, container</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--bg-elevated);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--bg-elevated</span>
+        <span class="swatch-hex">#111A24</span>
+        <span class="swatch-usage">Hover, modal, toast</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--bg-inset);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--bg-inset</span>
+        <span class="swatch-hex">#182230</span>
+        <span class="swatch-usage">Input, data fields</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-surface);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-surface</span>
+        <span class="swatch-hex">#1A2A3A</span>
+        <span class="swatch-usage">Chart grid, border</span>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Data Colors &mdash; Funzionali, non decorativi</h3>
+  <div class="grid-6" style="margin-bottom:var(--space-6);">
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-fast);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-fast</span>
+        <span class="swatch-hex">#00E5A0</span>
+        <span class="swatch-usage">Pi&ugrave; veloce, delta negativo</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-slow);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-slow</span>
+        <span class="swatch-hex">#FF4466</span>
+        <span class="swatch-usage">Pi&ugrave; lento, delta positivo</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-neutral);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-neutral</span>
+        <span class="swatch-hex">#6B7D8F</span>
+        <span class="swatch-usage">Baseline, riferimento</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-blue);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-blue</span>
+        <span class="swatch-hex">#0088FF</span>
+        <span class="swatch-usage">Selezionato, attivo, focus</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-amber);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-amber</span>
+        <span class="swatch-hex">#FF9000</span>
+        <span class="swatch-usage">Warning, pit soon</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-purple);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-purple</span>
+        <span class="swatch-hex">#8860FF</span>
+        <span class="swatch-usage">Lap A (confronto)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:var(--space-6);">
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-cyan);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-cyan</span>
+        <span class="swatch-hex">#00C8FF</span>
+        <span class="swatch-usage">Lap B (confronto)</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--text-tertiary);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--text-tertiary</span>
+        <span class="swatch-hex">#4A5A6A</span>
+        <span class="swatch-usage">Placeholder, legenda</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--data-line);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--data-line</span>
+        <span class="swatch-hex">#2A3A4A</span>
+        <span class="swatch-usage">Chart axes, border</span>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Text Hierarchy</h3>
+  <div class="grid-4">
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--text-primary);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--text-primary</span>
+        <span class="swatch-hex">#E8EDF2</span>
+        <span class="swatch-usage">Dati critici, valori</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--text-secondary);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--text-secondary</span>
+        <span class="swatch-hex">#8A9BAB</span>
+        <span class="swatch-usage">Label, metadata</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--text-tertiary);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--text-tertiary</span>
+        <span class="swatch-hex">#4A5A6A</span>
+        <span class="swatch-usage">Non importante, legenda</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-preview" style="background:var(--text-inverse);"></div>
+      <div class="swatch-label">
+        <span class="swatch-name">--text-inverse</span>
+        <span class="swatch-hex">#05080C</span>
+        <span class="swatch-usage">Su badge colorati</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════ TYPOGRAPHY ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">02</span>
+    <h2>Typography</h2>
+    <span class="section-tagline">Tre font, tre ruoli, nessun Inter sovrautilizzato</span>
+  </div>
+
+  <div class="grid-2">
+    <div class="type-sample">
+      <div class="type-label">
+        Display — Aktiv Grotesk Bold <span style="color:var(--text-tertiary);">(fallback: Inter Bold)</span>
+        <span style="margin-left:auto;">Per valori hero e header</span>
+      </div>
+      <div class="type-content" style="font-family:'Inter',sans-serif;font-weight:700;letter-spacing:-0.02em;">
+        <div style="font-size:2.5rem;line-height:1.1;">223.456</div>
+        <div style="font-size:1.5rem;line-height:1.2;margin-top:0.5rem;color:var(--data-fast);">+0.042</div>
+        <div style="font-size:1.25rem;line-height:1.3;margin-top:0.5rem;color:var(--text-primary);">Optimal Lap Analysis</div>
+      </div>
+    </div>
+
+    <div class="type-sample">
+      <div class="type-label">
+        Mono — JetBrains Mono <span style="color:var(--text-tertiary);">Regular 400 / SemiBold 600</span>
+        <span style="margin-left:auto;">Per dati grezzi e tabelle</span>
+      </div>
+      <div class="type-content" style="font-family:'JetBrains Mono',monospace;">
+        <div style="font-size:0.875rem;line-height:1.6;">
+          74.123 &nbsp; 75.234 &nbsp; 74.099<br>
+          <span style="color:var(--data-fast);">-0.042s</span> &nbsp; <span style="color:var(--data-slow);">+0.112s</span><br>
+          <span style="font-size:0.75rem;color:var(--text-tertiary);">Fuel: 42.3L &nbsp; Tyre: 8% wear</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="type-sample" style="margin-top:var(--space-4);">
+    <div class="type-label">
+      UI — Inter <span style="color:var(--text-tertiary);">Regular 400 / Medium 500 / SemiBold 600</span>
+      <span style="margin-left:auto;">Solo per sistema, mai per dati</span>
+    </div>
+    <div class="type-content" style="font-family:'Inter',sans-serif;">
+      <div style="display:flex;gap:var(--space-5);align-items:center;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:0.625rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-tertiary);">MACCHINA</div>
+          <div style="font-size:0.75rem;font-weight:500;color:var(--text-primary);margin-top:2px;">Ferrari 499P LMH</div>
+        </div>
+        <div style="width:1px;height:24px;background:var(--data-surface);"></div>
+        <div>
+          <div style="font-size:0.625rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-tertiary);">PISTA</div>
+          <div style="font-size:0.75rem;font-weight:500;color:var(--text-primary);margin-top:2px;">Circuit de la Sarthe</div>
+        </div>
+        <div style="width:1px;height:24px;background:var(--data-surface);"></div>
+        <div>
+          <span class="badge badge--hypercar">HYPERCAR</span>
+          <span class="badge badge--pit" style="margin-left:4px;">PIT L18</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin:var(--space-5) 0 var(--space-4);">Size Scale</h3>
+  <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-5);border:1px solid var(--data-surface);">
+    <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+      <div><span class="font-mono" style="font-size:0.625rem;color:var(--text-tertiary);">10px &middot; --text-xs</span> <span style="font-family:'Inter',sans-serif;font-size:0.625rem;color:var(--text-secondary);margin-left:12px;">LEGENDA CHART &middot; METADATA</span></div>
+      <div><span class="font-mono" style="font-size:0.75rem;color:var(--text-tertiary);">12px &middot; --text-sm</span> <span style="font-family:'Inter',sans-serif;font-size:0.75rem;color:var(--text-primary);margin-left:12px;">Table header &middot; Label form</span></div>
+      <div><span class="font-mono" style="font-size:0.875rem;color:var(--text-tertiary);">14px &middot; --text-base</span> <span style="font-family:'Inter',sans-serif;font-size:0.875rem;color:var(--text-primary);margin-left:12px;">Body text &middot; Descrizioni</span></div>
+      <div><span class="font-mono" style="font-size:1rem;color:var(--text-tertiary);">16px &middot; --text-lg</span> <span style="font-family:'Inter',sans-serif;font-size:1rem;font-weight:600;color:var(--text-primary);margin-left:12px;">Card title &middot; Dati secondari</span></div>
+      <div><span class="font-mono" style="font-size:1.25rem;color:var(--text-tertiary);">20px &middot; --text-xl</span> <span style="font-family:'Inter',sans-serif;font-size:1.25rem;font-weight:700;color:var(--text-primary);margin-left:12px;">Valori card &middot; Metriche secondarie</span></div>
+      <div><span class="font-mono" style="font-size:1.5rem;color:var(--text-tertiary);">24px &middot; --text-2xl</span> <span style="font-family:'Inter',sans-serif;font-size:1.5rem;font-weight:700;color:var(--text-primary);margin-left:12px;">Metriche primarie</span></div>
+      <div><span class="font-mono" style="font-size:2rem;color:var(--text-tertiary);">32px &middot; --text-3xl</span> <span style="font-family:'Inter',sans-serif;font-size:2rem;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary);margin-left:12px;">223.456</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════ COMPONENTS ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">03</span>
+    <h2>Component Library</h2>
+    <span class="section-tagline">8 componenti con specifiche complete</span>
+  </div>
+
+  <!-- Stat Card -->
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Stat Card &middot; 3 varianti</h3>
+  <div class="grid-3" style="margin-bottom:var(--space-6);">
+    <div class="card card--accent-fast">
+      <div class="card-title">Best Lap</div>
+      <div class="card-value" style="color:var(--data-fast);">223.456</div>
+      <div class="card-sub">&plusmn;0.042s</div>
+    </div>
+    <div class="card card--accent-slow">
+      <div class="card-title">Fuel</div>
+      <div class="card-value" style="color:var(--data-amber);">24.3<span style="font-size:1rem;">L</span></div>
+      <div class="card-sub">7.2 laps remaining</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--data-neutral);">
+      <div class="card-title">Laps Analyzed</div>
+      <div class="card-value">1,247</div>
+      <div class="card-sub">18 sessions</div>
+    </div>
+  </div>
+
+  <!-- Button System -->
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Button System &middot; 5 varianti</h3>
+  <div class="component-preview" style="margin-bottom:var(--space-6);">
+    <div class="btn-row">
+      <span class="btn btn--primary">Calcola</span>
+      <span class="btn btn--secondary">Reset</span>
+      <span class="btn btn--danger">Drop</span>
+      <span class="btn btn--ghost">Annulla</span>
+      <span class="btn btn--disabled">Disabilitato</span>
+    </div>
+  </div>
+
+  <!-- Badge -->
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Badge &middot; Classi e stati</h3>
+  <div class="component-preview" style="margin-bottom:var(--space-6);">
+    <div class="badge-demo">
+      <span class="badge badge--hypercar">Hypercar</span>
+      <span class="badge badge--lmp2">LMP2</span>
+      <span class="badge badge--gt3">GT3</span>
+      <span class="badge badge--fast">+0.042</span>
+      <span class="badge badge--slow">-0.112</span>
+      <span class="badge badge--pit">PIT</span>
+      <span class="badge badge--wet">WET</span>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Filter Bar</h3>
+  <div class="filter-bar-demo" style="margin-bottom:var(--space-6);">
+    <div class="filter-group">
+      <span class="filter-label">Macchina</span>
+      <select class="filter-select"><option>Ferrari 499P LMH</option></select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Pista</span>
+      <select class="filter-select"><option>Circuit de la Sarthe</option></select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Mescola</span>
+      <select class="filter-select"><option>Soft</option></select>
+    </div>
+    <div class="filter-group">
+      <span class="btn btn--primary" style="font-size:0.75rem;padding:0 var(--space-3);">Load</span>
+    </div>
+  </div>
+
+  <!-- Data Table -->
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Data Table</h3>
+  <div class="table-demo" style="margin-bottom:var(--space-6);">
+    <table>
+      <thead>
+        <tr>
+          <th>Lap</th>
+          <th>Time</th>
+          <th>S1</th>
+          <th>S2</th>
+          <th>S3</th>
+          <th class="num">Fuel</th>
+          <th>Compound</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td style="color:var(--data-fast);">227.041</td>
+          <td>75.123</td>
+          <td>76.234</td>
+          <td>75.684</td>
+          <td class="num">92.3L</td>
+          <td><span class="badge badge--hypercar">Soft</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>226.894</td>
+          <td>75.012</td>
+          <td>75.988</td>
+          <td>75.894</td>
+          <td class="num">87.1L</td>
+          <td><span class="badge badge--hypercar">Soft</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td style="color:var(--data-slow);">228.112</td>
+          <td>75.345</td>
+          <td>76.567</td>
+          <td>76.200</td>
+          <td class="num">81.9L</td>
+          <td><span class="badge badge--pit">Soft</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Toast -->
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Toast / Alert</h3>
+  <div class="toast-demo" style="margin-bottom:var(--space-6);">
+    <div class="toast toast--ok">
+      <span>Strategy recalculated. 2 stops, pit at lap 18 and 35.</span>
+    </div>
+    <div class="toast">
+      <span style="color:var(--data-amber);">⚠ Fuel low</span>
+      <span style="font-weight:400;">Pit in 3 laps</span>
+    </div>
+    <div class="toast toast--critical">
+      <span style="color:var(--data-slow);">✕ PIT NOW</span>
+      <span style="font-weight:400;">Tyres critical</span>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Sidebar Navigation</h3>
+  <div class="sidebar-mock" style="margin-bottom:var(--space-6);">
+    <div class="sidebar-brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--data-blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><circle cx="3" cy="17" r="1.5" fill="var(--data-blue)"/></svg>
+      LMU LarpTimes
+    </div>
+    <div class="sidebar-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+      Tyre Profile
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+      Lap Archive
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>
+      Strategy
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Setup
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Lap Compare
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════ CHART ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">04</span>
+    <h2>Data Visualization</h2>
+    <span class="section-tagline">Speed trace, micro-settori, stint timeline</span>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Speed Trace &middot; Lap A vs Lap B</h3>
+      <div class="chart-mock" style="height:240px;">
+        <div class="chart-header">
+          <span>Speed (km/h)</span>
+          <span style="display:flex;gap:12px;"><span style="color:var(--data-purple);">● Lap A</span><span style="color:var(--data-cyan);">● Lap B</span></span>
+        </div>
+        <div class="chart-grid"></div>
+        <div class="chart-line">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <!-- Grid lines -->
+            <line x1="0" y1="33" x2="100" y2="33" stroke="#1A2A3A" stroke-dasharray="2,2" stroke-width="0.5"/>
+            <line x1="0" y1="66" x2="100" y2="66" stroke="#1A2A3A" stroke-dasharray="2,2" stroke-width="0.5"/>
+            <!-- Area highlight (Lap A faster zone) -->
+            <path d="M0,80 Q10,70 20,75 Q30,40 40,45 Q50,30 60,50 Q70,20 80,60 Q90,50 100,55 L100,100 L0,100 Z" fill="rgba(136,96,255,0.08)"/>
+            <!-- Lap A -->
+            <path d="M0,82 Q10,72 20,78 Q30,42 40,48 Q50,32 60,52 Q70,22 80,62 Q90,52 100,58" fill="none" stroke="var(--data-purple)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+            <!-- Lap B -->
+            <path d="M0,78 Q10,68 20,72 Q30,52 40,42 Q50,38 60,48 Q70,20 80,55 Q90,48 100,52" fill="none" stroke="var(--data-cyan)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Micro-Sector Delta &middot; Optimal vs Best Lap</h3>
+      <div class="chart-mock" style="height:240px;">
+        <div class="chart-header">
+          <span>Time (s)</span>
+        </div>
+        <div class="chart-line">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <!-- Bars: optimal (blue) and best lap (green) alternating -->
+            <rect x="2" y="40" width="8" height="60" fill="var(--data-blue)" opacity="0.6" rx="1"/>
+            <rect x="11" y="52" width="8" height="48" fill="var(--data-fast)" opacity="0.4" rx="1"/>
+            <rect x="24" y="45" width="8" height="55" fill="var(--data-blue)" opacity="0.6" rx="1"/>
+            <rect x="33" y="48" width="8" height="52" fill="var(--data-fast)" opacity="0.4" rx="1"/>
+            <rect x="46" y="35" width="8" height="65" fill="var(--data-blue)" opacity="0.6" rx="1"/>
+            <rect x="55" y="42" width="8" height="58" fill="var(--data-fast)" opacity="0.4" rx="1"/>
+            <rect x="68" y="50" width="8" height="50" fill="var(--data-blue)" opacity="0.6" rx="1"/>
+            <rect x="77" y="55" width="8" height="45" fill="var(--data-fast)" opacity="0.4" rx="1"/>
+            <rect x="90" y="38" width="8" height="62" fill="var(--data-blue)" opacity="0.6" rx="1"/>
+            <!-- Delta labels -->
+            <text x="6" y="32" fill="#E8EDF2" font-size="4" font-family="monospace">+0.042</text>
+            <text x="28" y="37" fill="#E8EDF2" font-size="4" font-family="monospace">+0.023</text>
+            <text x="72" y="42" fill="#E8EDF2" font-size="4" font-family="monospace">+0.088</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:var(--space-5);">
+    <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Stint Timeline &middot; Race Director</h3>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid var(--data-surface);padding:var(--space-5);">
+      <!-- Weather band -->
+      <div style="height:16px;border-radius:2px;margin-bottom:var(--space-3);display:flex;overflow:hidden;">
+        <div style="flex:3;background:#1A2A3A;"></div>
+        <div style="flex:1;background:linear-gradient(90deg,#1A2A3A,#0B2430);"></div>
+        <div style="flex:6;background:rgba(0,136,255,0.15);border-left:1px solid var(--data-blue);"></div>
+      </div>
+      <!-- Stint bars -->
+      <div style="display:flex;gap:3px;height:32px;">
+        <div style="flex:4;background:rgba(0,229,160,0.2);border-radius:2px;display:flex;align-items:center;padding:0 8px;font-family:'JetBrains Mono',monospace;font-size:0.625rem;color:var(--data-fast);">Stint 1 &middot; Soft</div>
+        <div style="width:4px;background:var(--data-amber);border-radius:1px;"></div>
+        <div style="flex:3;background:rgba(0,229,160,0.15);border-radius:2px;display:flex;align-items:center;padding:0 8px;font-family:'JetBrains Mono',monospace;font-size:0.625rem;color:var(--data-fast);">Stint 2 &middot; Soft</div>
+        <div style="width:4px;background:var(--data-amber);border-radius:1px;"></div>
+        <div style="flex:5;background:rgba(255,144,0,0.15);border-radius:2px;display:flex;align-items:center;padding:0 8px;font-family:'JetBrains Mono',monospace;font-size:0.625rem;color:var(--data-amber);">Stint 3 &middot; Medium</div>
+        <div style="width:4px;background:var(--data-amber);border-radius:1px;"></div>
+        <div style="flex:2;background:rgba(0,136,255,0.1);border-radius:2px;display:flex;align-items:center;padding:0 8px;font-family:'JetBrains Mono',monospace;font-size:0.625rem;color:var(--data-blue);">Final</div>
+      </div>
+      <!-- Lap markers -->
+      <div style="margin-top:var(--space-2);display:flex;font-family:'JetBrains Mono',monospace;font-size:0.5625rem;color:var(--text-tertiary);">
+        <span style="flex:4;">L1</span>
+        <span style="width:4px;"></span>
+        <span style="flex:3;">L15</span>
+        <span style="width:4px;"></span>
+        <span style="flex:5;">L23</span>
+        <span style="width:4px;"></span>
+        <span style="flex:2;">L38</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════ VOICE ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">05</span>
+    <h2>Voice &amp; Tone</h2>
+    <span class="section-tagline">Race Engineer, non motivational coach</span>
+  </div>
+
+  <div class="do-dont">
+    <div class="do">
+      <div class="tag">DO &middot; Race Engineer</div>
+      <p><strong style="color:var(--text-primary);">"Box this lap. Fuel critical."</strong><br>
+      Secco, metrico, lessico motorsport. Due frasi brevi. Punto.</p>
+    </div>
+    <div class="dont">
+      <div class="tag">DON'T &middot; AI Slop</div>
+      <p><strong style="color:var(--text-primary);">"Your fuel is getting low — we recommend pitting in the next few laps!"</strong><br>
+      Troppe parole, tono da assistente, lessico generico.</p>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:var(--space-5);">
+    <div class="usage-item">
+      <div class="usage-title">Critico</div>
+      <div class="usage-text"><span style="font-family:'JetBrains Mono',monospace;color:var(--text-primary);">"Pit now. Tyres at cliff."</span><br>Imperativo, secco. Zero parole di riempimento.</div>
+    </div>
+    <div class="usage-item">
+      <div class="usage-title">Warning</div>
+      <div class="usage-text"><span style="font-family:'JetBrains Mono',monospace;color:var(--text-primary);">"Pit in 3 laps. Fuel low."</span><br>Informativo, metrico. "Laps" non "giri", "fuel" non "carburante".</div>
+    </div>
+    <div class="usage-item">
+      <div class="usage-title">Info</div>
+      <div class="usage-text"><span style="font-family:'JetBrains Mono',monospace;color:var(--text-primary);">"GT3 traffic ahead. Losing 1.5s per lap."</span><br>Descrittivo, preciso. Il dato &egrave; la raccomandazione.</div>
+    </div>
+    <div class="usage-item">
+      <div class="usage-title">Performance</div>
+      <div class="usage-text"><span style="font-family:'JetBrains Mono',monospace;color:var(--text-primary);">"Personal best. 223.456."</span><br>Incoraggiante ma metrico. Mai "great job" o "amazing".</div>
+    </div>
+  </div>
+
+  <div style="margin-top:var(--space-5);background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-5);border:1px solid var(--data-surface);">
+    <h3 style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-4);">Lessico motorsport</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);font-family:'Inter',sans-serif;font-size:0.75rem;">
+      <div><span style="color:var(--data-fast);">box</span> <span style="color:var(--text-tertiary);">→ non "pit"</span></div>
+      <div><span style="color:var(--data-fast);">stint</span> <span style="color:var(--text-tertiary);">→ non "run"</span></div>
+      <div><span style="color:var(--data-fast);">cliff</span> <span style="color:var(--text-tertiary);">→ non "limit"</span></div>
+      <div><span style="color:var(--data-fast);">compound</span> <span style="color:var(--text-tertiary);">→ non "tyre type"</span></div>
+      <div><span style="color:var(--data-fast);">window</span> <span style="color:var(--text-tertiary);">→ non "range"</span></div>
+      <div><span style="color:var(--data-fast);">delta</span> <span style="color:var(--text-tertiary);">→ non "difference"</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════ ANTI-PATTERNS ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">06</span>
+    <h2>Anti-Patterns</h2>
+    <span class="section-tagline">18 pattern da evitare nella UI</span>
+  </div>
+
+  <div class="grid-auto">
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Glassmorphism</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Nessun background blur, nessun frost effect. Superfici solide.</div>
+    </div>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Purple-blue gradient</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Non siamo un SaaS generico. Colori funzionali, non decorativi.</div>
+    </div>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Inter-only typography</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Aktiv Grotesk per display, JetBrains Mono per dati, Inter solo UI.</div>
+    </div>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Soft drop shadows</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Ombre nette e definite, o niente ombre. Bordo come separatore.</div>
+    </div>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Rounded everything</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Max 4px su contenitori dati. Radius solo per gerarchia, non estetica.</div>
+    </div>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Loading skeletons</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Placeholder text &gt; skeleton shimmer. I dati o ci sono o non ci sono.</div>
+    </div>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Empty state illustrations</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Dati assenti = testo, non disegnini. "Nessun dato. Crea un giro."</div>
+    </div>
+    <div style="background:var(--bg-surface);border-radius:var(--radius-sm);padding:var(--space-4);border:1px solid rgba(255,68,102,0.15);">
+      <div style="font-family:'Inter',sans-serif;font-weight:600;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--data-slow);margin-bottom:var(--space-2);">❌ Notification bell</div>
+      <div style="font-family:'Inter',sans-serif;font-size:0.6875rem;color:var(--text-secondary);">Il race engineer PARLA, non notifica. Niente badge, niente campanella.</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════ GAP ANALYSIS ═══════════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">07</span>
+    <h2>Gap Analysis</h2>
+    <span class="section-tagline">Stato attuale vs Design System proposto</span>
+  </div>
+
+  <div class="table-demo">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:25%;">Token Attuale</th>
+          <th style="width:25%;">Valore Attuale</th>
+          <th style="width:25%;">Proposto</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>--bg-app</td>
+          <td class="num">#050709</td>
+          <td class="num" style="color:var(--data-fast);">#05080C</td>
+          <td style="font-family:'Inter',sans-serif;">Leggermente pi&ugrave; caldo</td>
+        </tr>
+        <tr>
+          <td>--bg-sidebar</td>
+          <td class="num">rgba(12,15,18,0.95)</td>
+          <td class="num" style="color:var(--data-fast);">#030507</td>
+          <td style="font-family:'Inter',sans-serif;">Solido, non trasparente</td>
+        </tr>
+        <tr>
+          <td>--surface-glass</td>
+          <td class="num">rgba(20,26,33,0.6)</td>
+          <td class="num" style="color:var(--data-slow);">ELIMINARE</td>
+          <td style="font-family:'Inter',sans-serif;">Glass non serve</td>
+        </tr>
+        <tr>
+          <td>--accent-blue</td>
+          <td class="num">#00a1ff</td>
+          <td class="num" style="color:var(--data-fast);">#0088FF</td>
+          <td style="font-family:'Inter',sans-serif;">Meno saturo, + professionale</td>
+        </tr>
+        <tr>
+          <td>--accent-green</td>
+          <td class="num">#2ea043</td>
+          <td class="num" style="color:var(--data-fast);">#00E5A0</td>
+          <td style="font-family:'Inter',sans-serif;">Teal, non "ok" generico</td>
+        </tr>
+        <tr>
+          <td>--accent-red</td>
+          <td class="num">#ff4d4d</td>
+          <td class="num" style="color:var(--data-fast);">#FF4466</td>
+          <td style="font-family:'Inter',sans-serif;">Rosso pi&ugrave; caldo</td>
+        </tr>
+        <tr>
+          <td>--font-display</td>
+          <td>Rajdhani</td>
+          <td style="color:var(--data-fast);">Aktiv Grotesk</td>
+          <td style="font-family:'Inter',sans-serif;">Rajdhani troppo "game-y"</td>
+        </tr>
+        <tr>
+          <td>--font-body</td>
+          <td>Inter</td>
+          <td style="color:var(--data-fast);">Inter (OK)</td>
+          <td style="font-family:'Inter',sans-serif;">Confermato per UI system</td>
+        </tr>
+        <tr>
+          <td>--radius</td>
+          <td class="num">4px</td>
+          <td class="num" style="color:var(--data-fast);">4px (OK)</td>
+          <td style="font-family:'Inter',sans-serif;">Ma solo per bottoni/badge</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div style="margin-top:var(--space-10);padding:var(--space-5);background:var(--bg-deep);border:1px solid var(--data-surface);border-radius:var(--radius-sm);text-align:center;">
+  <p style="font-family:'Inter',sans-serif;font-size:0.875rem;color:var(--text-tertiary);">
+    LMU LarpTimes &middot; Brand Board v1.0 &middot; Bozza di revisione<br>
+    <span style="font-size:0.75rem;">Nessuna modifica al codice applicata &mdash; documento da revisionare prima dell'implementazione</span>
+  </p>
+</div>
+
+</body>
+</html>

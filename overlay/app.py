@@ -41,27 +41,33 @@ from overlay.voice_engine import VoiceEngine
 from analysis.race_engineer import RaceEngineer
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Design System
+# Design System — v2 Cockpit
 # ══════════════════════════════════════════════════════════════════════════════
 
-BG_0 = QColor(5, 7, 9, 240)        # --bg-app with alpha
-BG_1 = QColor(13, 17, 23, 230)     # --surface-1
-BG_2 = QColor(20, 26, 33, 230)     # --surface-2
-BORDER_DIM = QColor(28, 33, 40)    # --border-dim (keep)
-BORDER_BRIGHT = QColor(45, 51, 59) # --border-bright (keep)
+BG_DEEP = QColor(7, 8, 9)
+BG_APP = QColor(10, 12, 14)
+BG_SURFACE = QColor(15, 19, 23)
+BG_ELEVATED = QColor(22, 27, 32)
+BG_INSET = QColor(30, 37, 44)
+BORDER = QColor(30, 37, 44)
+BORDER_STRONG = QColor(40, 48, 56)
 
-ACCENT_GREEN = QColor(46, 160, 67)   # --accent-green #2ea043
-ACCENT_BLUE = QColor(0, 161, 255)    # --accent-blue #00a1ff
-ACCENT_RED = QColor(255, 77, 77)     # --accent-red #ff4d4d
-ACCENT_AMBER = QColor(247, 129, 102) # --accent-orange #f78166
-ACCENT_PURPLE = QColor(188, 140, 255) # --accent-purple #bc8cff
+ACCENT_AMBER = QColor(255, 107, 0)
+ACCENT_AMBER_BRIGHT = QColor(255, 136, 0)
+ACCENT_RED = QColor(255, 34, 0)
+ACCENT_GREEN = QColor(0, 255, 136)
+ACCENT_BLUE = QColor(0, 136, 255)
+ACCENT_PURPLE = QColor(170, 102, 255)
+ACCENT_CYAN = QColor(0, 200, 255)
 
-TEXT_PRIMARY = QColor(230, 237, 243)   # --text-primary
-TEXT_SECONDARY = QColor(125, 133, 144) # --text-secondary
-TEXT_MUTED = QColor(72, 79, 88)       # --text-muted
+TEXT_PRIMARY = QColor(240, 244, 248)
+TEXT_SECONDARY = QColor(200, 212, 224)
+TEXT_TERTIARY = QColor(90, 106, 122)
+TEXT_MUTED = QColor(53, 64, 74)
 
-FONT_TITLE = "Rajdhani"   # change from Geist to Rajdhani
-FONT_VALUE = "JetBrains Mono"  # keep for numeric values
+FONT_DISPLAY = "Rajdhani"
+FONT_MONO = "JetBrains Mono"
+FONT_UI = "Inter"
 
 
 def qcolor_hex(c: QColor) -> str:
@@ -160,26 +166,26 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Impostazioni Overlay")
         self.setMinimumWidth(420)
         self.setStyleSheet(f"""
-            QDialog {{ background-color: {qcolor_hex(BG_0)}; color: {qcolor_hex(TEXT_PRIMARY)};
-                       border: 1px solid {qcolor_hex(BORDER_BRIGHT)}; border-radius: 8px; }}
+            QDialog {{ background-color: {qcolor_hex(BG_DEEP)}; color: {qcolor_hex(TEXT_PRIMARY)};
+                       border: 1px solid {qcolor_hex(BORDER_STRONG)}; border-radius: 8px; }}
             QLabel {{ color: {qcolor_hex(TEXT_PRIMARY)}; font-family: 'Rajdhani', 'Inter', sans-serif; }}
             QCheckBox {{ color: {qcolor_hex(TEXT_PRIMARY)}; font-family: 'JetBrains Mono';
                          spacing: 8px; padding: 4px 0; }}
-            QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
-                                   background: {qcolor_hex(BG_1)}; border-radius: 3px; }}
-            QCheckBox::indicator:checked {{ background: {qcolor_hex(ACCENT_BLUE)};
-                                            border-color: {qcolor_hex(ACCENT_BLUE)}; }}
-            QSlider::groove:horizontal {{ height: 4px; background: {qcolor_hex(BG_1)}; border-radius: 2px; }}
-            QSlider::handle:horizontal {{ background: {qcolor_hex(ACCENT_BLUE)}; width: 14px; height: 14px;
+            QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {qcolor_hex(BORDER_STRONG)};
+                                   background: {qcolor_hex(BG_ELEVATED)}; border-radius: 3px; }}
+            QCheckBox::indicator:checked {{ background: {qcolor_hex(ACCENT_AMBER)};
+                                            border-color: {qcolor_hex(ACCENT_AMBER)}; }}
+            QSlider::groove:horizontal {{ height: 4px; background: {qcolor_hex(BG_ELEVATED)}; border-radius: 2px; }}
+            QSlider::handle:horizontal {{ background: {qcolor_hex(ACCENT_AMBER)}; width: 14px; height: 14px;
                                           margin: -5px 0; border-radius: 7px; }}
-            QSlider::sub-page:horizontal {{ background: {qcolor_hex(ACCENT_BLUE)}; border-radius: 2px; }}
+            QSlider::sub-page:horizontal {{ background: {qcolor_hex(ACCENT_AMBER)}; border-radius: 2px; }}
             QPushButton {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 {qcolor_hex(ACCENT_BLUE)}, stop:1 #0072cc);
+                           stop:0 {qcolor_hex(ACCENT_AMBER)}, stop:1 #CC5500);
                            color: {qcolor_hex(TEXT_PRIMARY)};
                            border: none; padding: 6px 16px; border-radius: 4px;
                            font-family: 'Rajdhani', 'Inter', sans-serif; font-weight: bold; font-size: 11px; }}
             QPushButton:hover {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                 stop:0 #00b8ff, stop:1 #0088dd); }}
+                                 stop:0 #FF8800, stop:1 #CC5500); }}
             QRadioButton {{ color: {qcolor_hex(TEXT_PRIMARY)}; font-family: 'Rajdhani', 'Inter', sans-serif; font-size: 12px; }}
         """)
 
@@ -188,12 +194,12 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(20, 16, 20, 16)
 
         title = QLabel("Impostazioni")
-        title.setFont(QFont(FONT_TITLE, 14, QFont.Weight.Bold))
+        title.setFont(QFont(FONT_DISPLAY, 14, QFont.Weight.Bold))
         layout.addWidget(title)
 
         # Audio
         al = QLabel("SUONI")
-        al.setStyleSheet("color: #7d8590; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
+        al.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
         layout.addWidget(al)
         self._cb_audio = QCheckBox("Abilita suoni")
         self._cb_audio.setChecked(self._cfg.get("audio_enabled", True))
@@ -203,14 +209,14 @@ class SettingsDialog(QDialog):
         vl = QHBoxLayout()
         vl.setContentsMargins(24, 0, 0, 0)
         vlabel = QLabel("Volume:")
-        vlabel.setFont(QFont(FONT_VALUE, 10))
+        vlabel.setFont(QFont(FONT_MONO, 10))
         vlabel.setFixedWidth(60)
         self._vol = QSlider(Qt.Orientation.Horizontal)
         self._vol.setRange(0, 100)
         self._vol.setValue(int(self._cfg.get("audio_volume", 1.0) * 100))
         self._vol.valueChanged.connect(self._on_vol)
         self._volv = QLabel(f"{self._vol.value()}%")
-        self._volv.setFont(QFont(FONT_VALUE, 10))
+        self._volv.setFont(QFont(FONT_MONO, 10))
         self._volv.setFixedWidth(40)
         vl.addWidget(vlabel)
         vl.addWidget(self._vol)
@@ -222,7 +228,7 @@ class SettingsDialog(QDialog):
 
         # Mode
         ml = QLabel("MODALITA")
-        ml.setStyleSheet("color: #7d8590; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
+        ml.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
         layout.addWidget(ml)
         self._cb_ig = QCheckBox("Solo in gioco (auto-hide)")
         self._cb_ig.setChecked(self._cfg.get("in_game_only", False))
@@ -235,7 +241,7 @@ class SettingsDialog(QDialog):
 
         # Overlay mode toggle
         mode_label = QLabel("MODO OVERLAY")
-        mode_label.setStyleSheet("color: #7d8590; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
+        mode_label.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;")
         layout.addWidget(mode_label)
         mode_layout = QHBoxLayout()
         self._rb_full = QRadioButton("Full (1 finestra)")
@@ -249,7 +255,7 @@ class SettingsDialog(QDialog):
         mode_layout.addWidget(self._rb_modular)
         layout.addLayout(mode_layout)
         mode_hint = QLabel("Il cambio modalità richiede il riavvio dell'overlay")
-        mode_hint.setStyleSheet("color: #505664; font-size: 10px;")
+        mode_hint.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; font-size: 10px;")
         layout.addWidget(mode_hint)
 
         # Buttons
@@ -349,11 +355,11 @@ class OverlayWidget(QWidget):
     def contextMenuEvent(self, event):
         menu = QMenu(self)
         menu.setStyleSheet(f"""
-            QMenu {{ background-color: {qcolor_hex(BG_0)}; color: {qcolor_hex(TEXT_PRIMARY)};
-                     border: 1px solid {qcolor_hex(BORDER_BRIGHT)}; padding: 4px; }}
+            QMenu {{ background-color: {qcolor_hex(BG_DEEP)}; color: {qcolor_hex(TEXT_PRIMARY)};
+                     border: 1px solid {qcolor_hex(BORDER_STRONG)}; padding: 4px; }}
             QMenu::item {{ padding: 6px 24px; }}
-            QMenu::item:selected {{ background-color: {qcolor_hex(ACCENT_BLUE)}; }}
-            QMenu::separator {{ height: 1px; background: {qcolor_hex(BORDER_BRIGHT)}; margin: 4px 8px; }}
+            QMenu::item:selected {{ background-color: {qcolor_hex(ACCENT_AMBER)}; }}
+            QMenu::separator {{ height: 1px; background: {qcolor_hex(BORDER_STRONG)}; margin: 4px 8px; }}
         """)
         a_sett = menu.addAction("Impostazioni")
         a_refr = menu.addAction("Ricalcola strategia")
@@ -404,11 +410,11 @@ class OverlayWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.setContentsMargins(0, 0, 0, 4)
         self._lbl_brand = QLabel("LMU  LarpTimes")
-        self._lbl_brand.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
+        self._lbl_brand.setFont(QFont(FONT_DISPLAY, 8, QFont.Weight.Bold))
         self._lbl_brand.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)}; letter-spacing: 1px;")
         self._lbl_track_car = QLabel("\u2014")
-        self._lbl_track_car.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
-        self._lbl_track_car.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; letter-spacing: 1px;")
+        self._lbl_track_car.setFont(QFont(FONT_DISPLAY, 8, QFont.Weight.Bold))
+        self._lbl_track_car.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)}; letter-spacing: 1px;")
         self._lbl_track_car.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         # Settings gear button
@@ -420,12 +426,12 @@ class OverlayWidget(QWidget):
         self._btn_settings.setFixedSize(22, 22)
         self._btn_settings.setStyleSheet(f"""
             QPushButton {{
-                background: transparent; border: 1px solid {qcolor_hex(BORDER_BRIGHT)};
+                background: transparent; border: 1px solid {qcolor_hex(BORDER_STRONG)};
                 border-radius: 4px; color: {qcolor_hex(TEXT_SECONDARY)};
                 font-size: 12px; padding: 0;
             }}
             QPushButton:hover {{
-                background: {qcolor_hex(BG_2)}; color: {qcolor_hex(TEXT_PRIMARY)};
+                background: {qcolor_hex(BG_ELEVATED)}; color: {qcolor_hex(TEXT_PRIMARY)};
             }}
         """)
         self._btn_settings.clicked.connect(self.open_settings_dialog)
@@ -447,7 +453,7 @@ class OverlayWidget(QWidget):
             container.setStyleSheet(f"""
                 QWidget {{
                     background: transparent;
-                    border-left: 3px solid {qcolor_hex(ACCENT_BLUE)};
+                    border-left: 3px solid {qcolor_hex(ACCENT_AMBER)};
                     padding-left: 6px;
                 }}
             """)
@@ -455,10 +461,10 @@ class OverlayWidget(QWidget):
             w.setContentsMargins(0, 0, 0, 0)
             w.setSpacing(2)
             lbl = QLabel(label)
-            lbl.setFont(QFont(FONT_TITLE, 7, QFont.Weight.Bold))
-            lbl.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)}; letter-spacing: 1px; background: transparent;")
+            lbl.setFont(QFont(FONT_DISPLAY, 7, QFont.Weight.Bold))
+            lbl.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)}; letter-spacing: 1px; background: transparent;")
             val = QLabel(default)
-            val.setFont(QFont(FONT_VALUE, fs, QFont.Weight.Bold))
+            val.setFont(QFont(FONT_MONO, fs, QFont.Weight.Bold))
             val.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; background: transparent;")
             w.addWidget(lbl)
             w.addWidget(val)
@@ -502,12 +508,12 @@ class OverlayWidget(QWidget):
         ts_row.setContentsMargins(0, 0, 0, 0)
         ts_row.setSpacing(8)
         self._lbl_tyre_status_title = QLabel("GOMME:")
-        self._lbl_tyre_status_title.setFont(QFont(FONT_TITLE, 7, QFont.Weight.Bold))
+        self._lbl_tyre_status_title.setFont(QFont(FONT_DISPLAY, 7, QFont.Weight.Bold))
         self._lbl_tyre_status_title.setStyleSheet(
-            f"color: {qcolor_hex(TEXT_MUTED)}; letter-spacing: 1px;"
+            f"color: {qcolor_hex(TEXT_TERTIARY)}; letter-spacing: 1px;"
         )
         self._lbl_tyre_status = QLabel("\u2014")
-        self._lbl_tyre_status.setFont(QFont(FONT_VALUE, 8, QFont.Weight.Bold))
+        self._lbl_tyre_status.setFont(QFont(FONT_MONO, 8, QFont.Weight.Bold))
         self._lbl_tyre_status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
         self._lbl_tyre_status.setAlignment(Qt.AlignmentFlag.AlignLeft)
         ts_row.addWidget(self._lbl_tyre_status_title)
@@ -516,7 +522,7 @@ class OverlayWidget(QWidget):
 
         # Warning
         self._lbl_warning = QLabel("")
-        self._lbl_warning.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
+        self._lbl_warning.setFont(QFont(FONT_DISPLAY, 8, QFont.Weight.Bold))
         self._lbl_warning.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_warning.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; padding: 2px;")
         self._lbl_warning.setVisible(False)
@@ -524,7 +530,7 @@ class OverlayWidget(QWidget):
 
         # Qualifying info (hidden by default)
         self._lbl_qualy = QLabel("")
-        self._lbl_qualy.setFont(QFont(FONT_VALUE, 8, QFont.Weight.Bold))
+        self._lbl_qualy.setFont(QFont(FONT_MONO, 8, QFont.Weight.Bold))
         self._lbl_qualy.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(ACCENT_GREEN)}; padding: 2px;")
         self._lbl_qualy.setVisible(False)
@@ -544,31 +550,32 @@ class OverlayWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect.adjusted(2, 2, 0, 0), 8, 8)
 
-        # Background
-        painter.setBrush(QBrush(BG_0))
-        pen = QPen(BORDER_BRIGHT, 1)
+        # Background — BG_DEEP
+        painter.setBrush(QBrush(BG_DEEP))
+        pen = QPen(BORDER, 1)
         painter.setPen(pen)
         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
 
-        # Grid dot pattern
+        # Carbon fiber texture dots
         painter.setPen(QPen(QColor(255, 255, 255, 6), 1))
         dot_spacing = 24
         for x in range(dot_spacing, rect.width(), dot_spacing):
             for y in range(dot_spacing, rect.height(), dot_spacing):
                 painter.drawPoint(x, y)
 
-        # Top accent bar (6px blue with glow)
-        painter.setBrush(QBrush(ACCENT_BLUE))
+        # Top accent bar — SOLID amber (ACCENT_AMBER) 6px
+        painter.setBrush(QBrush(ACCENT_AMBER))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(0, 0, rect.width(), 6, 3, 3)
+        # Amber glow
         glow = QLinearGradient(0, 0, 0, 24)
-        glow.setColorAt(0.0, QColor(0, 161, 255, 80))
-        glow.setColorAt(1.0, QColor(0, 161, 255, 0))
+        glow.setColorAt(0.0, QColor(255, 107, 0, 80))
+        glow.setColorAt(1.0, QColor(255, 107, 0, 0))
         painter.setBrush(QBrush(glow))
         painter.drawRoundedRect(0, 0, rect.width(), 24, 3, 3)
 
-        # Left accent bar (3px blue)
-        painter.setBrush(QBrush(ACCENT_BLUE))
+        # Left accent bar (3px amber)
+        painter.setBrush(QBrush(ACCENT_AMBER))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(2, 14, 3, rect.height() - 28, 1, 1)
 
@@ -678,25 +685,25 @@ class OverlayWidget(QWidget):
         fl = frame.fuel
         self._lbl_fuel.setText(f"{fl:.0f}L")
         self._lbl_fuel.setStyleSheet(
-            f"color: {qcolor_hex(ACCENT_RED) if fl < 10 else qcolor_hex(TEXT_PRIMARY)};"
+            f"color: {qcolor_hex(ACCENT_AMBER) if fl < 10 else qcolor_hex(TEXT_PRIMARY)};"
         )
 
         # Fuel laps
         f_laps = self._estimate_fuel_laps(frame)
         self._lbl_fuel_laps.setText(f"{f_laps:.1f}")
         self._lbl_fuel_laps.setStyleSheet(
-            f"color: {qcolor_hex(ACCENT_RED) if f_laps < 3 else qcolor_hex(TEXT_PRIMARY)};"
+            f"color: {qcolor_hex(ACCENT_AMBER) if f_laps < 3 else qcolor_hex(TEXT_PRIMARY)};"
         )
 
         # Refuel suggestion
         refuel = self._calculate_refuel(frame)
         if refuel is not None and refuel > 0:
             self._lbl_fuel.setText(f"{frame.fuel:.0f}L / +{refuel:.0f}L")
-            self._lbl_fuel.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)};")
+            self._lbl_fuel.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)};")
         else:
             self._lbl_fuel.setText(f"{frame.fuel:.0f}L")
             self._lbl_fuel.setStyleSheet(
-                f"color: {qcolor_hex(ACCENT_RED) if frame.fuel < 10 else qcolor_hex(TEXT_PRIMARY)};"
+                f"color: {qcolor_hex(ACCENT_AMBER) if frame.fuel < 10 else qcolor_hex(TEXT_PRIMARY)};"
             )
 
         # Wear
@@ -786,7 +793,7 @@ class OverlayWidget(QWidget):
             nxt = next((l for l in self._pit_plan if l >= self._current_lap), None)
             if nxt is None:
                 self._lbl_pit.setText("\u2014")
-                self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+                self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             elif nxt == self._current_lap:
                 self._lbl_pit.setText("BOX!")
                 self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(ACCENT_RED)}; font-weight: bold;")
@@ -795,7 +802,7 @@ class OverlayWidget(QWidget):
                 self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)};")
         else:
             self._lbl_pit.setText("\u2014")
-            self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._lbl_pit.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
 
     # ── Strategy ────────────────────────────────────────────────────────────
 
@@ -987,7 +994,7 @@ class OverlayWidget(QWidget):
                 lines.append(f"→ {top.get('message', '')[:50]}")
 
             self._lbl_qualy.setText("  ".join(lines))
-            self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(ACCENT_BLUE)}; padding: 2px; font-size: 7px;")
+            self._lbl_qualy.setStyleSheet(f"color: {qcolor_hex(ACCENT_AMBER)}; padding: 2px; font-size: 7px;")
             if not self._lbl_qualy.isVisible():
                 self._lbl_qualy.setVisible(True)
         except Exception as e:

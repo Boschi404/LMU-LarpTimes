@@ -8,55 +8,56 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: #0a0e18;
-  color: #f0f4ff;
+  background: #0A0C0E;
+  color: #F0F4F8;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .card {
-  background: #11151f;
-  border: 1px solid #2d333b;
-  border-radius: 16px;
+  background: #0F1317;
+  border: 1px solid #1E252C;
+  border-radius: 2px;
   padding: 48px 40px 36px;
   width: 420px;
   max-width: 90vw;
   text-align: center;
 }
-.card h1 { font-size: 22px; font-weight: 700; letter-spacing: 2px; margin-bottom: 4px; }
-.card .subtitle { color: #7d8590; font-size: 13px; margin-bottom: 32px; }
+.card h1 { font-family: 'Rajdhani', sans-serif; font-size: 24px; font-weight: 700; letter-spacing: 2px; margin-bottom: 4px; text-transform: uppercase; }
+.card .subtitle { color: #5A6A7A; font-size: 13px; margin-bottom: 32px; }
 .brand-bar {
   width: 60px; height: 3px;
-  background: linear-gradient(90deg, #1dd1a1, #4a9eff);
+  background: linear-gradient(90deg, #FF6B00, #FF2200);
   border-radius: 2px;
   margin: 0 auto 24px;
 }
-.tabs { display: flex; gap: 0; margin-bottom: 28px; background: #0a0e18; border-radius: 8px; padding: 3px; }
-.tab { flex: 1; padding: 10px; border: none; background: transparent; color: #7d8590; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 6px; transition: all 0.2s; }
-.tab.active { background: #4a9eff; color: #fff; }
+.tabs { display: flex; gap: 0; margin-bottom: 28px; background: #0A0C0E; border-radius: 2px; padding: 3px; border: 1px solid #1E252C; }
+.tab { flex: 1; padding: 10px; border: none; background: transparent; color: #5A6A7A; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 2px; transition: all 0.2s; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
+.tab.active { background: #FF6B00; color: #fff; }
 .form-group { text-align: left; margin-bottom: 18px; }
-.form-group label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #7d8590; margin-bottom: 6px; }
+.form-group label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #5A6A7A; margin-bottom: 6px; font-family: 'Rajdhani', sans-serif; }
 .form-group input {
-  width: 100%; padding: 12px 14px; background: #0a0e18;
-  border: 1px solid #2d333b; border-radius: 8px; color: #f0f4ff;
+  width: 100%; padding: 12px 14px; background: #1E252C;
+  border: 1px solid #283038; border-radius: 2px; color: #F0F4F8;
   font-size: 15px; font-family: 'JetBrains Mono', monospace;
   outline: none; transition: border-color 0.2s;
 }
-.form-group input:focus { border-color: #4a9eff; }
-.form-group input::placeholder { color: #505664; }
+.form-group input:focus { border-color: #FF6B00; }
+.form-group input::placeholder { color: #35404A; }
 .btn {
-  width: 100%; padding: 12px; background: #4a9eff; border: none;
-  border-radius: 8px; color: #fff; font-size: 15px; font-weight: 600;
+  width: 100%; padding: 12px; background: #FF6B00; border: none;
+  border-radius: 2px; color: #fff; font-size: 15px; font-weight: 600;
   cursor: pointer; transition: background 0.2s; margin-top: 8px;
+  font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 0.05em;
 }
-.btn:hover { background: #3a7ecc; }
+.btn:hover { background: #FF8800; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-secondary { background: #2d333b; margin-top: 4px; }
-.btn-secondary:hover { background: #3d434b; }
-.error-msg { color: #ff6b6b; font-size: 13px; margin-top: 12px; display: none; }
-.info-msg { color: #1dd1a1; font-size: 13px; margin-top: 12px; display: none;}
-.footer { margin-top: 24px; font-size: 12px; color: #505664; }
+.btn-secondary { background: #283038; margin-top: 4px; }
+.btn-secondary:hover { background: #35404A; }
+.error-msg { color: #FF2200; font-size: 13px; margin-top: 12px; display: none; }
+.info-msg { color: #00FF88; font-size: 13px; margin-top: 12px; display: none;}
+.footer { margin-top: 24px; font-size: 12px; color: #35404A; }
 .form-box { display: none; }
 .form-box.active { display: block; }
 </style>

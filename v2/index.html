@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LMU LarpTimes — Brand Board v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   LMU LarpTimes — Brand Board v2
+   "Cockpit Instruments" direction
+   Inspired by: LMP1 steering wheels, F1 timing,
+   hypercar dashboards, carbon fiber racecraft
+   ═══════════════════════════════════════════════ */
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  /* ── Carbon core ── */
+  --carbon-900:#070809;
+  --carbon-800:#0A0C0E;
+  --carbon-700:#0F1317;
+  --carbon-600:#161B20;
+  --carbon-500:#1E252C;
+  --carbon-400:#283038;
+  --carbon-300:#35404A;
+  --carbon-200:#5A6A7A;
+  --carbon-100:#7A8A9A;
+
+  /* ── Dashboard lights ── */
+  --amber:#FF6B00;
+  --amber-bright:#FF8800;
+  --amber-dim:#994400;
+  --red:#FF2200;
+  --red-bright:#FF4433;
+  --red-dim:#991500;
+  --white:#F0F4F8;
+  --white-dim:#C8D4E0;
+  --green:#00FF88;
+  --green-dim:#009953;
+  --blue:#0088FF;
+  --purple:#AA66FF;
+
+  /* ── Functional ── */
+  --sector-purple:#AA66FF;
+  --sector-green:#00FF88;
+  --sector-orange:#FF8800;
+  --sector-default:#B0BCC8;
+
+  /* ── Typography ── */
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Inter',system-ui,sans-serif;
+  --display:'Rajdhani','Inter',sans-serif;
+
+  /* ── Gauge colors ── */
+  --gauge-track:#1C2126;
+  --gauge-fill:linear-gradient(90deg,#FF6B00,#FF2200);
+  --gauge-fill-green:linear-gradient(90deg,#00FF88,#0088FF);
+
+  font-family:var(--mono);
+  background:var(--carbon-900);
+  color:var(--white);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Carbon fiber texture ── */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background:
+    repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,0.008) 2px,rgba(255,255,255,0.008) 4px),
+    repeating-linear-gradient(90deg,transparent,transparent 2px,rgba(255,255,255,0.005) 2px,rgba(255,255,255,0.005) 4px);
+  pointer-events:none;
+  z-index:0;
+}
+
+body{position:relative;z-index:1;padding:40px;max-width:1440px;margin:0 auto;min-height:100vh}
+
+/* ── Accent line ── */
+.accent-line{
+  position:fixed;
+  top:0;left:0;right:0;
+  height:3px;
+  background:linear-gradient(90deg,var(--amber),var(--red),transparent 80%);
+  z-index:100;
+}
+
+/* ── Typography ── */
+h1.font-dash{font-family:var(--sans);font-weight:900;font-size:3rem;letter-spacing:-0.04em;text-transform:uppercase;color:var(--white);line-height:1}
+h1.font-dash span{color:var(--amber)}
+.subtitle-dash{font-family:var(--sans);font-weight:500;font-size:0.8125rem;color:var(--carbon-200);text-transform:uppercase;letter-spacing:0.1em;margin-top:8px}
+
+.section-header{
+  display:flex;align-items:center;gap:16px;
+  margin-bottom:32px;padding-bottom:12px;
+  border-bottom:1px solid var(--carbon-500);
+}
+.section-header .num{
+  font-family:var(--mono);font-weight:800;font-size:1rem;
+  color:var(--amber);letter-spacing:-0.05em;
+}
+.section-header h2{
+  font-family:var(--display);font-weight:600;font-size:1.5rem;
+  text-transform:uppercase;letter-spacing:0.03em;
+  color:var(--white);
+}
+.section-header .tag{
+  margin-left:auto;
+  font-family:var(--sans);font-weight:500;font-size:0.625rem;
+  text-transform:uppercase;letter-spacing:0.08em;
+  color:var(--carbon-200);
+}
+
+/* ── Section spacing ── */
+.section{margin-bottom:64px}
+.section:last-child{margin-bottom:0}
+
+/* ── Grids ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
+.grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px}
+.grid-6{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:12px}
+.grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+
+/* ── Dashboard panel ── */
+.panel{
+  background:var(--carbon-800);
+  border:1px solid var(--carbon-500);
+  position:relative;
+  overflow:hidden;
+}
+.panel--squared{border-radius:0}
+.panel--radius{border-radius:2px}
+.panel--inset{background:var(--carbon-900);border-color:var(--carbon-600)}
+
+.panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;
+  border-bottom:1px solid var(--carbon-500);
+  font-family:var(--sans);font-weight:600;font-size:0.5625rem;
+  text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--carbon-100);
+  background:var(--carbon-700);
+}
+
+/* ── Linear gauge ── */
+.gauge{
+  height:6px;
+  background:var(--gauge-track);
+  border-radius:0;
+  overflow:hidden;
+  position:relative;
+}
+.gauge-fill{
+  height:100%;
+  background:var(--gauge-fill);
+  transition:width 0.3s ease;
+  border-radius:0;
+}
+.gauge-fill.green{background:var(--gauge-fill-green)}
+.gauge-labels{
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:0.5rem;
+  color:var(--carbon-200);
+  margin-top:2px;
+}
+
+/* ── Dashboard card ── */
+.dash-card{
+  background:var(--carbon-800);
+  border:1px solid var(--carbon-500);
+  padding:16px;
+  position:relative;
+}
+.dash-card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:2px;
+  background:var(--amber);
+}
+.dash-card .label{
+  font-family:var(--sans);font-weight:600;font-size:0.5rem;
+  text-transform:uppercase;letter-spacing:0.15em;
+  color:var(--carbon-200);
+  margin-bottom:8px;
+}
+.dash-card .value{
+  font-family:var(--mono);font-weight:700;font-size:1.75rem;
+  letter-spacing:-0.03em;
+  color:var(--white);
+  line-height:1;
+}
+.dash-card .sub{
+  font-family:var(--mono);font-weight:400;font-size:0.625rem;
+  color:var(--carbon-100);
+  margin-top:4px;
+}
+
+/* ── Shift light indicator ── */
+.shift-lights{display:flex;gap:4px;margin:4px 0}
+.shift-light{
+  width:100%;height:8px;
+  background:var(--carbon-500);
+  transition:background 0.1s;
+}
+.shift-light.on{background:var(--green)}
+.shift-light.warn{background:var(--amber)}
+.shift-light.crit{background:var(--red)}
+.shift-light.active.on{background:var(--green-dim)}
+.shift-light.active.warn{background:var(--amber)}
+.shift-light.active.crit{background:var(--red)}
+
+/* ── Color swatches ── */
+.c-swatch{
+  background:var(--carbon-800);
+  border:1px solid var(--carbon-500);
+  padding:12px;
+}
+.c-preview{
+  height:48px;
+  margin-bottom:8px;
+  border:1px solid rgba(255,255,255,0.05);
+}
+.c-name{
+  font-family:var(--mono);font-weight:600;font-size:0.6875rem;
+  color:var(--white);letter-spacing:-0.02em;
+}
+.c-hex{
+  font-family:var(--mono);font-weight:400;font-size:0.5625rem;
+  color:var(--carbon-100);
+}
+.c-use{
+  font-family:var(--sans);font-weight:400;font-size:0.5rem;
+  color:var(--carbon-200);text-transform:uppercase;letter-spacing:0.08em;
+  margin-top:4px;
+}
+
+/* ── Type sample ── */
+.type-block{
+  background:var(--carbon-800);
+  border:1px solid var(--carbon-500);
+  padding:20px;
+}
+.type-label{
+  font-family:var(--sans);font-weight:500;font-size:0.5rem;
+  text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--carbon-200);
+  margin-bottom:12px;
+  display:flex;gap:12px;
+}
+.type-label span{color:var(--carbon-300);font-weight:400}
+.type-demo{line-height:1.3}
+
+/* ── 7-segment style ── */
+.segment{
+  font-family:var(--mono);font-weight:800;
+  letter-spacing:0.02em;
+  background:var(--carbon-900);
+  padding:4px 8px;
+  border:1px solid var(--carbon-500);
+  display:inline-block;
+  color:var(--amber);
+}
+
+/* ── Button styles ── */
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:34px;padding:0 16px;
+  font-family:var(--sans);font-weight:700;font-size:0.6875rem;
+  text-transform:uppercase;letter-spacing:0.05em;
+  cursor:default;
+  transition:none;
+}
+.btn--primary{background:var(--amber);color:var(--carbon-900);border:none}
+.btn--secondary{background:transparent;color:var(--white);border:1px solid var(--carbon-400)}
+.btn--danger{background:var(--red);color:var(--carbon-900);border:none}
+.btn--ghost{background:transparent;color:var(--carbon-200);border:1px solid transparent}
+.btn--disabled{background:var(--carbon-600);color:var(--carbon-300);border:none}
+
+/* ── Dashboard meters ── */
+.meter-row{display:flex;gap:16px;align-items:center;padding:4px 0}
+.meter-row .m-label{font-family:var(--sans);font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);min-width:48px}
+.meter-row .m-bar{flex:1;height:4px;background:var(--carbon-500);position:relative}
+.meter-row .m-bar .m-fill{height:100%;position:absolute;left:0;top:0}
+.meter-row .m-val{font-family:var(--mono);font-size:0.625rem;color:var(--white);min-width:40px;text-align:right}
+
+/* ── Timeline ── */
+.timeline-track{display:flex;gap:2px;height:40px;margin:8px 0}
+.timeline-stint{
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:0.5rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.05em;
+}
+.timeline-stint.s1{background:rgba(170,102,255,0.2);color:var(--purple)}
+.timeline-stint.s2{background:rgba(0,255,136,0.15);color:var(--green)}
+.timeline-stint.s3{background:rgba(255,136,0,0.15);color:var(--amber)}
+.timeline-stint.final{background:rgba(0,136,255,0.1);color:var(--blue)}
+.timeline-pit{
+  width:4px;
+  background:var(--red);
+  flex-shrink:0;
+}
+
+/* ── Badge ── */
+.badge{
+  font-family:var(--sans);font-weight:800;font-size:0.5rem;
+  text-transform:uppercase;letter-spacing:0.08em;
+  padding:2px 6px;
+  border:1px solid currentColor;
+}
+.badge--hypercar{color:var(--amber);border-color:rgba(255,107,0,0.3);background:rgba(255,107,0,0.08)}
+.badge--lmp2{color:var(--blue);border-color:rgba(0,136,255,0.3);background:rgba(0,136,255,0.08)}
+.badge--gt3{color:var(--green);border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.08)}
+.badge--fast{color:var(--green);border-color:rgba(0,255,136,0.3)}
+.badge--slow{color:var(--red);border-color:rgba(255,34,0,0.3)}
+.badge--pit{color:var(--amber);border-color:rgba(255,107,0,0.3)}
+
+/* ── DO / DON'T ── */
+.comp{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px
+}
+.comp-good,.comp-bad{padding:16px;border-width:1px;border-style:solid}
+.comp-good{border-color:rgba(0,255,136,0.15);background:rgba(0,255,136,0.03)}
+.comp-bad{border-color:rgba(255,34,0,0.15);background:rgba(255,34,0,0.03)}
+.comp-tag{font-family:var(--sans);font-weight:800;font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px}
+.comp-good .comp-tag{color:var(--green)}
+.comp-bad .comp-tag{color:var(--red)}
+.comp p{font-family:var(--sans);font-size:0.6875rem;color:var(--white-dim);line-height:1.5}
+
+/* ── Anti-pattern grid ── */
+.anti-card{
+  background:var(--carbon-800);
+  border:1px solid rgba(255,34,0,0.12);
+  padding:12px;
+}
+.anti-card .title{
+  font-family:var(--display);font-weight:600;font-size:0.75rem;
+  text-transform:uppercase;letter-spacing:0.05em;
+  color:var(--red);
+  margin-bottom:4px;
+  display:flex;align-items:center;gap:6px;
+}
+.anti-card .desc{
+  font-family:var(--sans);font-size:0.625rem;
+  color:var(--carbon-100);
+  line-height:1.4;
+}
+
+/* ── Hero intro ── */
+.hero{
+  margin-bottom:48px;
+  padding:48px 40px;
+  background:linear-gradient(135deg,var(--carbon-900) 0%,var(--carbon-800) 100%);
+  border:1px solid var(--carbon-500);
+  position:relative;
+  overflow:hidden;
+}
+.hero::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:3px;
+  background:linear-gradient(90deg,var(--amber),var(--red),transparent);
+}
+.hero::after{
+  content:'';
+  position:absolute;
+  top:-100px;right:-100px;
+  width:300px;height:300px;
+  border:1px solid rgba(255,107,0,0.03);
+  border-radius:50%;
+}
+.hero h1{font-family:var(--display);font-weight:700;font-size:4rem;letter-spacing:0.02em;text-transform:uppercase;color:var(--white);line-height:1;position:relative;z-index:1}
+.hero h1 span{color:var(--amber)}
+.hero .sub{font-family:var(--sans);font-weight:400;font-size:1rem;color:var(--carbon-200);margin-top:12px;max-width:600px;position:relative;z-index:1;line-height:1.5}
+.hero .meta{font-family:var(--mono);font-size:0.6875rem;color:var(--carbon-100);margin-top:24px;display:flex;gap:24px;position:relative;z-index:1}
+.hero .meta span{display:flex;align-items:center;gap:8px}
+
+/* ── Data table ── */
+.d-table{width:100%;border-collapse:collapse}
+.d-table th{
+  font-family:var(--sans);font-weight:600;font-size:0.5rem;
+  text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--carbon-200);
+  padding:6px 10px;
+  text-align:left;
+  border-bottom:1px solid var(--carbon-500);
+  background:var(--carbon-700);
+}
+.d-table td{
+  font-family:var(--mono);font-size:0.6875rem;
+  color:var(--white);
+  padding:6px 10px;
+  border-bottom:1px solid var(--carbon-600);
+}
+.d-table .num{text-align:right}
+.d-table tbody tr:hover td{background:var(--carbon-700)}
+.d-table tbody tr:last-child td{border-bottom:none}
+
+/* ── Gap table ── */
+.gap-table{width:100%;border-collapse:collapse}
+.gap-table th{
+  font-family:var(--sans);font-weight:600;font-size:0.5rem;
+  text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--carbon-200);
+  padding:6px 10px;
+  text-align:left;
+  border-bottom:1px solid var(--carbon-500);
+  background:var(--carbon-700);
+}
+.gap-table td{
+  font-family:var(--mono);font-size:0.625rem;
+  color:var(--white);
+  padding:6px 10px;
+  border-bottom:1px solid var(--carbon-600);
+}
+.gap-table .ok{color:var(--green)}
+.gap-table .ko{color:var(--red)}
+.gap-table .note{font-family:var(--sans);font-size:0.5625rem;color:var(--carbon-100)}
+
+/* ── Section label ── */
+.section-label{
+  font-family:var(--sans);font-weight:600;font-size:0.5625rem;
+  text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--carbon-100);
+  margin-bottom:12px;
+}
+
+/* ── Divider ── */
+.divider{
+  height:1px;
+  background:linear-gradient(90deg,var(--carbon-500),transparent);
+  margin:48px 0;
+}
+
+/* ── Footer ── */
+.footer{
+  margin-top:48px;padding:24px;
+  background:var(--carbon-800);
+  border:1px solid var(--carbon-500);
+  text-align:center;
+}
+.footer p{font-family:var(--sans);font-size:0.75rem;color:var(--carbon-200);line-height:1.6}
+.footer span{font-family:var(--mono);font-size:0.5625rem;color:var(--carbon-300);margin-top:8px;display:block}
+
+/* ── Responsive ── */
+@media(max-width:900px){
+  body{padding:16px}
+  .grid-2,.grid-3,.grid-4,.grid-6{grid-template-columns:1fr}
+  .comp{grid-template-columns:1fr}
+  .hero h1{font-size:2rem}
+  .hero{padding:24px 20px}
+}
+</style>
+</head>
+<body>
+<div class="accent-line"></div>
+
+<!-- ═══════ HERO ═══════ -->
+<div class="hero">
+  <h1>LMU <span>LarpTimes</span></h1>
+  <div class="sub">Brand Board v2 &mdash; "Cockpit Instruments" direction.<br>Inspired by LMP1 steering wheels, F1 timing screens, and hypercar telemetry.</div>
+  <div class="meta">
+    <span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      v2.0 &middot; Bozza
+    </span>
+    <span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Direzione: Cockpit / Dashboard
+    </span>
+    <span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+      Palette: Amber, Carbon, Red
+    </span>
+  </div>
+</div>
+
+<!-- ═══════ MANIFESTO ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">00</span>
+    <h2>Design Direction</h2>
+    <span class="tag">Cockpit instruments &ne; SaaS dashboard</span>
+  </div>
+  <div class="grid-2">
+    <div class="panel panel--radius" style="padding:20px">
+      <div class="section-label">Questa &egrave; la direzione per v2</div>
+      <div style="font-family:var(--sans);font-size:0.75rem;color:var(--white-dim);line-height:1.7;">
+        Un cruscotto da corsa non &egrave; un'app. Ogni elemento ha un rapporto segnale/rumore estremo.
+        Non ci sono "animazioni di benvenuto", non ci sono "scheletri di caricamento", non c'&egrave; "whitespace arioso".
+        <br><br>
+        Ispirato ai display dei volanti LMP1/LMDh, ai pannelli timing F1, e alla strumentazione delle hypercar.
+        <strong style="color:var(--white);">Ambra come luce primaria</strong>, come i display digitali delle race car.
+        <strong style="color:var(--white);">Rosso come allarme</strong>, non come "errore UI".
+        <strong style="color:var(--white);">Carbonio come texture</strong>, non come sfondo piatto.
+      </div>
+    </div>
+    <div class="panel panel--radius" style="padding:20px">
+      <div class="section-label">Riferimenti di design</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-family:var(--sans);font-size:0.6875rem;color:var(--white-dim);">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="color:var(--amber);">▸</span>
+          Display volante Toyota GR010 LMP1
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="color:var(--amber);">▸</span>
+          F1 Timing Screen (purple/orange/green sectors)
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="color:var(--amber);">▸</span>
+          Ferrari 499P LMDh instrument cluster
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="color:var(--amber);">▸</span>
+          Porsche 963 steering wheel display
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="color:var(--amber);">▸</span>
+          Cadillac V-Series.R dash HMI
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="color:var(--amber);">▸</span>
+          F1 broadcast lower thirds &amp; timing tower
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ COLOR ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">01</span>
+    <h2>Color System</h2>
+    <span class="tag">Race car dashboard palette</span>
+  </div>
+
+  <div class="section-label">Carbon core &mdash; 7 livelli di profondit&agrave;</div>
+  <div class="grid-6" style="margin-bottom:24px;">
+    <div class="c-swatch"><div class="c-preview" style="background:var(--carbon-900)"></div><div class="c-name">--carbon-900</div><div class="c-hex">#070809</div><div class="c-use">Fondale</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--carbon-800)"></div><div class="c-name">--carbon-800</div><div class="c-hex">#0A0C0E</div><div class="c-use">Surface</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--carbon-700)"></div><div class="c-name">--carbon-700</div><div class="c-hex">#0E1114</div><div class="c-use">Panel bg</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--carbon-600)"></div><div class="c-name">--carbon-600</div><div class="c-hex">#14181C</div><div class="c-use">Inset</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--carbon-500)"></div><div class="c-name">--carbon-500</div><div class="c-hex">#1C2126</div><div class="c-use">Borders</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--carbon-400)"></div><div class="c-name">--carbon-400</div><div class="c-hex">#252B32</div><div class="c-use">Divider strong</div></div>
+  </div>
+
+  <div class="section-label">Dashboard lights &mdash; i colori che contano</div>
+  <div class="grid-6" style="margin-bottom:24px;">
+    <div class="c-swatch"><div class="c-preview" style="background:var(--amber)"></div><div class="c-name">--amber</div><div class="c-hex">#FF6B00</div><div class="c-use">Primario dash</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--amber-bright)"></div><div class="c-name">--amber-bright</div><div class="c-hex">#FF8800</div><div class="c-use">Hover, active</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--red)"></div><div class="c-name">--red</div><div class="c-hex">#FF2200</div><div class="c-use">Allarme, shift light</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--green)"></div><div class="c-name">--green</div><div class="c-hex">#00FF88</div><div class="c-use">Fast, optimal</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--blue)"></div><div class="c-name">--blue</div><div class="c-hex">#0088FF</div><div class="c-use">Info, water</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--purple)"></div><div class="c-name">--purple</div><div class="c-hex">#AA66FF</div><div class="c-use">Best sector</div></div>
+  </div>
+
+  <div class="section-label">Sector colors &mdash; F1 timing inspired</div>
+  <div class="grid-4">
+    <div class="c-swatch"><div class="c-preview" style="background:var(--sector-purple)"></div><div class="c-name">--sector-purple</div><div class="c-hex">#AA66FF</div><div class="c-use">Best overall sector</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--sector-green)"></div><div class="c-name">--sector-green</div><div class="c-hex">#00FF88</div><div class="c-use">Personal best sector</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--sector-orange)"></div><div class="c-name">--sector-orange</div><div class="c-hex">#FF8800</div><div class="c-use">Slower sector</div></div>
+    <div class="c-swatch"><div class="c-preview" style="background:var(--sector-default)"></div><div class="c-name">--sector-default</div><div class="c-hex">#B0BCC8</div><div class="c-use">Neutral sector</div></div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ TYPOGRAPHY ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">02</span>
+    <h2>Typography</h2>
+    <span class="tag">Monospace-dominant, come un ECU da corsa</span>
+  </div>
+
+  <div class="grid-2">
+    <div class="type-block">
+      <div class="type-label">Dash Display &mdash; JetBrains Mono 800 <span>Extended character set</span></div>
+      <div class="type-demo">
+        <div style="font-family:var(--mono);font-weight:800;font-size:3rem;letter-spacing:-0.04em;color:var(--white);line-height:1;">
+          2:23.456
+        </div>
+        <div style="font-family:var(--mono);font-weight:700;font-size:1.5rem;letter-spacing:-0.03em;color:var(--amber);margin-top:4px;">
+          +0.042s
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-family:var(--mono);font-weight:500;font-size:0.75rem;color:var(--white-dim);">
+          <span style="color:var(--green);">S1: 74.123</span>
+          <span style="color:var(--purple);">S2: 75.234</span>
+          <span style="color:var(--sector-orange);">S3: 75.684</span>
+        </div>
+      </div>
+    </div>
+    <div class="type-block">
+      <div class="type-label">UI System &mdash; Inter 600-900 <span>UPPERCASE, letter-spacing</span></div>
+      <div class="type-demo">
+        <div style="font-family:var(--sans);font-weight:900;font-size:0.875rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--white);">STRATEGY CALCULATION</div>
+        <div style="font-family:var(--sans);font-weight:700;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--carbon-200);margin-top:8px;">MACCHINA &middot; PISTA &middot; MESCOLA</div>
+        <div style="display:flex;gap:12px;margin-top:6px;">
+          <span class="badge badge--hypercar">HYPERCAR</span>
+          <span class="badge badge--pit">PIT L18</span>
+          <span class="badge badge--fast">-0.042</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-top:20px;">Size scale</div>
+  <div style="background:var(--carbon-800);border:1px solid var(--carbon-500);padding:20px;">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div><span class="segment" style="font-size:0.5rem;padding:2px 6px;">10px</span> <span style="font-family:var(--sans);font-size:0.5rem;color:var(--carbon-200);margin-left:8px;text-transform:uppercase;letter-spacing:0.1em;">LEGENDA CHART &middot; BADGE</span></div>
+      <div><span class="segment" style="font-size:0.625rem;padding:2px 6px;">12px</span> <span style="font-family:var(--sans);font-size:0.625rem;color:var(--carbon-200);margin-left:8px;text-transform:uppercase;letter-spacing:0.08em;">TABLE HEADER &middot; LABEL FILTRO</span></div>
+      <div><span class="segment" style="font-size:0.75rem;padding:2px 6px;">14px</span> <span style="font-family:var(--sans);font-size:0.75rem;color:var(--white-dim);margin-left:8px;">Dati tabella &middot; Meter value</span></div>
+      <div><span class="segment" style="font-size:1rem;padding:2px 6px;">18px</span> <span style="font-family:var(--sans);font-size:1rem;font-weight:700;color:var(--white);margin-left:8px;">Metriche secondarie</span></div>
+      <div><span class="segment" style="font-size:1.5rem;padding:2px 8px;">24px</span> <span style="font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--amber);margin-left:8px;letter-spacing:-0.03em;">224.567</span></div>
+      <div><span class="segment" style="font-size:2.25rem;padding:2px 8px;">40px</span> <span style="font-family:var(--mono);font-size:2.25rem;font-weight:800;color:var(--white);margin-left:8px;letter-spacing:-0.04em;">223.456</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ COMPONENTS ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">03</span>
+    <h2>Component Library</h2>
+    <span class="tag">Dashboard instruments, non card generiche</span>
+  </div>
+
+  <!-- Dashboard meters -->
+  <div class="section-label">Dashboard meters &larr; Linear gauges, non card numeriche</div>
+  <div class="grid-2" style="margin-bottom:32px;">
+    <div class="panel panel--radius" style="padding:16px;">
+      <div class="panel-header" style="margin:-16px -16px 12px -16px;">
+        <span>FUEL SYSTEM</span>
+        <span style="color:var(--amber);">42.3L</span>
+      </div>
+      <div class="meter-row">
+        <span class="m-label">Fuel</span>
+        <div class="m-bar"><div class="m-fill" style="width:42%;background:linear-gradient(90deg,var(--amber),var(--amber-bright));"></div></div>
+        <span class="m-val">42.3L</span>
+      </div>
+      <div class="meter-row">
+        <span class="m-label">Consumption</span>
+        <div class="m-bar"><div class="m-fill" style="width:65%;background:var(--carbon-300);"></div></div>
+        <span class="m-val">3.2L/lap</span>
+      </div>
+      <div class="meter-row">
+        <span class="m-label">Range</span>
+        <div class="m-bar"><div class="m-fill" style="width:55%;background:var(--green);"></div></div>
+        <span class="m-val">12 laps</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:8px;">
+        <div class="shift-light on" style="background:var(--carbon-500);"></div>
+        <div class="shift-light on" style="background:var(--carbon-500);"></div>
+        <div class="shift-light warn" style="background:var(--carbon-500);"></div>
+        <div class="shift-light warn" style="background:var(--amber);"></div>
+        <div class="shift-light crit" style="background:var(--red);"></div>
+      </div>
+    </div>
+
+    <div class="panel panel--radius" style="padding:16px;">
+      <div class="panel-header" style="margin:-16px -16px 12px -16px;">
+        <span>TYRE STATUS</span>
+        <span style="color:var(--green);">Soft &middot; L5</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <div style="font-family:var(--sans);font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);">FL</div>
+          <div class="gauge"><div class="gauge-fill" style="width:72%;"></div></div>
+          <div style="font-family:var(--mono);font-size:0.5rem;color:var(--white-dim);margin-top:1px;">72%</div>
+        </div>
+        <div>
+          <div style="font-family:var(--sans);font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);">FR</div>
+          <div class="gauge"><div class="gauge-fill" style="width:68%;"></div></div>
+          <div style="font-family:var(--mono);font-size:0.5rem;color:var(--white-dim);margin-top:1px;">68%</div>
+        </div>
+        <div>
+          <div style="font-family:var(--sans);font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);">RL</div>
+          <div class="gauge"><div class="gauge-fill green" style="width:85%;"></div></div>
+          <div style="font-family:var(--mono);font-size:0.5rem;color:var(--white-dim);margin-top:1px;">85%</div>
+        </div>
+        <div>
+          <div style="font-family:var(--sans);font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);">RR</div>
+          <div class="gauge"><div class="gauge-fill" style="width:65%;background:linear-gradient(90deg,#FF6B00,#FF2200);"></div></div>
+          <div style="font-family:var(--mono);font-size:0.5rem;color:var(--white-dim);margin-top:1px;">65%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dash cards -->
+  <div class="section-label">Dashboard stat blocks &larr; 3 varianti</div>
+  <div class="grid-3" style="margin-bottom:32px;">
+    <div class="dash-card">
+      <div class="label">Best Lap</div>
+      <div class="value" style="color:var(--green);">227.041</div>
+      <div class="sub">&plusmn;0.042s</div>
+      <div style="margin-top:8px;"><span class="badge badge--fast">+0.000</span></div>
+    </div>
+    <div class="dash-card">
+      <div class="label">Fuel</div>
+      <div class="value" style="color:var(--amber);">24.3<span style="font-size:1rem;">L</span></div>
+      <div class="sub">7.2 laps remaining</div>
+      <div style="margin-top:8px;"><span class="badge badge--pit">PIT SOON</span></div>
+    </div>
+    <div class="dash-card">
+      <div class="label">Track Temp</div>
+      <div class="value" style="color:var(--white);">32<span style="font-size:1rem;">°C</span></div>
+      <div class="sub">Ambient: 24°C</div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="section-label">Button system &larr; UPPERCASE, tattili</div>
+  <div class="panel panel--radius" style="padding:16px;margin-bottom:32px;">
+    <div class="btn-row">
+      <span class="btn btn--primary">Calculate</span>
+      <span class="btn btn--secondary">Reset</span>
+      <span class="btn btn--danger">Drop Lap</span>
+      <span class="btn btn--ghost">Cancel</span>
+      <span class="btn btn--disabled">Disabled</span>
+    </div>
+  </div>
+
+  <!-- 7-segment display -->
+  <div class="section-label">7-segment style data display</div>
+  <div class="panel panel--radius" style="padding:16px;margin-bottom:32px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="segment" style="font-size:1rem;padding:4px 8px;color:var(--white);">FUEL 42.3L</span>
+      <span class="segment" style="font-size:1rem;padding:4px 8px;color:var(--green);">LAP 7/40</span>
+      <span class="segment" style="font-size:1rem;padding:4px 8px;color:var(--amber);">+0.042s</span>
+      <span class="segment" style="font-size:1rem;padding:4px 8px;color:var(--red);">PIT NOW</span>
+    </div>
+  </div>
+
+  <!-- Badges -->
+  <div class="section-label">Badge system &larr; Bordered, UPPERCASE</div>
+  <div class="panel panel--radius" style="padding:16px;margin-bottom:32px;">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <span class="badge badge--hypercar">HYPERCAR</span>
+      <span class="badge badge--lmp2">LMP2</span>
+      <span class="badge badge--gt3">GT3</span>
+      <span class="badge badge--fast">+0.042</span>
+      <span class="badge badge--slow">-0.112</span>
+      <span class="badge badge--pit">PIT L18</span>
+    </div>
+  </div>
+
+  <!-- Data table -->
+  <div class="section-label">Data table &larr; Monospace, denso</div>
+  <div class="panel panel--squared" style="margin-bottom:32px;">
+    <table class="d-table">
+      <thead>
+        <tr><th>Lap</th><th>Time</th><th>S1</th><th>S2</th><th>S3</th><th class="num">Fuel</th><th>Compound</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td style="color:var(--green);">227.041</td><td style="color:var(--purple);">75.123</td><td>76.234</td><td>75.684</td><td class="num">92.3L</td><td><span class="badge badge--hypercar">Soft</span></td></tr>
+        <tr><td>2</td><td>226.894</td><td>75.012</td><td style="color:var(--green);">75.988</td><td>75.894</td><td class="num">87.1L</td><td><span class="badge badge--hypercar">Soft</span></td></tr>
+        <tr><td>3</td><td style="color:var(--red);">228.112</td><td>75.345</td><td>76.567</td><td style="color:var(--sector-orange);">76.200</td><td class="num">81.9L</td><td><span class="badge badge--pit">Soft</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Shift lights -->
+  <div class="section-label">Shift light indicator</div>
+  <div class="panel panel--radius" style="padding:16px;margin-bottom:32px;">
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+      <div class="shift-light active on"></div>
+      <div class="shift-light active on"></div>
+      <div class="shift-light active on"></div>
+      <div class="shift-light active on"></div>
+      <div class="shift-light active warn"></div>
+      <div class="shift-light active warn"></div>
+      <div class="shift-light active crit"></div>
+      <div class="shift-light active crit"></div>
+    </div>
+    <div style="font-family:var(--mono);font-size:0.5rem;color:var(--carbon-200);display:flex;justify-content:space-between;">
+      <span>RPM: 8,400</span>
+      <span style="color:var(--green);">▸▸▸ SHIFT</span>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="section-label">Race timeline</div>
+  <div class="panel panel--radius" style="padding:16px;margin-bottom:32px;">
+    <div class="timeline-track">
+      <div class="timeline-stint s1" style="flex:4;">Stint 1 &middot; Soft</div>
+      <div class="timeline-pit"></div>
+      <div class="timeline-stint s2" style="flex:3;">Stint 2 &middot; Medium</div>
+      <div class="timeline-pit"></div>
+      <div class="timeline-stint s3" style="flex:5;">Stint 3 &middot; Soft</div>
+      <div class="timeline-pit"></div>
+      <div class="timeline-stint final" style="flex:2;">Final</div>
+    </div>
+    <div style="display:flex;font-family:var(--mono);font-size:0.5rem;color:var(--carbon-200);">
+      <span style="flex:4;">L1</span><span style="width:4px;"></span><span style="flex:3;">L15</span><span style="width:4px;"></span><span style="flex:5;">L23</span><span style="width:4px;"></span><span style="flex:2;">L38</span>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ DATA VIZ ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">04</span>
+    <h2>Data Visualization</h2>
+    <span class="tag">Bar graph racing, non scatter generico</span>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <div class="section-label">Speed trace &larr; Overlay Lap A / Lap B</div>
+      <div class="panel panel--radius" style="padding:16px;height:280px;position:relative;">
+        <div style="display:flex;justify-content:space-between;font-size:0.5rem;color:var(--carbon-200);font-family:var(--sans);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">
+          <span>Speed (km/h)</span>
+          <span style="display:flex;gap:16px;"><span style="color:var(--purple);">● Lap A</span><span style="color:var(--green);">● Lap B</span></span>
+        </div>
+        <svg viewBox="0 0 300 180" preserveAspectRatio="none" style="width:100%;height:calc(100% - 24px);display:block;">
+          <!-- Grid -->
+          <line x1="40" y1="35" x2="280" y2="35" stroke="#1E252C" stroke-width="0.5"/>
+          <line x1="40" y1="70" x2="280" y2="70" stroke="#1E252C" stroke-width="0.5"/>
+          <line x1="40" y1="105" x2="280" y2="105" stroke="#1E252C" stroke-width="0.5"/>
+          <line x1="40" y1="140" x2="280" y2="140" stroke="#1E252C" stroke-width="0.5"/>
+          <!-- Area fill where Lap A is faster -->
+          <path d="M40,95 C55,88 65,92 80,75 C95,58 105,62 120,50 C135,38 145,42 160,55 C175,68 185,72 200,48 C215,28 225,32 240,52 C255,72 265,68 280,58 L280,175 L40,175 Z" fill="rgba(170,102,255,0.06)" stroke="none"/>
+          <!-- Lap A (purple) -->
+          <path d="M40,95 C48,88 54,85 60,90 C66,95 70,98 76,82 C82,66 88,54 94,58 C100,62 104,68 110,52 C116,36 122,28 128,32 C134,36 138,42 144,38 C150,34 156,30 162,34 C168,38 172,44 178,40 C184,36 190,32 196,28 C202,24 208,26 214,22 C220,18 226,20 232,28 C238,36 244,42 250,38 C256,34 262,30 268,32 C274,34 278,38 280,36" fill="none" stroke="var(--purple)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          <!-- Lap B (green) -->
+          <path d="M40,92 C48,86 54,82 60,88 C66,94 70,100 76,86 C82,72 88,60 94,62 C100,64 104,70 110,56 C116,42 122,34 128,38 C134,42 138,48 144,42 C150,36 156,32 162,36 C168,40 172,46 178,44 C184,42 190,38 196,34 C202,30 208,32 214,26 C220,20 226,24 232,32 C238,40 244,46 250,42 C256,38 262,34 268,36 C274,38 278,42 280,40" fill="none" stroke="var(--green)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          <!-- Labels -->
+          <text x="40" y="172" fill="#5A6A7A" font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle">0%</text>
+          <text x="280" y="172" fill="#5A6A7A" font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle">100%</text>
+          <text x="38" y="38" fill="#5A6A7A" font-size="6" font-family="JetBrains Mono, monospace" text-anchor="end">300</text>
+          <text x="38" y="73" fill="#5A6A7A" font-size="6" font-family="JetBrains Mono, monospace" text-anchor="end">260</text>
+          <text x="38" y="108" fill="#5A6A7A" font-size="6" font-family="JetBrains Mono, monospace" text-anchor="end">220</text>
+          <text x="38" y="143" fill="#5A6A7A" font-size="6" font-family="JetBrains Mono, monospace" text-anchor="end">180</text>
+        </svg>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Micro-sector delta &larr; Optimal vs Best by bar</div>
+      <div class="panel panel--radius" style="padding:16px;height:280px;position:relative;">
+        <div style="display:flex;justify-content:space-between;font-size:0.5rem;color:var(--carbon-200);font-family:var(--sans);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">
+          <span>Time (s) &middot; per micro-sector</span>
+          <span style="display:flex;gap:16px;"><span style="color:var(--amber);">■ Optimal</span><span style="color:var(--carbon-300);">■ Best Lap</span></span>
+        </div>
+        <svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet" style="width:100%;height:calc(100% - 24px);display:block;">
+          <!-- Axis -->
+          <line x1="20" y1="10" x2="20" y2="190" stroke="#283038" stroke-width="1"/>
+          <line x1="20" y1="190" x2="290" y2="190" stroke="#283038" stroke-width="1"/>
+          <!-- 9 micro-sectors grouped: optimal + best -->
+          <!-- S1-A -->
+          <rect x="28" y="78" width="24" height="112" fill="var(--amber)" opacity="0.85" rx="0"/>
+          <rect x="56" y="102" width="24" height="88" fill="var(--carbon-300)" opacity="0.5" rx="0"/>
+          <text x="40" y="72" fill="#E8EDF2" font-size="8" font-family="JetBrains Mono, monospace" font-weight="600" text-anchor="middle">+0.042</text>
+          <!-- S1-B -->
+          <rect x="88" y="90" width="24" height="100" fill="var(--amber)" opacity="0.85" rx="0"/>
+          <rect x="116" y="102" width="24" height="88" fill="var(--carbon-300)" opacity="0.5" rx="0"/>
+          <text x="100" y="72" fill="#E8EDF2" font-size="8" font-family="JetBrains Mono, monospace" font-weight="600" text-anchor="middle">+0.023</text>
+          <!-- S1-C -->
+          <rect x="148" y="60" width="24" height="130" fill="var(--amber)" opacity="0.85" rx="0"/>
+          <rect x="176" y="78" width="24" height="112" fill="var(--carbon-300)" opacity="0.5" rx="0"/>
+          <text x="160" y="54" fill="#E8EDF2" font-size="8" font-family="JetBrains Mono, monospace" font-weight="600" text-anchor="middle">+0.088</text>
+          <!-- S2-A -->
+          <rect x="208" y="96" width="24" height="94" fill="var(--amber)" opacity="0.85" rx="0"/>
+          <rect x="236" y="110" width="24" height="80" fill="var(--carbon-300)" opacity="0.5" rx="0"/>
+          <text x="220" y="78" fill="#E8EDF2" font-size="8" font-family="JetBrains Mono, monospace" font-weight="600" text-anchor="middle">+0.015</text>
+          <!-- Axis labels -->
+          <text x="20" y="200" fill="#5A6A7A" font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle">S1</text>
+          <text x="100" y="200" fill="#5A6A7A" font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle">S2</text>
+          <text x="220" y="200" fill="#5A6A7A" font-size="7" font-family="JetBrains Mono, monospace" text-anchor="middle">S3</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ VOICE ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">05</span>
+    <h2>Voice &amp; Tone</h2>
+    <span class="tag">Race engineer, parla come un telemetrista</span>
+  </div>
+
+  <div class="comp">
+    <div class="comp-good">
+      <div class="comp-tag">DO &middot; Telemetrista</div>
+      <p><strong style="color:var(--white);">"Box. Fuel critical."</strong><br>
+      Secco, imperativo, lessico specialistico. Ogni parola conta.</p>
+    </div>
+    <div class="comp-bad">
+      <div class="comp-tag">DON'T &middot; Assistente</div>
+      <p><strong style="color:var(--white);">"Your fuel level is getting low, we recommend you pit soon."</strong><br>
+      Generico, verbose, sembra un chatbot non un ingegnere.</p>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:20px;">
+    <div class="panel panel--radius" style="padding:16px;">
+      <div class="section-label">Lessico motorsport</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-family:var(--mono);font-size:0.625rem;">
+        <div><span style="color:var(--amber);">box</span> <span style="color:var(--carbon-200);">→ non pit</span></div>
+        <div><span style="color:var(--amber);">stint</span> <span style="color:var(--carbon-200);">→ non run</span></div>
+        <div><span style="color:var(--amber);">cliff</span> <span style="color:var(--carbon-200);">→ non limit</span></div>
+        <div><span style="color:var(--amber);">delta</span> <span style="color:var(--carbon-200);">→ non difference</span></div>
+        <div><span style="color:var(--amber);">window</span> <span style="color:var(--carbon-200);">→ non range</span></div>
+        <div><span style="color:var(--amber);">compound</span> <span style="color:var(--carbon-200);">→ non tyre type</span></div>
+      </div>
+    </div>
+    <div class="panel panel--radius" style="padding:16px;">
+      <div class="section-label">Race Engineer phrases</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:0.625rem;">
+        <div style="color:var(--red);">!"Box now. Tyres critical."</div>
+        <div style="color:var(--amber);">"Pit in 3. Fuel low."</div>
+        <div style="color:var(--white-dim);">"GT3 ahead. Losing 1.5 per lap."</div>
+        <div style="color:var(--green);">"Personal best. 223.456."</div>
+        <div style="color:var(--carbon-200);">"Qualifying. Hotlap mode."</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ ANTI-PATTERNS ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">06</span>
+    <h2>Anti-Patterns</h2>
+    <span class="tag">Cosa NON fare in un design motorsport</span>
+  </div>
+
+  <div class="grid-auto">
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Glassmorphism</div>
+      <div class="desc">Nessun frost effect su un cruscotto da corsa. Superfici carbonio solide.</div>
+    </div>
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Gradient blu/viola</div>
+      <div class="desc">Palette da race car: ambra, rosso, bianco. Non un SaaS.</div>
+    </div>
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Circular gauges</div>
+      <div class="desc">Le race car moderne usano barre lineari. I tachimetri circolari sono da stradale.</div>
+    </div>
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Soft shadows</div>
+      <div class="desc">Ombre nette da pannello LCD, non da cartolina.</div>
+    </div>
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Rounded corners &gt; 4px</div>
+      <div class="desc">I display race car hanno spigoli vivi. Radius = 0 o 2px massimo.</div>
+    </div>
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Loading animations</div>
+      <div class="desc">Skeleton shimmer? No. I dati arrivano o non arrivano.</div>
+    </div>
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Notification bell</div>
+      <div class="desc">Race engineer parla, non notifica. Zero badge non richiesti.</div>
+    </div>
+    <div class="anti-card">
+      <div class="title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Avatar / profilo</div>
+      <div class="desc">Non sei su Instagram. Non serve la foto profilo in un tool da corsa.</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ GAP ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="num">07</span>
+    <h2>Gap Analysis</h2>
+    <span class="tag">v1 (attuale) → v2 (proposta)</span>
+  </div>
+
+  <div class="panel panel--squared">
+    <table class="gap-table">
+      <thead>
+        <tr><th style="width:22%;">Elemento</th><th style="width:26%;">v1 Attuale</th><th style="width:26%;">v2 Proposto</th><th>Note</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Primary color</td><td class="ko">#00a1ff (blue)</td><td class="ok">#FF6B00 (amber)</td><td class="note">Ambra = race car dash standard</td></tr>
+        <tr><td>Alert color</td><td class="ko">#ff4d4d (generic red)</td><td class="ok">#FF2200 (race red)</td><td class="note">Rosso più aggressivo, caldo</td></tr>
+        <tr><td>Positive indicator</td><td class="ko">#2ea043 (green)</td><td class="ok">#00FF88 (teal green)</td><td class="note">Neon, più leggibile su fondo scuro</td></tr>
+        <tr><td>Background</td><td class="ko">#050709</td><td class="ok">#070809 + carbon fiber texture</td><td class="note">Texture weaving, non piatto</td></tr>
+        <tr><td>Surface treatment</td><td class="ko">Solid flat colors</td><td class="ok">Panel header + border hierarchy</td><td class="note">Come cruscotto con sezioni</td></tr>
+        <tr><td>Component shape</td><td class="ko">Card (border-radius 4px)</td><td class="ok">Dashboard block (radius 0-2px)</td><td class="note">Più spigoloso, più race</td></tr>
+        <tr><td>Data display</td><td class="ko">Stat card (label + value)</td><td class="ok">Linear gauge + meter row + segment</td><td class="note">Più informativo, meno "card"</td></tr>
+        <tr><td>Typography DNA</td><td class="ko">Inter + Rajdhani</td><td class="ok">JetBrains Mono 800 + Inter 900</td><td class="note">Monospace dominante come ECU</td></tr>
+        <tr><td>Text case</td><td class="ko">Sentence case</td><td class="ok">UPPERCASE per label</td><td class="note">Standard motorsport</td></tr>
+        <tr><td>Sector coloring</td><td class="ko">Custom</td><td class="ok">F1-inspired (purple/orange/green)</td><td class="note">Utenti F1 riconoscono subito</td></tr>
+        <tr><td>Shift lights</td><td class="ko">N/A</td><td class="ok">Bar indicator active</td><td class="note">Nuovo pattern visuale</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════ CLOSING ═══════ -->
+<div class="section">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;">
+    <div style="background:var(--carbon-800);border:1px solid var(--carbon-500);padding:24px;text-align:center;">
+      <div style="font-family:var(--sans);font-weight:700;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);">Direzione</div>
+      <div style="font-family:var(--mono);font-weight:700;font-size:1.25rem;color:var(--amber);margin-top:8px;">Cockpit</div>
+    </div>
+    <div style="background:var(--carbon-800);border:1px solid var(--carbon-500);padding:24px;text-align:center;border-left:none;border-right:none;">
+      <div style="font-family:var(--sans);font-weight:700;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);">Stato</div>
+      <div style="font-family:var(--mono);font-weight:700;font-size:1.25rem;color:var(--green);margin-top:8px;">Bozza</div>
+    </div>
+    <div style="background:var(--carbon-800);border:1px solid var(--carbon-500);padding:24px;text-align:center;">
+      <div style="font-family:var(--sans);font-weight:700;font-size:0.625rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--carbon-200);">Voci TTS</div>
+      <div style="font-family:var(--mono);font-weight:700;font-size:1.25rem;color:var(--white);margin-top:8px;">Lewis UK</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>LMU LarpTimes &middot; Brand Board v2 &middot; "Cockpit Instruments" direction</p>
+  <span>Nessuna modifica al codice applicata &mdash; revisione richiesta prima dell'implementazione</span>
+</div>
+
+</body>
+</html>

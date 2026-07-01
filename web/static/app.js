@@ -290,9 +290,9 @@ function buildDegradChart(curve, rawPoints) {
   const scatterData = rawPoints.map(function(p) { return { x: p.tyre_age, y: p.lap_time }; });
 
   const rootStyle = getComputedStyle(document.documentElement);
-  const colorPrimary = rootStyle.getPropertyValue('--border-focus').trim() || '#4a9eff';
+  const colorPrimary = rootStyle.getPropertyValue('--border-focus').trim() || '#FF6B00';
   const colorScatter = rootStyle.getPropertyValue('--ink-secondary').trim() || '#99a3af';
-  const gridColor = rootStyle.getPropertyValue('--border-subtle').trim() || '#262c35';
+  const gridColor = rootStyle.getPropertyValue('--border-subtle').trim() || '#283038';
 
   degradChart = new Chart(ctx, {
     type: 'line',
@@ -331,7 +331,7 @@ function buildDegradChart(curve, rawPoints) {
            titleFont: { family: "'Geist', sans-serif" },
            bodyFont: { family: "'JetBrains Mono', monospace" },
            cornerRadius: 4,
-           borderColor: '#262c35',
+           borderColor: '#283038',
            borderWidth: 1
         }
       },
@@ -454,7 +454,7 @@ async function loadLaps(silent) {
     renderLapsTable();
   } catch (e) {
     if (!silent) {
-      tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--accent-red); text-align:center;">Error: ' + e.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--red); text-align:center;">Error: ' + e.message + '</td></tr>';
     }
   }
 }
@@ -480,7 +480,7 @@ function renderLapsTable() {
 
   var tbody = document.getElementById('laps-tbody');
   if (!pageData.length) {
-    tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--text-muted); text-align:center;">Nessun giro trovato.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--text-tertiary); text-align:center;">Nessun giro trovato.</td></tr>';
     renderPagination(0, 0);
     return;
   }
@@ -492,7 +492,7 @@ function renderLapsTable() {
     var cls = deleted ? ' class="deleted"' : '';
     var validBadge = l.is_valid_lap ? '<span class="badge badge-valid">VALID</span>' : '<span class="badge badge-invalid">INVALID</span>';
     var pitBadge = l.is_pit_in_lap ? '<span class="badge badge-pit">IN</span> ' : (l.is_pit_out_lap ? '<span class="badge badge-pit">OUT</span> ' : '');
-    var anomStr = l.anomaly_flag ? '<span style="color:var(--accent-orange); cursor:help;" title="' + (l.anomaly_reason || 'Anomalia rilevata') + '">\u26a0\ufe0f</span>' : '';
+    var anomStr = l.anomaly_flag ? '<span style="color:var(--amber); cursor:help;" title="' + (l.anomaly_reason || 'Anomalia rilevata') + '">\u26a0\ufe0f</span>' : '';
 
     var action = deleted
       ? '<button class="btn btn-restore" onclick="restoreLap(' + l.id + ')">Restore</button>'
@@ -502,7 +502,7 @@ function renderLapsTable() {
     var wearEnd = l.wear_pct_end_FL != null ? l.wear_pct_end_FL.toFixed(0) + '%' : '—';
     var wearBadge = '—';
     if (l.wear_pct_start_FL != null && l.wear_pct_end_FL != null) {
-      var wColor = l.wear_pct_end_FL > 50 ? 'var(--accent-red)' : 'var(--text-secondary)';
+      var wColor = l.wear_pct_end_FL > 50 ? 'var(--red)' : 'var(--text-secondary)';
       wearBadge = '<span style="font-size:0.75rem; color:' + wColor + '">' + wearStart + ' \u2192 ' + wearEnd + '</span>';
     }
 
@@ -516,7 +516,7 @@ function renderLapsTable() {
       '<td class="num-col">' + l.lap_number + '</td>' +
       '<td>' + (l.track || '—') + '</td>' +
       '<td>' + (l.car || '—') + '</td>' +
-      '<td><span class="class-badge" style="background:' + (l.class_color || 'var(--border-dim)') + '22; color:' + (l.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (l.class_color || 'var(--border-dim)') + '44;">' + (l.class_display || l.car_class || '—') + '</span></td>' +
+      '<td><span class="class-badge" style="background:' + (l.class_color || 'var(--border)') + '22; color:' + (l.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (l.class_color || 'var(--border)') + '44;">' + (l.class_display || l.car_class || '—') + '</span></td>' +
       '<td>' + (l.session_type || '—') + '</td>' +
       '<td class="num-col">' + (l.stint_id != null ? l.stint_id : '—') + '</td>' +
       '<td class="num-col">' + fmtTime(l.lap_time) + '</td>' +
@@ -679,7 +679,7 @@ async function calculateStrategy() {
         trafficHtml = '<div class="section-label" style="margin-top: 1rem">Traffic Assessment</div>' +
           '<div class="table-container" style="padding: 1rem 1.25rem; margin-bottom: 1rem;">' +
           '<div style="display: flex; gap: var(--space-xl); flex-wrap: wrap;">' +
-          '<div><div class="stat-label">Car Class</div><div class="stat-value" style="font-size:1.2rem; color:' + (tr.own_class === 'Hypercar' ? '#ff6b6b' : tr.own_class === 'LMP2' ? '#4a9eff' : '#2ea043') + ';">' + (tr.own_class || '—') + '</div></div>' +
+          '<div><div class="stat-label">Car Class</div><div class="stat-value" style="font-size:1.2rem; color:' + (tr.own_class === 'Hypercar' ? '#FF2200' : tr.own_class === 'LMP2' ? '#FF6B00' : '#00FF88') + ';">' + (tr.own_class || '—') + '</div></div>' +
           '<div style="padding-left: var(--space-xl); border-left: 1px solid var(--border-subtle);"><div class="stat-label">Traffic Density</div><div class="stat-value text-mono" style="font-size:1.2rem;">' + (tr.traffic_density * 100).toFixed(0) + '%</div></div>' +
           '<div style="padding-left: var(--space-xl); border-left: 1px solid var(--border-subtle);"><div class="stat-label">Estimated Penalty/Lap</div><div class="stat-value text-mono" style="font-size:1.2rem; color:' + trafficColor + ';">+' + tr.estimated_penalty_per_lap.toFixed(2) + 's</div></div>' +
           '</div>' +
@@ -925,8 +925,8 @@ async function renderLapChart(car, track) {
 
     // ── Stint colors and single legend entry per stint (no duplicates) ──
     var stintColors = {
-      1: '#1dd1a1', 2: '#4a9eff', 3: '#ff6b6b',
-      4: '#ffa94d', 5: '#a29bfe', 6: '#fd79a8'
+      1: '#00FF88', 2: '#FF6B00', 3: '#FF2200',
+      4: '#FF8800', 5: '#AA66FF', 6: '#FF4466'
     };
 
     // Group points by stint (for color, not for legend)
@@ -935,7 +935,7 @@ async function renderLapChart(car, track) {
       var s = p.stint_id || 1;
       if (!stints[s]) {
         stints[s] = {
-          id: s, color: stintColors[s] || '#7d8590',
+          id: s, color: stintColors[s] || '#5A6A7A',
           compound: p.compound || 'Medium', lap_start: p.x, lap_end: p.x,
           fuel_start: p.fuel, fuel_end: p.fuel
         };
@@ -952,8 +952,8 @@ async function renderLapChart(car, track) {
     datasets.push({
       label: 'Lap time (real)',
       data: allPoints.map(function(p) { return {x: p.x, y: p.y}; }),
-      backgroundColor: '#7d8590',
-      borderColor: '#7d8590',
+      backgroundColor: '#5A6A7A',
+      borderColor: '#5A6A7A',
       pointRadius: 3,
       pointHoverRadius: 5,
       showLine: false,
@@ -966,9 +966,9 @@ async function renderLapChart(car, track) {
       label: 'Tyre degradation (fuel-corrected)',
       data: allPoints.map(function(p) { return {x: p.x, y: p.yc}; }),
       backgroundColor: function(ctx) {
-        return stintColors[ctx.raw.stint_id] || '#ffa94d';
+        return stintColors[ctx.raw.stint_id] || '#FF8800';
       },
-      borderColor: '#ffa94d',
+      borderColor: '#FF8800',
       pointRadius: 4,
       pointHoverRadius: 7,
       showLine: false,
@@ -981,8 +981,8 @@ async function renderLapChart(car, track) {
       datasets.push({
         label: 'Degradation model fit',
         data: data.degradation.curve.map(function(p) { return {x: p.age, y: p.predicted}; }),
-        borderColor: '#1dd1a1',
-        backgroundColor: 'rgba(29,209,161,0.15)',
+        borderColor: '#00FF88',
+        backgroundColor: 'rgba(0,255,136,0.15)',
         pointRadius: 0,
         borderWidth: 2.5,
         borderDash: [6, 4],
@@ -1003,14 +1003,14 @@ async function renderLapChart(car, track) {
           type: 'line',
           xMin: ps.lap_number, xMax: ps.lap_number,
           yMin: 0, yMax: 999,
-          borderColor: '#ff6b6b',
+          borderColor: '#FF2200',
           borderWidth: 2,
           borderDash: [8, 4],
           label: {
             display: true,
             content: 'PIT ' + Math.round(ps.pit_loss) + 's',
             position: 'start',
-            backgroundColor: 'rgba(255,107,107,0.85)',
+            backgroundColor: 'rgba(255,34,0,0.85)',
             color: '#fff',
             padding: 3,
             font: {size: 10, weight: 'bold'}
@@ -1053,7 +1053,7 @@ async function renderLapChart(car, track) {
           legend: {
             position: 'top',
             labels: {
-              color: '#7d8590',
+              color: '#5A6A7A',
               font: {family: 'Inter, sans-serif', size: 11},
               generateLabels: function(chart) {
                 // Build labels: 2 dataset labels + 1 per stint
@@ -1065,7 +1065,7 @@ async function renderLapChart(car, track) {
                     fillStyle: st.color,
                     strokeStyle: st.color,
                     lineWidth: 0,
-                    fontColor: '#7d8590',
+                    fontColor: '#5A6A7A',
                     pointStyle: 'rect',
                     hidden: false
                   });
@@ -1099,13 +1099,13 @@ async function renderLapChart(car, track) {
         scales: {
           x: {
             type: 'linear',
-            title: {display: true, text: 'Lap Number', color: '#7d8590'},
-            ticks: {color: '#7d8590', stepSize: 1, precision: 0},
+            title: {display: true, text: 'Lap Number', color: '#5A6A7A'},
+            ticks: {color: '#5A6A7A', stepSize: 1, precision: 0},
             grid: {color: 'rgba(255,255,255,0.05)'}
           },
           y: {
-            title: {display: true, text: 'Lap Time (s)', color: '#7d8590'},
-            ticks: {color: '#7d8590'},
+            title: {display: true, text: 'Lap Time (s)', color: '#5A6A7A'},
+            ticks: {color: '#5A6A7A'},
             grid: {color: 'rgba(255,255,255,0.05)'}
           }
         }
@@ -1219,7 +1219,7 @@ function renderLapComparison() {
     var secs = (lap.lap_time % 60).toFixed(3);
     var timeStr = hours > 0 ? hours + ':' + (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs : (mins > 0 ? mins + ':' + (secs < 10 ? '0' : '') + secs : secs + 's');
     return '<div class="comp-card-header">' +
-      '<div class="comp-card-title">Lap ' + lap.lap_number + (lap.stint_number ? ' <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(Stint ' + lap.stint_number + ')</span>' : '') + '</div>' +
+      '<div class="comp-card-title">Lap ' + lap.lap_number + (lap.stint_number ? ' <span style="font-size:0.75rem;color:var(--text-tertiary);font-weight:400;">(Stint ' + lap.stint_number + ')</span>' : '') + '</div>' +
       '<div class="comp-badge ' + cls + '">' + badge + '</div>' +
       '</div>' +
       '<div class="comp-row"><span class="comp-row-label">Lap Time</span><span class="comp-row-value ' + cls + '">' + timeStr + '</span></div>' +
@@ -1231,7 +1231,7 @@ function renderLapComparison() {
       '<div class="comp-row"><span class="comp-row-label">Fuel Used</span><span class="comp-row-value">' + (lap.fuel_used_l != null ? lap.fuel_used_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Tyre Age</span><span class="comp-row-value">' + (lap.tyre_age_laps != null ? lap.tyre_age_laps + ' laps' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Compound</span><span class="comp-row-value">' + (lap.compound_front || '\u2014') + '</span></div>' +
-      '<div class="comp-row"><span class="comp-row-label">Class</span><span class="comp-row-value"><span class="class-badge" style="background:' + (lap.class_color || 'var(--border-dim)') + '22; color:' + (lap.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (lap.class_color || 'var(--border-dim)') + '44;">' + (lap.class_display || lap.car_class || '\u2014') + '</span></span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Class</span><span class="comp-row-value"><span class="class-badge" style="background:' + (lap.class_color || 'var(--border)') + '22; color:' + (lap.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (lap.class_color || 'var(--border)') + '44;">' + (lap.class_display || lap.car_class || '\u2014') + '</span></span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Track Temp</span><span class="comp-row-value">' + (lap.track_temp != null ? lap.track_temp.toFixed(1) + '\u00b0C' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Weather</span><span class="comp-row-value">' + (lap.weather_state || '\u2014') + '</span></div>';
   }
@@ -1268,13 +1268,13 @@ function renderLapComparison() {
           '<div class="sector-bar ' + (!aIsFaster ? 'faster' : 'slower') + '" style="width:' + barWidthB + 'px;"></div>' +
           '<span class="sector-time">' + tB.toFixed(3) + '</span>' +
         '</div>' +
-        '<div class="sector-delta" style="color:' + (aIsFaster ? 'var(--accent-green)' : 'var(--accent-red)') + '">' + (aIsFaster ? '-' : '+') + diff.toFixed(3) + '</div>' +
+        '<div class="sector-delta" style="color:' + (aIsFaster ? 'var(--green)' : 'var(--red)') + '">' + (aIsFaster ? '-' : '+') + diff.toFixed(3) + '</div>' +
       '</div>';
     } else {
       sectorsHtml += '<div class="sector-bar-row">' +
         '<div class="sector-label">' + sectorLabels[si] + '</div>' +
-        '<div class="sector-bar-container" style="justify-content:center;color:var(--text-muted);">N/A</div>' +
-        '<div class="sector-bar-container" style="justify-content:center;color:var(--text-muted);">N/A</div>' +
+        '<div class="sector-bar-container" style="justify-content:center;color:var(--text-tertiary);">N/A</div>' +
+        '<div class="sector-bar-container" style="justify-content:center;color:var(--text-tertiary);">N/A</div>' +
         '<div class="sector-delta">\u2014</div>' +
       '</div>';
     }
@@ -1293,8 +1293,8 @@ function buildCompChart(lapA, lapB, aFaster) {
   if (_compChart) _compChart.destroy();
 
   var labels = ['Lap Time', 'Sector 1', 'Sector 2', 'Sector 3', 'Fuel Used', 'Tyre Age', 'Track Temp'];
-  var aColor = aFaster ? '#2ea043' : '#ff4d4d';
-  var bColor = aFaster ? '#ff4d4d' : '#2ea043';
+  var aColor = aFaster ? '#00FF88' : '#FF2200';
+  var bColor = aFaster ? '#FF2200' : '#00FF88';
 
   function extract(lap, key) {
     var val = lap[key];
@@ -1340,25 +1340,25 @@ function buildCompChart(lapA, lapB, aFaster) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: { color: '#7d8590', font: { family: 'Inter, sans-serif', size: 11 } }
+          labels: { color: '#5A6A7A', font: { family: 'Inter, sans-serif', size: 11 } }
         },
         tooltip: {
           backgroundColor: 'rgba(15, 15, 15, 0.95)',
           titleFont: { family: "'Geist', sans-serif" },
           bodyFont: { family: "'JetBrains Mono', monospace" },
           cornerRadius: 4,
-          borderColor: '#262c35',
+          borderColor: '#283038',
           borderWidth: 1
         }
       },
       scales: {
         x: {
           grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
-          ticks: { color: '#7d8590', font: { family: "'JetBrains Mono', monospace" } }
+          ticks: { color: '#5A6A7A', font: { family: "'JetBrains Mono', monospace" } }
         },
         y: {
           grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
-          ticks: { color: '#7d8590', font: { family: "'JetBrains Mono', monospace" } }
+          ticks: { color: '#5A6A7A', font: { family: "'JetBrains Mono', monospace" } }
         }
       }
     }
@@ -1422,7 +1422,7 @@ function renderSpeedTraceChart(data) {
   _speedTraceChart = null;
 
   if (!data || !data.lap_a || !data.lap_b) {
-    canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem;">No telemetry data available for these laps.</div>';
+    canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:0.85rem;">No telemetry data available for these laps.</div>';
     return;
   }
 
@@ -1430,7 +1430,7 @@ function renderSpeedTraceChart(data) {
   var samplesB = data.lap_b.samples || [];
 
   if (!samplesA.length && !samplesB.length) {
-    canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem;">No telemetry data available for these laps.</div>';
+    canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:0.85rem;">No telemetry data available for these laps.</div>';
     return;
   }
 
@@ -1438,8 +1438,8 @@ function renderSpeedTraceChart(data) {
   var lapALabel = 'Lap ' + (data.lap_a.lap ? data.lap_a.lap.lap_number : 'A');
   var lapBLabel = 'Lap ' + (data.lap_b.lap ? data.lap_b.lap.lap_number : 'B');
 
-  var colorA = '#4a9eff';
-  var colorB = '#ff6b6b';
+  var colorA = '#AA66FF';
+  var colorB = '#00FF88';
 
   var dsA = getTelemetryDataset(view, samplesA, lapALabel, colorA);
   var dsB = getTelemetryDataset(view, samplesB, lapBLabel, colorB);
@@ -1464,7 +1464,7 @@ function renderSpeedTraceChart(data) {
         legend: {
           position: 'top',
           labels: {
-            color: '#7d8590',
+            color: '#5A6A7A',
             font: {family: 'Inter, sans-serif', size: 11},
             usePointStyle: true,
             pointStyle: 'line',
@@ -1475,7 +1475,7 @@ function renderSpeedTraceChart(data) {
           titleFont: {family: "'Geist', sans-serif"},
           bodyFont: {family: "'JetBrains Mono', monospace"},
           cornerRadius: 4,
-          borderColor: '#262c35',
+          borderColor: '#283038',
           borderWidth: 1,
           callbacks: {
             title: function(items) {
@@ -1515,15 +1515,15 @@ function renderSpeedTraceChart(data) {
       scales: {
         x: {
           type: 'linear',
-          title: {display: true, text: 'Track Position (%)', color: '#7d8590', font: {size: 11}},
-          ticks: {color: '#7d8590', font: {family: "'JetBrains Mono', monospace", size: 10}, callback: function(v) { return v.toFixed(0) + '%'; }},
+          title: {display: true, text: 'Track Position (%)', color: '#5A6A7A', font: {size: 11}},
+          ticks: {color: '#5A6A7A', font: {family: "'JetBrains Mono', monospace", size: 10}, callback: function(v) { return v.toFixed(0) + '%'; }},
           grid: {color: 'rgba(255,255,255,0.05)'},
           min: 0,
           max: 100,
         },
         y: {
-          title: {display: true, text: yTitle, color: '#7d8590', font: {size: 11}},
-          ticks: {color: '#7d8590', font: {family: "'JetBrains Mono', monospace", size: 10}},
+          title: {display: true, text: yTitle, color: '#5A6A7A', font: {size: 11}},
+          ticks: {color: '#5A6A7A', font: {family: "'JetBrains Mono', monospace", size: 10}},
           grid: {color: 'rgba(255,255,255,0.05)'},
           beginAtZero: view === 'gear' ? false : true,
         }
@@ -1538,13 +1538,13 @@ function switchTelemetryView(view) {
     var isActive = btn.getAttribute('data-view') === view;
     btn.classList.toggle('active', isActive);
     if (isActive) {
-      btn.style.background = 'var(--accent-blue)';
+      btn.style.background = 'var(--amber)';
       btn.style.color = '#ffffff';
-      btn.style.borderColor = 'var(--accent-blue)';
+      btn.style.borderColor = 'var(--amber)';
     } else {
-      btn.style.background = 'var(--surface-2)';
+      btn.style.background = 'var(--bg-elevated)';
       btn.style.color = 'var(--text-primary)';
-      btn.style.borderColor = 'var(--border-bright)';
+      btn.style.borderColor = 'var(--border-strong)';
     }
   });
   if (_speedTraceData) {
@@ -1608,7 +1608,7 @@ async function loadOptimalLap() {
     let html = '';
     for (let i = 0; i < data.num_micro_sectors; i++) {
       const delta = bestLapDeltas ? bestLapDeltas.micro_deltas[i] : 0;
-      const deltaColor = delta <= 0.005 ? 'var(--accent-green)' : delta < 0.05 ? '#f78166' : delta < 0.1 ? '#ffa94d' : 'var(--accent-red)';
+      const deltaColor = delta <= 0.005 ? 'var(--green)' : delta < 0.05 ? '#FF6B00' : delta < 0.1 ? '#FF8800' : 'var(--red)';
       let priority;
       if (delta <= 0.01) priority = '✅ On pace';
       else if (delta < 0.05) priority = '⚡ Small gain';
@@ -1617,7 +1617,7 @@ async function loadOptimalLap() {
 
       html += '<tr>' +
         '<td><strong>' + data.micro_labels[i] + '</strong></td>' +
-        '<td class="num-col" style="color:var(--accent-green)">' + data.optimal_micro_times[i].toFixed(3) + '</td>' +
+        '<td class="num-col" style="color:var(--green)">' + data.optimal_micro_times[i].toFixed(3) + '</td>' +
         '<td class="num-col">' + (bestLapDeltas ? bestLapDeltas.micro_times[i].toFixed(3) : '—') + '</td>' +
         '<td class="num-col" style="color:' + deltaColor + '">+' + Math.abs(delta).toFixed(3) + '</td>' +
         '<td style="color:' + deltaColor + '; font-size:0.8rem;">' + priority + '</td>' +
@@ -1647,15 +1647,15 @@ function renderOptimalLapChart(data, bestLapDeltas) {
       datasets: [{
         label: 'Optimal Time',
         data: data.optimal_micro_times,
-        backgroundColor: 'rgba(0, 161, 255, 0.5)',
-        borderColor: '#00a1ff',
+        backgroundColor: 'rgba(255, 107, 0, 0.5)',
+        borderColor: '#FF6B00',
         borderWidth: 1,
         borderRadius: 2,
       }, {
         label: 'Best Lap (' + (data.best_lap_number ? 'Lap ' + data.best_lap_number : '') + ')',
         data: bestLapDeltas ? bestLapDeltas.micro_times : [],
-        backgroundColor: 'rgba(46, 160, 67, 0.3)',
-        borderColor: '#2ea043',
+        backgroundColor: 'rgba(0, 255, 136, 0.3)',
+        borderColor: '#00FF88',
         borderWidth: 1,
         borderRadius: 2,
       }]
@@ -1666,7 +1666,7 @@ function renderOptimalLapChart(data, bestLapDeltas) {
       plugins: {
         legend: {
           labels: {
-            color: '#7d8590',
+            color: '#5A6A7A',
             font: { family: 'Inter, sans-serif', size: 11 }
           }
         },
@@ -1674,7 +1674,7 @@ function renderOptimalLapChart(data, bestLapDeltas) {
           backgroundColor: 'rgba(15, 15, 15, 0.95)',
           bodyFont: { family: "'JetBrains Mono', monospace" },
           cornerRadius: 4,
-          borderColor: '#262c35',
+          borderColor: '#283038',
           borderWidth: 1,
           callbacks: {
             afterBody: function(context) {
@@ -1688,19 +1688,19 @@ function renderOptimalLapChart(data, bestLapDeltas) {
       scales: {
         x: {
           grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: '#7d8590', font: { size: 10 } }
+          ticks: { color: '#5A6A7A', font: { size: 10 } }
         },
         y: {
           grid: { color: 'rgba(255,255,255,0.05)' },
           ticks: {
-            color: '#7d8590',
+            color: '#5A6A7A',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             callback: function(v) { return v.toFixed(2) + 's'; }
           },
           title: {
             display: true,
             text: 'Time (s)',
-            color: '#7d8590',
+            color: '#5A6A7A',
             font: { size: 11 }
           }
         }
@@ -1799,7 +1799,7 @@ function renderRaceTimeline(data) {
     '</div>' +
     '<div class="stat-card">' +
       '<div class="stat-label">Best Lap</div>' +
-      '<div class="stat-value" style="color:var(--accent-green)">' + fmtTime(data.best_lap_time) + '</div>' +
+      '<div class="stat-value" style="color:var(--green)">' + fmtTime(data.best_lap_time) + '</div>' +
       '<div class="stat-sub">Session fastest</div>' +
     '</div>' +
     '<div class="stat-card">' +
@@ -1829,7 +1829,7 @@ function renderRaceTimeline(data) {
       '</div>';
     }).join('');
   } else {
-    stintBars.innerHTML = '<div style="color:var(--text-muted);padding:1rem;">No stint data available.</div>';
+    stintBars.innerHTML = '<div style="color:var(--text-tertiary);padding:1rem;">No stint data available.</div>';
   }
 
   // ── Weather timeline ──
@@ -1845,7 +1845,7 @@ function renderRaceTimeline(data) {
       '</div>';
     }).join('');
   } else {
-    weatherDiv.innerHTML = '<div style="color:var(--text-muted);padding:0.5rem;">No weather changes recorded.</div>';
+    weatherDiv.innerHTML = '<div style="color:var(--text-tertiary);padding:0.5rem;">No weather changes recorded.</div>';
   }
 
   // ── Event log ──
@@ -1869,7 +1869,7 @@ function renderRaceTimeline(data) {
       '</div>';
     }).join('');
   } else {
-    eventLog.innerHTML = '<div class="event-item info"><span class="event-icon">i</span><span class="event-desc" style="color:var(--text-muted);">No events recorded.</span></div>';
+    eventLog.innerHTML = '<div class="event-item info"><span class="event-icon">i</span><span class="event-desc" style="color:var(--text-tertiary);">No events recorded.</span></div>';
   }
 
   // ── Lap time chart ──
@@ -1885,7 +1885,7 @@ function renderRaceLapChart(data) {
   // We need lap data with stint numbers - fetch from /api/laps/chart or build from stints+events
   // Since we can't easily get per-lap times from the summary, we'll fetch the chart data
   if (!data.car || !data.track) {
-    ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">No lap time data for chart.</div>';
+    ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);">No lap time data for chart.</div>';
     return;
   }
 
@@ -1894,12 +1894,12 @@ function renderRaceLapChart(data) {
     .then(function(r) { return r.json(); })
     .then(function(chartData) {
       if (!chartData.laps || chartData.laps.length < 2) {
-        ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">Not enough laps for chart.</div>';
+        ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);">Not enough laps for chart.</div>';
         return;
       }
 
       // Build datasets: color points by stint
-      var stintColors = {1: '#1dd1a1', 2: '#4a9eff', 3: '#ff6b6b', 4: '#ffa94d', 5: '#a29bfe', 6: '#fd79a8'};
+      var stintColors = {1: '#00FF88', 2: '#FF6B00', 3: '#FF2200', 4: '#FF8800', 5: '#AA66FF', 6: '#FF4466'};
       var points = chartData.laps.map(function(l) {
         var st = l.stint_number || l.stint_id || 1;
         return {x: l.lap_number, y: l.lap_time, stint: st, compound: l.compound_front, fuel: l.fuel_start_l, age: l.tyre_age_laps};
@@ -1915,7 +1915,7 @@ function renderRaceLapChart(data) {
       var datasets = [];
       Object.keys(stintGroups).sort().forEach(function(stintId) {
         var pts = stintGroups[stintId];
-        var color = stintColors[parseInt(stintId)] || '#7d8590';
+        var color = stintColors[parseInt(stintId)] || '#5A6A7A';
         datasets.push({
           label: 'Stint ' + stintId + ' (' + (pts[0].compound || '?') + ')',
           data: pts.map(function(p) { return {x: p.x, y: p.y}; }),
@@ -1933,8 +1933,8 @@ function renderRaceLapChart(data) {
         datasets.push({
           label: 'Degradation model',
           data: chartData.degradation.curve.map(function(p) { return {x: p.age, y: p.predicted}; }),
-          borderColor: '#1dd1a1',
-          backgroundColor: 'rgba(29,209,161,0.1)',
+          borderColor: '#00FF88',
+          backgroundColor: 'rgba(0,255,136,0.1)',
           pointRadius: 0,
           borderWidth: 2,
           borderDash: [6, 4],
@@ -1953,13 +1953,13 @@ function renderRaceLapChart(data) {
           plugins: {
             legend: {
               position: 'top',
-              labels: { color: '#7d8590', font: {family: 'Inter, sans-serif', size: 10} }
+              labels: { color: '#5A6A7A', font: {family: 'Inter, sans-serif', size: 10} }
             },
             tooltip: {
               backgroundColor: 'rgba(15,15,15,0.95)',
               bodyFont: {family: "'JetBrains Mono', monospace", size: 11},
               cornerRadius: 4,
-              borderColor: '#262c35',
+              borderColor: '#283038',
               borderWidth: 1,
               callbacks: {
                 label: function(context) {
@@ -1973,13 +1973,13 @@ function renderRaceLapChart(data) {
           scales: {
             x: {
               type: 'linear',
-              title: {display: true, text: 'Lap Number', color: '#7d8590'},
-              ticks: {color: '#7d8590', stepSize: 1, precision: 0},
+              title: {display: true, text: 'Lap Number', color: '#5A6A7A'},
+              ticks: {color: '#5A6A7A', stepSize: 1, precision: 0},
               grid: {color: 'rgba(255,255,255,0.05)'}
             },
             y: {
-              title: {display: true, text: 'Lap Time (s)', color: '#7d8590'},
-              ticks: {color: '#7d8590'},
+              title: {display: true, text: 'Lap Time (s)', color: '#5A6A7A'},
+              ticks: {color: '#5A6A7A'},
               grid: {color: 'rgba(255,255,255,0.05)'}
             }
           }
@@ -1988,7 +1988,7 @@ function renderRaceLapChart(data) {
     })
     .catch(function(e) {
       console.error('Race chart error:', e);
-      ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">Failed to load chart data.</div>' + (e.message || '');
+      ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);">Failed to load chart data.</div>' + (e.message || '');
     });
 }
 
@@ -2111,14 +2111,14 @@ async function loadPitPractice() {
         return '<div class="pit-tip">' + tip + '</div>';
       }).join('');
     } else {
-      tipsDiv.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No improvement tips available yet. Complete more pit stops.</div>';
+      tipsDiv.innerHTML = '<div style="color:var(--text-tertiary); font-size:0.85rem;">No improvement tips available yet. Complete more pit stops.</div>';
     }
 
     // Fill table
     var tbody = document.getElementById('pit-tbody');
     if (d.recent_pit_stops && d.recent_pit_stops.length > 0) {
       tbody.innerHTML = d.recent_pit_stops.map(function(ps) {
-        var lossColor = ps.loss > 35 ? 'var(--accent-red)' : (ps.loss > 30 ? 'var(--accent-orange)' : 'var(--accent-green)');
+        var lossColor = ps.loss > 35 ? 'var(--red)' : (ps.loss > 30 ? 'var(--amber)' : 'var(--green)');
         return '<tr>' +
           '<td style="font-family:var(--font-mono); font-size:0.75rem;">' + (ps.session_id ? ps.session_id.substring(0, 8) : '—') + '</td>' +
           '<td class="num-col">' + ps.lap + '</td>' +
@@ -2131,7 +2131,7 @@ async function loadPitPractice() {
         '</tr>';
       }).join('');
     } else {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No pit stops detected in your data.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);">No pit stops detected in your data.</td></tr>';
     }
 
     // Build pit loss chart
@@ -2152,7 +2152,7 @@ function buildPitChart(d) {
   if (_pitChart) { _pitChart.destroy(); _pitChart = null; }
 
   if (!d.loss_history || d.loss_history.length < 2) {
-    ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem;">Need at least 2 pit stops for a chart.</div>';
+    ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:0.85rem;">Need at least 2 pit stops for a chart.</div>';
     return;
   }
 
@@ -2172,10 +2172,10 @@ function buildPitChart(d) {
         label: 'Pit Loss (s)',
         data: d.loss_history,
         backgroundColor: d.loss_history.map(function(v) {
-          return v > 35 ? 'rgba(255,77,77,0.7)' : (v > 30 ? 'rgba(247,129,102,0.7)' : 'rgba(46,160,67,0.7)');
+          return v > 35 ? 'rgba(255,34,0,0.7)' : (v > 30 ? 'rgba(255,107,0,0.7)' : 'rgba(0,255,136,0.7)');
         }),
         borderColor: d.loss_history.map(function(v) {
-          return v > 35 ? '#ff4d4d' : (v > 30 ? '#f78166' : '#2ea043');
+          return v > 35 ? '#FF2200' : (v > 30 ? '#FF6B00' : '#00FF88');
         }),
         borderWidth: 1,
         borderRadius: 3,
@@ -2190,7 +2190,7 @@ function buildPitChart(d) {
           backgroundColor: 'rgba(15,15,15,0.95)',
           bodyFont: { family: "'JetBrains Mono', monospace" },
           cornerRadius: 4,
-          borderColor: '#262c35',
+          borderColor: '#283038',
           borderWidth: 1,
           callbacks: {
             label: function(ctx) {
@@ -2202,12 +2202,12 @@ function buildPitChart(d) {
       scales: {
         x: {
           grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: '#7d8590', font: { size: 10 } }
+          ticks: { color: '#5A6A7A', font: { size: 10 } }
         },
         y: {
-          title: { display: true, text: 'Seconds Lost', color: '#7d8590', font: { size: 11 } },
+          title: { display: true, text: 'Seconds Lost', color: '#5A6A7A', font: { size: 11 } },
           grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: '#7d8590', font: { family: "'JetBrains Mono', monospace", size: 10 } }
+          ticks: { color: '#5A6A7A', font: { family: "'JetBrains Mono', monospace", size: 10 } }
         }
       }
     }
