@@ -925,11 +925,19 @@ async function renderLapChart(car, track) {
       }
     }
 
-    // Compute Y axis range from actual data
+    // Compute Y axis range from ALL data shown on chart (actual laps + projected stint)
     var yMin = Infinity, yMax = -Infinity;
     for (var i = 0; i < laps.length; i++) {
       if (laps[i].lap_time > 0 && laps[i].lap_time < yMin) yMin = laps[i].lap_time;
       if (laps[i].lap_time > 0 && laps[i].lap_time > yMax) yMax = laps[i].lap_time;
+    }
+    // Also include projected stint data
+    if (data.degradation && data.degradation.curve) {
+      for (var i = 0; i < data.degradation.curve.length; i++) {
+        var v = data.degradation.curve[i].predicted;
+        if (v > 0 && v < yMin) yMin = v;
+        if (v > 0 && v > yMax) yMax = v;
+      }
     }
     if (yMin === Infinity) { yMin = 220; yMax = 230; }
 
