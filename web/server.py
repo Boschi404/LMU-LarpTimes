@@ -947,9 +947,15 @@ async def get_laps_chart(
 
 @app.get("/api/owner")
 async def get_owner(request: Request):
-    """Return the current user's email from auth."""
+    """Return the current user's info from auth system."""
+    # Try auth system first
+    token = request.headers.get("authorization", "").replace("Bearer ", "")
+    if token:
+        user = AuthManager.verify_token(token)
+        if user:
+            return {"email": user.email or "", "display_name": user.display_name or "", "logged_in": True}
     # Fallback for backward compat
-    return {"email": database.get_owner_email() or ""}
+    return {"email": database.get_owner_email() or "", "display_name": "", "logged_in": False}
 
 
 @app.post("/api/owner")

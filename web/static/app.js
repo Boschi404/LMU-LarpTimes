@@ -826,7 +826,13 @@ async function loadOwner() {
     var d = await r.json();
     var display = document.getElementById('owner-display');
     if (display) {
-      display.textContent = d.email || 'Non loggato';
+      if (d.logged_in && d.display_name) {
+        display.textContent = d.display_name + ' (' + d.email + ')';
+      } else if (d.email) {
+        display.textContent = d.email || 'Non loggato';
+      } else {
+        display.textContent = 'Non loggato';
+      }
     }
     // Show welcome banner if no laps
     var r2 = await fetch('/api/laps?limit=1');

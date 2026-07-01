@@ -2126,6 +2126,10 @@
         if (nameEl) {
           nameEl.textContent = user.display_name || user.email || 'utente';
         }
+        // Load owner display from server
+        setTimeout(function() {
+          if (typeof loadOwner === 'function') loadOwner();
+        }, 100);
         if (logoutBtn) {
           logoutBtn.style.display = 'inline-block';
           logoutBtn.onclick = function() {
