@@ -188,10 +188,10 @@ def compute_optimal_lap(
         per_lap_deltas.append({
             "lap_id": lap['id'],
             "lap_number": lap.get('lap_number', i + 1),
-            "total_gap": round(sum(deltas), 4),
+            "lap_time": lap.get('lap_time', 0),
+            "total_gap": sum(deltas),
             "micro_deltas": deltas,
-            "micro_times": micro_times[:n_micro] if len(micro_times) >= n_micro
-                           else micro_times + [0] * (n_micro - len(micro_times)),
+            "micro_times": micro_times[:n_micro] if len(micro_times) >= n_micro else micro_times + [0] * (n_micro - len(micro_times)),
         })
 
     return {

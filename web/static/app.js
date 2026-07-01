@@ -1646,24 +1646,68 @@ function renderOptimalLapChart(data, bestLapDeltas) {
   if (!ctx) return;
   if (_optChart) _optChart.destroy();
 
+  // Sort per_lap_deltas by lap_number for a clean x-axis
+  var laps = (data.per_lap_deltas || []).slice().sort(function(a, b) {
+    return a.lap_number - b.lap_number;
+  });
+
+  if (!laps.length) {
+    document.getElementById('opt-chart').style.display = 'none';
+    return;
+  }
+
+  var lapNumbers = laps.map(function(l) { return l.lap_number; });
+  var lapTimes = laps.map(function(l) { return l.lap_time; });
+  var gaps = laps.map(function(l) { return l.total_gap; });
+
+  // Find the best lap index for highlighting
+  var bestLapIdx = -1;
+  var bestTime = Infinity;
+  for (var i = 0; i < laps.length; i++) {
+    if (laps[i].lap_time > 0 && laps[i].lap_time < bestTime) {
+      bestTime = laps[i].lap_time;
+      bestLapIdx = i;
+    }
+  }
+
+  var optimalTime = data.optimal_total_time || 0;
+
   _optChart = new Chart(ctx.getContext('2d'), {
-    type: 'bar',
+    type: 'scatter',
     data: {
-      labels: data.micro_labels,
       datasets: [{
-        label: 'Optimal Time',
-        data: data.optimal_micro_times,
-        backgroundColor: 'rgba(255, 107, 0, 0.5)',
-        borderColor: '#FF6B00',
-        borderWidth: 1,
-        borderRadius: 2,
+        label: 'Lap Time',
+        data: laps.map(function(l) {
+          return { x: l.lap_number, y: l.lap_time || 0 };
+        }),
+        backgroundColor: function(context) {
+          var idx = context.dataIndex;
+          return idx === bestLapIdx ? 'rgba(0, 255, 136, 0.8)' : 'rgba(255, 107, 0, 0.5)';
+        },
+        borderColor: function(context) {
+          var idx = context.dataIndex;
+          return idx === bestLapIdx ? '#00FF88' : '#FF6B00';
+        },
+        borderWidth: function(context) {
+          return context.dataIndex === bestLapIdx ? 2 : 1;
+        },
+        pointRadius: function(context) {
+          return context.dataIndex === bestLapIdx ? 8 : 5;
+        },
+        pointHoverRadius: 8,
       }, {
-        label: 'Best Lap (' + (data.best_lap_number ? 'Lap ' + data.best_lap_number : '') + ')',
-        data: bestLapDeltas ? bestLapDeltas.micro_times : [],
-        backgroundColor: 'rgba(0, 255, 136, 0.3)',
+        label: 'Optimal Lap (' + optimalTime.toFixed(3) + 's)',
+        data: lapNumbers.map(function(n) {
+          return { x: n, y: optimalTime };
+        }),
+        type: 'line',
         borderColor: '#00FF88',
-        borderWidth: 1,
-        borderRadius: 2,
+        borderWidth: 2,
+        borderDash: [8, 4],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        showLine: true,
       }]
     },
     options: {
@@ -1671,10 +1715,7 @@ function renderOptimalLapChart(data, bestLapDeltas) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: {
-            color: '#5A6A7A',
-            font: { family: 'Inter, sans-serif', size: 11 }
-          }
+          labels: { color: '#5A6A7A', font: { family: 'Inter, sans-serif', size: 11 } }
         },
         tooltip: {
           backgroundColor: 'rgba(15, 15, 15, 0.95)',
@@ -1683,32 +1724,52 @@ function renderOptimalLapChart(data, bestLapDeltas) {
           borderColor: '#283038',
           borderWidth: 1,
           callbacks: {
-            afterBody: function(context) {
-              const i = context[0].dataIndex;
-              const delta = bestLapDeltas ? bestLapDeltas.micro_deltas[i].toFixed(3) : '0.000';
-              return '\u0394: +' + Math.abs(delta) + 's' + (delta <= 0.01 ? ' (on pace)' : '');
+            label: function(context) {
+              var raw = context.raw;
+              if (!raw) return '';
+              var lap = laps[context.dataIndex];
+              if (!lap) return 'Lap ' + raw.x + ': ' + raw.y.toFixed(3) + 's';
+              var gap = lap.total_gap || 0;
+              var lines = [
+                'Lap ' + raw.x + ': ' + raw.y.toFixed(3) + 's',
+                'Δ from optimal: +' + Math.abs(gap).toFixed(3) + 's'
+              ];
+              return lines;
             }
           }
         }
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: '#5A6A7A', font: { size: 10 } }
+          type: 'linear',
+          title: {
+            display: true,
+            text: 'Lap Number',
+            color: '#5A6A7A',
+            font: { size: 11 }
+          },
+          min: 0,
+          ticks: {
+            color: '#5A6A7A',
+            stepSize: 1,
+            precision: 0,
+            font: { family: "'JetBrains Mono', monospace", size: 10 }
+          },
+          grid: { color: 'rgba(255,255,255,0.04)' }
         },
         y: {
-          grid: { color: 'rgba(255,255,255,0.05)' },
+          title: {
+            display: true,
+            text: 'Lap Time (s)',
+            color: '#5A6A7A',
+            font: { size: 11 }
+          },
           ticks: {
             color: '#5A6A7A',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
-            callback: function(v) { return v.toFixed(2) + 's'; }
+            callback: function(v) { return v.toFixed(1); }
           },
-          title: {
-            display: true,
-            text: 'Time (s)',
-            color: '#5A6A7A',
-            font: { size: 11 }
-          }
+          grid: { color: 'rgba(255,255,255,0.04)' }
         }
       }
     }

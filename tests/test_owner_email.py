@@ -214,7 +214,7 @@ def test_api_owner_get_set(tmp_db, monkeypatch):
     # GET initial
     r = client.get("/api/owner")
     assert r.status_code == 200
-    assert r.json() == {"email": ""}
+    assert r.json() == {"email": "", "display_name": "", "logged_in": False}
 
     # POST set
     r = client.post("/api/owner", json={"email": "Test@X.com"})
