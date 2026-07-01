@@ -33,6 +33,7 @@ from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst, TYRE_COLD, TYRE_IN_WINDOW, TYRE_DEGRADED
 from analysis.tyre_manager import estimate_remaining_life, TyreStatus
+from analysis.classes import detect_class
 from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRefresher
 from overlay.icons import settings_icon, icon_pixmap, clean_action_text
@@ -619,17 +620,19 @@ class OverlayWidget(QWidget):
 
     def update_frame(self, frame: TelemetryFrame):
         self._apply_auto_visibility(frame)
-        self._current_lap = frame.lap_number
-        self._last_frame = frame
 
-        # Track tyre age: reset on stint change, increment on lap change
+        # Track tyre age: reset on stint change, increment on lap number increase
         if frame.stint_number != self._last_stint:
             self._tyre_age_laps = 0
             self._last_stint = frame.stint_number
         elif frame.lap_number > self._current_lap:
             self._tyre_age_laps += 1
 
-        self._lbl_track_car.setText(f"{frame.track_name} \u2014 {frame.car_name}")
+        self._current_lap = frame.lap_number
+        self._last_frame = frame
+
+        car_class = detect_class(frame.car_name)
+        self._lbl_track_car.setText(f"{frame.track_name} — {frame.car_name}  [{car_class}]")
 
         # Delta
         d = frame.delta_best

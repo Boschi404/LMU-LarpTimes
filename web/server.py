@@ -36,6 +36,16 @@ from analysis.models import fit_degradation_model, fit_fuel_model, DegradationMo
 from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst
 from analysis.weather import linear_rain_forecast, build_stint_weather_forecast
+from analysis.weather_radar import analyze_rain_risk, get_pit_recommendation
+from analysis.pit_practice import extract_pit_stops, analyze_pit_performance
+from analysis.classes import (
+    add_class_to_laps,
+    detect_class,
+    get_class_params,
+    get_available_classes,
+    CLASS_PARAMS,
+    compute_traffic_adjusted_pace,
+)
 from analysis.microsectors import compute_optimal_lap as _compute_optimal_lap
 
 import paths
@@ -375,9 +385,15 @@ async def get_filter_compounds():
     return compounds
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# API — Setup Advisor
-# ──────────────────────────────────────────────────────────────────────────────
+@app.get("/api/filters/classes")
+async def get_filter_classes():
+    """Return the list of available car classes and their display params."""
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    classes = get_available_classes(laps)
+    return [
+        {"id": c, "display_name": get_class_params(c)["display_name"], "color": get_class_params(c)["color"]}
+        for c in classes
+    ]
 
 @app.get("/api/setup")
 async def get_setup_advice(car: str, track: str):
@@ -754,6 +770,7 @@ async def get_laps(
     car: Optional[str] = None,
     track: Optional[str] = None,
     compound: Optional[str] = None,
+    car_class: Optional[str] = None,
     owner_email: Optional[str] = None,
     include_deleted: bool = False
 ):
@@ -761,6 +778,7 @@ async def get_laps(
 
     Se `owner_email` è passato, filtra solo i giri di quell'utente.
     Se non è passato, restituisce tutti i giri (modalità admin).
+    Supporta filtro `car_class` per filtrare per classe (Hypercar/LMP2/GT3).
     """
     laps = database.get_all_laps_for_archive(include_deleted=include_deleted)
     if car:
@@ -772,12 +790,20 @@ async def get_laps(
     if owner_email:
         owner = owner_email.strip().lower()
         laps = [l for l in laps if (l.get("owner_email") or "").lower() == owner]
+
+    # Add car_class info to every lap
+    add_class_to_laps(laps)
+
+    if car_class:
+        laps = [l for l in laps if l.get("car_class") == car_class]
+
     return laps
 
 
 @app.get("/api/laps/compare")
 async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = None):
-    """Return all valid laps, optionally filtered by car+track, ordered by lap_number ASC."""
+    """Return all valid laps, optionally filtered by car+track, ordered by lap_number ASC.
+    Each lap includes car_class and class_color fields."""
     laps = database.get_all_laps_for_archive(include_deleted=False)
     filtered = laps
     if car:
@@ -786,6 +812,8 @@ async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = Non
         filtered = [l for l in filtered if l.get("track") == track]
     valid = [l for l in filtered if l.get("is_valid_lap") == 1 and not l.get("anomaly_flag")]
     valid.sort(key=lambda l: l.get("lap_number", 0))
+    # Add class info
+    add_class_to_laps(valid)
     return [
         {
             "id": l["id"],
@@ -803,6 +831,9 @@ async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = Non
             "track_temp": l.get("track_temp"),
             "weather_state": l.get("weather_state"),
             "stint_number": l.get("stint_number"),
+            "car_class": l.get("car_class"),
+            "class_color": l.get("class_color"),
+            "class_display": l.get("class_display"),
         }
         for l in valid
     ]
@@ -810,9 +841,12 @@ async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = Non
 
 @app.get("/api/laps/{lap_id}/telemetry")
 async def get_lap_telemetry(lap_id: int):
-    """Return telemetry samples for a single lap."""
+    """Return telemetry samples for a single lap, with car class info."""
     laps = database.get_all_laps_for_archive(include_deleted=False)
     lap = next((l for l in laps if l['id'] == lap_id), None)
+    # Add class info
+    if lap:
+        add_class_to_laps([lap])
     samples = database.get_lap_samples(lap_id)
     track_dist = database.get_track_distance(lap.get('track', '')) if lap else None
     return {
@@ -823,6 +857,9 @@ async def get_lap_telemetry(lap_id: int):
             "lap_time": lap['lap_time'],
             "track": lap.get('track'),
             "car": lap.get('car'),
+            "car_class": lap.get("car_class"),
+            "class_color": lap.get("class_color"),
+            "class_display": lap.get("class_display"),
         } if lap else None,
         "track_distance_km": track_dist,
     }
@@ -900,6 +937,10 @@ async def get_laps_chart(
                 ],
                 "params": model.to_dict(),
             }
+
+    # Add class info to laps in chart data
+    if "laps" in data:
+        add_class_to_laps(data["laps"])
 
     return data
 
@@ -1003,6 +1044,7 @@ async def get_profile(car: str, track: str, compound: Optional[str] = None):
     if not clean_laps:
         return {
             "car": car, "track": track, "compound": compound,
+            "car_class": detect_class(car),
             "n_valid_laps": 0,
             "insufficient_data": True,
             "warning": "Nessun giro valido disponibile per questa combinazione.",
@@ -1053,6 +1095,7 @@ async def get_profile(car: str, track: str, compound: Optional[str] = None):
         "car": car,
         "track": track,
         "compound": compound,
+        "car_class": detect_class(car),
         "n_valid_laps": n_valid,
         "insufficient_data": insufficient,
         "warning": warning,
@@ -1085,6 +1128,7 @@ async def get_strategy(
     weather_state: Optional[str] = "DRY",
     rain_intensity: float = 0.0,
     formation_lap: bool = False,
+    traffic_density: float = 0.0,  # 0.0-1.0 — how much traffic
 ):
     """Calcola la strategia di pit stop ottimale.
 
@@ -1092,6 +1136,10 @@ async def get_strategy(
       - track_temp: temperatura tracciato attuale in °C
       - weather_state: "DRY" o "WET" — condizione attuale
       - rain_intensity: 0.0-1.0 — intensità pioggia attuale
+
+    traffic_density (0.0-1.0):
+      Adatta la strategia per tenere conto del traffico.
+      Valori più alti penalizzano i sorpassi e favoriscono meno soste.
 
     Se vengono passati, l'API includerà anche un compound_plan
     (mescola consigliata per ogni stint) basato su meteo + dati storici.
@@ -1109,6 +1157,43 @@ async def get_strategy(
     mean_fuel, _ = fit_fuel_model(clean_laps)
     pit_losses = database.get_pit_stops_loss_by_session(car, track)
     pit_loss = float(np.mean(pit_losses)) if pit_losses else 30.0
+
+    # ── Traffic adjustment ────────────────────────────────────────────
+    # When traffic is dense, increase the effective pit loss because
+    # lapping slower traffic costs time and fewer stops = less traffic exposure.
+    traffic_info = None
+    if traffic_density > 0:
+        own_class = detect_class(car)
+        # Determine which slower classes might be on track
+        all_laps = database.get_all_laps_for_archive(include_deleted=False)
+        unique_cars = {l.get("car", "") for l in all_laps if l.get("track") == track}
+        slower_classes = set()
+        for other_car in unique_cars:
+            other_class = detect_class(other_car)
+            params_own = get_class_params(own_class)
+            params_other = get_class_params(other_class)
+            if params_other["avg_speed_kmh"] < params_own["avg_speed_kmh"]:
+                slower_classes.add(other_class)
+
+        from analysis.classes import compute_traffic_adjusted_pace
+        # Estimate the traffic penalty per lap
+        total_penalty = 0.0
+        for sc in slower_classes:
+            total_penalty += compute_traffic_adjusted_pace(
+                0, own_class, [sc], traffic_density, track_length_km=5.0,
+            )
+
+        traffic_info = {
+            "own_class": own_class,
+            "slower_classes": sorted(slower_classes),
+            "estimated_penalty_per_lap": round(total_penalty, 2),
+            "traffic_density": traffic_density,
+        }
+
+        # Adjust: add penalty to pit loss time to disincentivise extra stops
+        # When traffic is heavy, each extra stop = more time lost in traffic
+        if total_penalty > 0:
+            pit_loss = pit_loss + total_penalty * 0.5
 
     strat = PitStrategist(
         fuel_capacity=fuel_capacity,
@@ -1141,6 +1226,7 @@ async def get_strategy(
         "car": car,
         "track": track,
         "compound": compound,
+        "car_class": detect_class(car),
         "laps_remaining": result.get("laps_used", laps_remaining),
         "duration_hours": duration_hours,
         "mean_fuel_consumption": round(mean_fuel, 3),
@@ -1150,6 +1236,7 @@ async def get_strategy(
             "rain_intensity": rain_intensity,
             "track_temp": track_temp,
         },
+        "traffic": traffic_info,
         "result": result
     }
 
@@ -1226,7 +1313,54 @@ async def get_optimal_lap(car: str, track: str):
     )
     result['car'] = car
     result['track'] = track
+    result['car_class'] = detect_class(car)
     return result
+
+
+@app.get("/api/traffic")
+async def get_traffic_estimate(
+    car: str,
+    track: str,
+    traffic_density: float = 0.5,
+):
+    """Estimate traffic penalties for a given car/track combination.
+
+    Returns per-class traffic penalty estimates and the car's own class.
+    """
+    all_laps = database.get_all_laps_for_archive(include_deleted=False)
+    own_class = detect_class(car)
+
+    # Find unique classes present on this track
+    unique_cars = {l.get("car", "") for l in all_laps if l.get("track") == track}
+    classes_present = set()
+    for oc in unique_cars:
+        classes_present.add(detect_class(oc))
+
+    slower_classes = []
+    for c in sorted(classes_present):
+        c_params = get_class_params(c)
+        own_params = get_class_params(own_class)
+        if c_params["avg_speed_kmh"] < own_params["avg_speed_kmh"]:
+            penalty = estimate_traffic_penalty(
+                own_class, c,
+                track_length_km=database.get_track_distance(track) or 5.0,
+                traffic_density=traffic_density,
+            )
+            slower_classes.append({
+                "class": c,
+                "penalty_per_lap": penalty,
+                "display_name": c_params["display_name"],
+                "color": c_params["color"],
+            })
+
+    return {
+        "own_class": own_class,
+        "own_class_display": get_class_params(own_class)["display_name"],
+        "own_class_color": get_class_params(own_class)["color"],
+        "traffic_density": traffic_density,
+        "slower_classes": slower_classes,
+        "total_estimated_penalty": round(sum(s["penalty_per_lap"] for s in slower_classes), 2),
+    }
 
 
 @app.get("/api/practice")
@@ -1244,4 +1378,116 @@ async def get_practice_analysis(
         "car": car,
         "track": track,
         "result": result,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# API — Pit Stop Practice
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/pit-practice")
+async def get_pit_practice(
+    car: Optional[str] = None,
+    track: Optional[str] = None,
+):
+    """Analyze pit stop performance.
+    
+    Returns avg/best/worst pit loss, recent pit stop records, improvement tips.
+    Filters by car and/or track if provided.
+    """
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    
+    # Apply filters
+    if car:
+        laps = [l for l in laps if l.get("car") == car]
+    if track:
+        laps = [l for l in laps if l.get("track") == track]
+    
+    # Sort by session_id and lap_number for proper pit detection
+    laps.sort(key=lambda l: (l.get("session_id", ""), l.get("lap_number", 0)))
+    
+    pit_stops = extract_pit_stops(laps)
+    result = analyze_pit_performance(pit_stops)
+    
+    return {
+        "car": car or "all",
+        "track": track or "all",
+        "total_laps_analyzed": len(laps),
+        **result,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# API — Weather Radar
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/weather/radar")
+async def get_weather_radar(
+    car: Optional[str] = None,
+    track: Optional[str] = None,
+    current_compound: Optional[str] = "Dry",
+):
+    """Rain timing prediction with pit recommendations.
+    
+    Analyzes current weather conditions from the most recent lap data
+    and provides rain probability, time-to-rain estimation, and
+    pit/tire change recommendations.
+    """
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    
+    # Filter by car/track if specified
+    if car:
+        laps = [l for l in laps if l.get("car") == car]
+    if track:
+        laps = [l for l in laps if l.get("track") == track]
+    
+    if not laps:
+        return {
+            "rain_windows": [],
+            "recommendation": "No lap data available",
+            "current_weather": "UNKNOWN",
+            "rain_intensity": 0.0,
+        }
+    
+    # Get most recent lap weather
+    latest = laps[-1]
+    current_weather = latest.get("weather_state", "DRY")
+    rain_intensity = latest.get("rain_intensity", 0.0)
+    track_temp = latest.get("track_temp")
+    
+    # Analyze rain risk
+    rain_windows = analyze_rain_risk(
+        current_weather=current_weather,
+        rain_intensity=rain_intensity,
+        track_temp=track_temp,
+    )
+    
+    # Get pit recommendation
+    recommendation = get_pit_recommendation(
+        rain_windows=rain_windows,
+        laps_remaining=0,
+        lap_time_avg=0,
+        current_lap=latest.get("lap_number", 0),
+        current_compound=current_compound or latest.get("compound_front", "Dry"),
+    )
+    
+    # Build simplified response for the UI
+    windows_simple = []
+    for w in rain_windows:
+        windows_simple.append({
+            "probability": w.probability,
+            "expected_start_min": w.expected_start_min,
+            "expected_duration_min": w.expected_duration_min,
+            "intensity": w.intensity,
+            "recommendation": w.recommendation,
+        })
+    
+    return {
+        "rain_windows": windows_simple,
+        "recommendation": recommendation,
+        "current_weather": current_weather,
+        "rain_intensity": rain_intensity,
+        "track_temp": track_temp,
+        "car": latest.get("car", ""),
+        "track": latest.get("track", ""),
     }

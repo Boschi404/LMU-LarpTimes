@@ -1211,15 +1211,16 @@ class OverlayManager(QObject):
 
     def update_frame(self, frame: TelemetryFrame):
         self._apply_auto_visibility(frame)
-        self._current_lap = frame.lap_number
-        self._last_frame = frame
 
-        # Track tyre age: reset on stint change, increment on lap change
+        # Track tyre age: reset on stint change, increment on lap number increase
         if frame.stint_number != self._last_stint:
             self._tyre_age_laps = 0
             self._last_stint = frame.stint_number
         elif frame.lap_number > self._current_lap:
             self._tyre_age_laps += 1
+
+        self._current_lap = frame.lap_number
+        self._last_frame = frame
 
         # Delta
         delta = frame.delta_best

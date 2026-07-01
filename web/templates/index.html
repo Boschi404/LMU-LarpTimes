@@ -447,6 +447,72 @@
     .badge-invalid { background: rgba(255, 77, 77, 0.15); color: var(--accent-red); }
     .badge-pit { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-bright); margin-right: 0.5rem; }
 
+    /* ─── CLASS BADGES ─────────────────────────────────────────────── */
+    .class-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      font-family: var(--font-body);
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .class-badge.hypercar { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3); }
+    .class-badge.lmp2 { background: rgba(74, 158, 255, 0.15); color: #4a9eff; border: 1px solid rgba(74, 158, 255, 0.3); }
+    .class-badge.gt3 { background: rgba(46, 160, 67, 0.15); color: #2ea043; border: 1px solid rgba(46, 160, 67, 0.3); }
+
+    /* ─── TRAFFIC SLIDER ───────────────────────────────────────────── */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 160px;
+    }
+    .slider-group label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .slider-group input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: var(--border-bright);
+      border-radius: 3px;
+      outline: none;
+      margin: 4px 0;
+    }
+    .slider-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      cursor: pointer;
+      border: 2px solid var(--bg-app);
+      box-shadow: 0 0 6px rgba(0, 161, 255, 0.4);
+    }
+    .slider-group input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      cursor: pointer;
+      border: 2px solid var(--bg-app);
+    }
+    .slider-value {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
     .alert {
       display: flex;
       align-items: center;
@@ -1090,6 +1156,157 @@
       align-items: flex-end;
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
+
+    /* ─── WEATHER RADAR ──────────────────────────────────────────── */
+    .weather-radar {
+      background: var(--surface-glass);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .weather-radar-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 800px) {
+      .weather-radar-grid { grid-template-columns: 1fr; }
+    }
+
+    .weather-radar-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+
+    .weather-radar-card .weather-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .rain-prob-bar {
+      width: 100%;
+      height: 24px;
+      background: var(--surface-2);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+      margin: 0.5rem 0;
+    }
+
+    .rain-prob-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.8s ease;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+    }
+
+    .rain-prob-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: #ffffff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    }
+
+    .weather-radar .countdown {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .weather-radar .countdown.urgent { color: var(--accent-red); }
+    .weather-radar .countdown.warning { color: var(--accent-orange); }
+    .weather-radar .countdown.safe { color: var(--accent-green); }
+
+    .rec-box {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.75rem;
+    }
+
+    .rec-box.critical {
+      background: rgba(255, 77, 77, 0.12);
+      border: 1px solid rgba(255, 77, 77, 0.3);
+      color: var(--accent-red);
+    }
+
+    .rec-box.warning {
+      background: rgba(247, 129, 102, 0.1);
+      border: 1px solid rgba(247, 129, 102, 0.3);
+      color: var(--accent-orange);
+    }
+
+    .rec-box.info {
+      background: rgba(0, 161, 255, 0.08);
+      border: 1px solid rgba(0, 161, 255, 0.25);
+      color: var(--accent-blue);
+    }
+
+    .rec-box.success {
+      background: rgba(46, 160, 67, 0.08);
+      border: 1px solid rgba(46, 160, 67, 0.25);
+      color: var(--accent-green);
+    }
+
+    /* ─── PIT PRACTICE ───────────────────────────────────────────── */
+    .pit-tip {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface-1);
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .pit-tip::before {
+      content: '💡';
+      font-size: 1.1rem;
+    }
+
+    .pit-loss-bar {
+      height: 8px;
+      background: var(--surface-2);
+      border-radius: 4px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .pit-loss-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent-green), var(--accent-orange), var(--accent-red));
+      transition: width 0.5s ease;
+    }
+
+    .pit-chart-wrapper {
+      background: var(--surface-1);
+      border: 1px solid var(--border-dim);
+      padding: 1.25rem;
+      border-radius: var(--radius);
+      height: 250px;
+      position: relative;
+      margin-bottom: 1.5rem;
+    }
   </style>
 </head>
 <body>
@@ -1138,6 +1355,12 @@
           <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
         </svg>
         Race Director
+      </button>
+      <button class="nav-btn" id="btn-pit-practice" onclick="showPage('pit-practice')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>
+        </svg>
+        Pit Practice
       </button>
     </nav>
 
@@ -1195,6 +1418,12 @@
         <div class="filter-group">
           <label for="prof-compound">mescola</label>
           <select id="prof-compound">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="prof-class">classe</label>
+          <select id="prof-class">
             <option value="">Tutte</option>
           </select>
         </div>
@@ -1272,6 +1501,12 @@
           </select>
         </div>
         <div class="filter-group">
+          <label for="arch-class">classe</label>
+          <select id="arch-class">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group">
           <label for="arch-deleted">Dropped Laps</label>
           <select id="arch-deleted" onchange="loadLaps()">
             <option value="0">Escludi eliminati</option>
@@ -1290,6 +1525,7 @@
               <th onclick="sortTable('lap_number')">Lap</th>
               <th onclick="sortTable('track')">Track</th>
               <th onclick="sortTable('car')">Car</th>
+              <th>Class</th>
               <th onclick="sortTable('session_type')">Session</th>
               <th onclick="sortTable('stint_id')" class="text-right">Stint</th>
               <th onclick="sortTable('lap_time')" class="text-right">Time</th>
@@ -1309,7 +1545,7 @@
             </tr>
           </thead>
           <tbody id="laps-tbody">
-            <tr><td colspan="19" class="text-mono" style="color:var(--text-muted); text-align:center; padding: 2rem;">Nessun dato caricato. Usa i filtri sopra.</td></tr>
+            <tr><td colspan="20" class="text-mono" style="color:var(--text-muted); text-align:center; padding: 2rem;">Nessun dato caricato. Usa i filtri sopra.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1367,6 +1603,21 @@
           </label>
         </div>
         <div class="filter-group">
+          <label for="strat-class">classe</label>
+          <select id="strat-class">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="strat-traffic">Traffico</label>
+          <div style="display:flex;align-items:center;gap:8px;padding-top:4px;">
+            <input type="range" id="strat-traffic" min="0" max="100" value="0"
+              oninput="document.getElementById('strat-traffic-val').textContent=this.value+'%'"
+              style="width:100px;accent-color:var(--accent-blue);">
+            <span id="strat-traffic-val" style="font-family:var(--font-mono);font-size:0.8rem;min-width:40px;">0%</span>
+          </div>
+        </div>
+        <div class="filter-group">
           <button class="btn btn-primary" onclick="calculateStrategy()">Calculate</button>
         </div>
       </div>
@@ -1385,6 +1636,42 @@
         <div class="section-label" style="margin-top: 2rem">Lap Time Evolution</div>
         <div style="position:relative; width:100%; max-width:1000px; height:400px; margin-bottom:2rem;">
           <canvas id="strat-chart"></canvas>
+        </div>
+      </div>
+      <!-- ─── WEATHER RADAR ────────────────────────────────────────────── -->
+      <div id="weather-radar" class="weather-radar" style="display:none;">
+        <div class="section-label">🌤 Weather Radar</div>
+        <div id="weather-content">
+          <div class="weather-radar-grid">
+            <div class="weather-radar-card">
+              <div class="weather-icon" id="wr-icon">☀️</div>
+              <div style="font-size:0.85rem; color:var(--text-secondary);">Current Conditions</div>
+              <div style="font-family:var(--font-display); font-size:1.2rem; font-weight:600; margin-top:0.25rem;" id="wr-weather-text">—</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);" id="wr-temp">
+                Track: — | Ambient: —
+              </div>
+            </div>
+            <div class="weather-radar-card">
+              <div class="stat-label">Rain Probability</div>
+              <div class="rain-prob-bar">
+                <div class="rain-prob-fill" id="wr-rain-bar" style="width:0%"></div>
+                <div class="rain-prob-label" id="wr-rain-pct">0%</div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div class="stat-label" style="margin-bottom:0.25rem;">Time to Rain</div>
+                  <div class="countdown safe" id="wr-countdown">—</div>
+                </div>
+                <div style="text-align:right;">
+                  <div class="stat-label" style="margin-bottom:0.25rem;">Intensity</div>
+                  <div style="font-family:var(--font-display); font-size:1rem; font-weight:600;" id="wr-intensity">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="rec-box info" id="wr-recommendation">
+            <span>☀️ No weather concerns — stay on current tyres</span>
+          </div>
         </div>
       </div>
     </section>
@@ -1586,6 +1873,12 @@
           <select id="opt-track"><option value="">Seleziona...</option></select>
         </div>
         <div class="filter-group">
+          <label for="opt-class">classe</label>
+          <select id="opt-class">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group">
           <button class="btn btn-primary" onclick="loadOptimalLap()">Analyze</button>
         </div>
       </div>
@@ -1704,6 +1997,95 @@
           </div>
         </div>
 
+      </div>
+    </section>
+
+    <!-- PAGE: PIT PRACTICE -->
+    <section class="page" id="page-pit-practice">
+      <h2>Pit Stop Practice</h2>
+      <p class="description">
+        Track your pit stop performance. The system detects pit stops from your lap data and
+        analyzes time lost in the pits. Use the insights below to improve consistency.
+      </p>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label for="pit-car">macchina</label>
+          <select id="pit-car">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="pit-track">pista</label>
+          <select id="pit-track">
+            <option value="">Tutte</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <button class="btn btn-primary" onclick="loadPitPractice()">Analyze Pit Stops</button>
+        </div>
+      </div>
+
+      <div id="pit-error" class="alert" style="display:none">
+        <span id="pit-error-text"></span>
+      </div>
+
+      <div id="pit-content" style="display:none">
+        <!-- Stats -->
+        <div class="grid-stats">
+          <div class="stat-card">
+            <div class="stat-label">Total Pit Stops</div>
+            <div class="stat-value" id="pit-total">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Average Loss</div>
+            <div class="stat-value" id="pit-avg">—</div>
+            <div class="stat-sub">seconds per stop</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Best Stop</div>
+            <div class="stat-value" style="color:var(--accent-green)" id="pit-best">—</div>
+            <div class="stat-sub">seconds lost</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Worst Stop</div>
+            <div class="stat-value" style="color:var(--accent-red)" id="pit-worst">—</div>
+            <div class="stat-sub">seconds lost</div>
+          </div>
+        </div>
+
+        <!-- Improvement tips -->
+        <div class="section-label">💡 Improvement Tips</div>
+        <div id="pit-tips" style="margin-bottom:1.5rem;">
+        </div>
+
+        <!-- Pit loss chart -->
+        <div class="section-label">Pit Loss History</div>
+        <div class="pit-chart-wrapper">
+          <canvas id="pit-chart"></canvas>
+        </div>
+
+        <!-- Recent pit stops table -->
+        <div class="section-label">Recent Pit Stops</div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Session</th>
+                <th class="text-right">Lap</th>
+                <th class="text-right">Pit Loss</th>
+                <th>Track</th>
+                <th>Car</th>
+                <th>Compound</th>
+                <th class="text-right">In Lap</th>
+                <th class="text-right">Out Lap</th>
+              </tr>
+            </thead>
+            <tbody id="pit-tbody">
+              <tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No pit stop data available.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 

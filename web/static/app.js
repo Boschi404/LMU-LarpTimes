@@ -22,10 +22,11 @@ function showPage(name) {
 
 async function populateFilters() {
   try {
-    const [cars, tracks, compounds] = await Promise.all([
+    const [cars, tracks, compounds, classes] = await Promise.all([
       fetch('/api/filters/cars').then(r => r.json()),
       fetch('/api/filters/tracks').then(r => r.json()),
       fetch('/api/filters/compounds').then(r => r.json()),
+      fetch('/api/filters/classes').then(r => r.json()),
     ]);
 
     function fillSelect(id, items) {
@@ -35,11 +36,11 @@ async function populateFilters() {
       sel.innerHTML = '<option value="">Tutte</option>';
       items.forEach(v => {
         const opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
+        opt.value = typeof v === 'string' ? v : v.id;
+        opt.textContent = typeof v === 'string' ? v : (v.display_name || v.id);
         sel.appendChild(opt);
       });
-      if (current && items.includes(current)) sel.value = current;
+      if (current && items.some(v => (typeof v === 'string' ? v : v.id) === current)) sel.value = current;
     }
 
     fillSelect('arch-car', cars);
@@ -55,11 +56,18 @@ async function populateFilters() {
     fillSelect('opt-car', cars);
     fillSelect('opt-track', tracks);
 
+    // Class filter dropdowns
+    fillSelect('arch-class', classes);
+    fillSelect('prof-class', classes);
+    fillSelect('strat-class', classes);
+    fillSelect('comp-class', classes);
+    fillSelect('opt-class', classes);
+
     // Restore saved filter values
     restoreFilters('all');
 
     // Wire up filter change listeners for auto-save
-    var filterSelectors = ['prof-car','prof-track','prof-compound','arch-car','arch-track','arch-compound','arch-deleted','strat-car','strat-track','setup-car','setup-track','comp-car','comp-track','opt-car','opt-track'];
+    var filterSelectors = ['prof-car','prof-track','prof-compound','prof-class','arch-car','arch-track','arch-compound','arch-class','arch-deleted','strat-car','strat-track','strat-class','setup-car','setup-track','comp-car','comp-track','comp-class','opt-car','opt-track','opt-class'];
     filterSelectors.forEach(function(id) {
       var el = document.getElementById(id);
       if (el) {
@@ -192,12 +200,12 @@ var _currentPage = 1;
 /* ─── Persistent Filters via localStorage ───────────────────────── */
 function saveFilters(page) {
   var selectors = [];
-  if (page === 'profilo' || page === 'all') selectors.push('prof-car', 'prof-track', 'prof-compound');
-  if (page === 'archivio' || page === 'all') selectors.push('arch-car', 'arch-track', 'arch-compound', 'arch-deleted');
-  if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track');
+  if (page === 'profilo' || page === 'all') selectors.push('prof-car', 'prof-track', 'prof-compound', 'prof-class');
+  if (page === 'archivio' || page === 'all') selectors.push('arch-car', 'arch-track', 'arch-compound', 'arch-class', 'arch-deleted');
+  if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track', 'strat-class');
   if (page === 'setup' || page === 'all') selectors.push('setup-car', 'setup-track');
-  if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track');
-  if (page === 'optimal' || page === 'all') selectors.push('opt-car', 'opt-track');
+  if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track', 'comp-class');
+  if (page === 'optimal' || page === 'all') selectors.push('opt-car', 'opt-track', 'opt-class');
   selectors.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -208,12 +216,12 @@ function saveFilters(page) {
 
 function restoreFilters(page) {
   var selectors = [];
-  if (page === 'profilo' || page === 'all') selectors.push('prof-car', 'prof-track', 'prof-compound');
-  if (page === 'archivio' || page === 'all') selectors.push('arch-car', 'arch-track', 'arch-compound', 'arch-deleted');
-  if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track');
+  if (page === 'profilo' || page === 'all') selectors.push('prof-car', 'prof-track', 'prof-compound', 'prof-class');
+  if (page === 'archivio' || page === 'all') selectors.push('arch-car', 'arch-track', 'arch-compound', 'arch-class', 'arch-deleted');
+  if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track', 'strat-class');
   if (page === 'setup' || page === 'all') selectors.push('setup-car', 'setup-track');
-  if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track');
-  if (page === 'optimal' || page === 'all') selectors.push('opt-car', 'opt-track');
+  if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track', 'comp-class');
+  if (page === 'optimal' || page === 'all') selectors.push('opt-car', 'opt-track', 'opt-class');
   selectors.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -425,16 +433,18 @@ async function loadLaps(silent) {
   const car   = document.getElementById('arch-car').value.trim();
   const track = document.getElementById('arch-track').value.trim();
   const comp  = document.getElementById('arch-compound').value.trim();
+  const cls   = document.getElementById('arch-class').value.trim();
   const incDel = document.getElementById('arch-deleted').value === '1';
 
   let url = '/api/laps?include_deleted=' + incDel;
   if (car)  url += '&car=' + encodeURIComponent(car);
   if (track) url += '&track=' + encodeURIComponent(track);
   if (comp) url += '&compound=' + encodeURIComponent(comp);
+  if (cls)  url += '&car_class=' + encodeURIComponent(cls);
 
   const tbody = document.getElementById('laps-tbody');
   if (!silent) {
-    tbody.innerHTML = '<tr><td colspan="19"><div class="spinner-container"><div class="spinner"></div><div class="spinner-text">Fetching laps...</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="20"><div class="spinner-container"><div class="spinner"></div><div class="spinner-text">Fetching laps...</div></div></td></tr>';
   }
 
   try {
@@ -444,7 +454,7 @@ async function loadLaps(silent) {
     renderLapsTable();
   } catch (e) {
     if (!silent) {
-      tbody.innerHTML = '<tr><td colspan="19" class="text-mono" style="color:var(--accent-red); text-align:center;">Error: ' + e.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--accent-red); text-align:center;">Error: ' + e.message + '</td></tr>';
     }
   }
 }
@@ -470,7 +480,7 @@ function renderLapsTable() {
 
   var tbody = document.getElementById('laps-tbody');
   if (!pageData.length) {
-    tbody.innerHTML = '<tr><td colspan="19" class="text-mono" style="color:var(--text-muted); text-align:center;">Nessun giro trovato.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--text-muted); text-align:center;">Nessun giro trovato.</td></tr>';
     renderPagination(0, 0);
     return;
   }
@@ -506,6 +516,7 @@ function renderLapsTable() {
       '<td class="num-col">' + l.lap_number + '</td>' +
       '<td>' + (l.track || '—') + '</td>' +
       '<td>' + (l.car || '—') + '</td>' +
+      '<td><span class="class-badge" style="background:' + (l.class_color || 'var(--border-dim)') + '22; color:' + (l.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (l.class_color || 'var(--border-dim)') + '44;">' + (l.class_display || l.car_class || '—') + '</span></td>' +
       '<td>' + (l.session_type || '—') + '</td>' +
       '<td class="num-col">' + (l.stint_id != null ? l.stint_id : '—') + '</td>' +
       '<td class="num-col">' + fmtTime(l.lap_time) + '</td>' +
@@ -608,6 +619,12 @@ async function calculateStrategy() {
   var url = '/api/strategy?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track) +
     '&current_fuel=' + fuel + '&fuel_capacity=' + capacity + '&max_stops=' + maxstops;
   if (formation) url += '&formation_lap=true';
+  // Traffic density
+  var trafficSlider = document.getElementById('strat-traffic');
+  if (trafficSlider) {
+    var trafficVal = parseFloat(trafficSlider.value);
+    if (trafficVal > 0) url += '&traffic_density=' + trafficVal;
+  }
   if (mode === 'time') {
     url += '&duration_hours=' + document.getElementById('strat-hours').value;
   } else {
@@ -654,7 +671,25 @@ async function calculateStrategy() {
         return '<div class="lap-cell' + (isPit ? ' pit' : '') + '">' + (i + 1) + '</div>';
       }).join('');
 
+      // Traffic info block
+      var trafficHtml = '';
+      if (d.traffic) {
+        var tr = d.traffic;
+        var trafficColor = tr.estimated_penalty_per_lap > 1.0 ? 'var(--status-invalid)' : (tr.estimated_penalty_per_lap > 0.3 ? 'var(--status-warn)' : 'var(--ink-muted)');
+        trafficHtml = '<div class="section-label" style="margin-top: 1rem">Traffic Assessment</div>' +
+          '<div class="table-container" style="padding: 1rem 1.25rem; margin-bottom: 1rem;">' +
+          '<div style="display: flex; gap: var(--space-xl); flex-wrap: wrap;">' +
+          '<div><div class="stat-label">Car Class</div><div class="stat-value" style="font-size:1.2rem; color:' + (tr.own_class === 'Hypercar' ? '#ff6b6b' : tr.own_class === 'LMP2' ? '#4a9eff' : '#2ea043') + ';">' + (tr.own_class || '—') + '</div></div>' +
+          '<div style="padding-left: var(--space-xl); border-left: 1px solid var(--border-subtle);"><div class="stat-label">Traffic Density</div><div class="stat-value text-mono" style="font-size:1.2rem;">' + (tr.traffic_density * 100).toFixed(0) + '%</div></div>' +
+          '<div style="padding-left: var(--space-xl); border-left: 1px solid var(--border-subtle);"><div class="stat-label">Estimated Penalty/Lap</div><div class="stat-value text-mono" style="font-size:1.2rem; color:' + trafficColor + ';">+' + tr.estimated_penalty_per_lap.toFixed(2) + 's</div></div>' +
+          '</div>' +
+          (tr.slower_classes && tr.slower_classes.length > 0 ? '<div style="margin-top: var(--space-md); font-size: 0.85rem; color: var(--ink-secondary);">Slower classes on track: <span style="font-weight:600;">' + tr.slower_classes.join(', ') + '</span></div>' : '') +
+          (tr.estimated_penalty_per_lap > 0.5 ? '<div style="margin-top: var(--space-sm); font-size: 0.8rem; color: var(--status-warn);">⚠ Heavy traffic — consider fewer pit stops to minimise traffic exposure.</div>' : '') +
+          '</div>';
+      }
+
       document.getElementById('strat-detail').innerHTML =
+        trafficHtml +
         '<div style="display: flex; gap: var(--space-xl); margin-bottom: var(--space-xl);">' +
           '<div>' +
             '<div class="stat-label">Mean Fuel/Lap</div>' +
@@ -838,6 +873,9 @@ showPage = function(name) {
   if (name === 'profilo') loadOwner();
   if (name === 'race-director') {
     loadRaceSessions();
+  }
+  if (name === 'pit-practice') {
+    loadPitPractice();
   }
 };
 
@@ -1086,7 +1124,10 @@ calculateStrategy = function() {
   setTimeout(function() {
     var car = document.getElementById('strat-car').value.trim();
     var track = document.getElementById('strat-track').value.trim();
-    if (car && track) renderLapChart(car, track);
+    if (car && track) {
+      renderLapChart(car, track);
+      loadWeatherRadar(car, track);
+    }
   }, 500);
 };
 
@@ -1190,6 +1231,7 @@ function renderLapComparison() {
       '<div class="comp-row"><span class="comp-row-label">Fuel Used</span><span class="comp-row-value">' + (lap.fuel_used_l != null ? lap.fuel_used_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Tyre Age</span><span class="comp-row-value">' + (lap.tyre_age_laps != null ? lap.tyre_age_laps + ' laps' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Compound</span><span class="comp-row-value">' + (lap.compound_front || '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Class</span><span class="comp-row-value"><span class="class-badge" style="background:' + (lap.class_color || 'var(--border-dim)') + '22; color:' + (lap.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (lap.class_color || 'var(--border-dim)') + '44;">' + (lap.class_display || lap.car_class || '\u2014') + '</span></span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Track Temp</span><span class="comp-row-value">' + (lap.track_temp != null ? lap.track_temp.toFixed(1) + '\u00b0C' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Weather</span><span class="comp-row-value">' + (lap.weather_state || '\u2014') + '</span></div>';
   }
@@ -1638,7 +1680,7 @@ function renderOptimalLapChart(data, bestLapDeltas) {
             afterBody: function(context) {
               const i = context[0].dataIndex;
               const delta = bestLapDeltas ? bestLapDeltas.micro_deltas[i].toFixed(3) : '0.000';
-              return 'Δ: +' + Math.abs(delta) + 's' + (delta <= 0.01 ? ' (on pace)' : '');
+              return '\u0394: +' + Math.abs(delta) + 's' + (delta <= 0.01 ? ' (on pace)' : '');
             }
           }
         }
@@ -1661,6 +1703,511 @@ function renderOptimalLapChart(data, bestLapDeltas) {
             color: '#7d8590',
             font: { size: 11 }
           }
+        }
+      }
+    }
+  });
+}
+
+/* ─── RACE DIRECTOR ──────────────────────────────────────────────── */
+let _raceChart = null;
+let _raceLapsData = [];
+
+async function loadRaceSessions() {
+  try {
+    const res = await fetch('/api/race/sessions');
+    const sessions = await res.json();
+    const sel = document.getElementById('race-session-select');
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">Select a race session...</option>';
+    sessions.forEach(function(s) {
+      const opt = document.createElement('option');
+      opt.value = s.session_id || s.id;
+      const timeStr = s.started_at ? new Date(s.started_at).toLocaleString() : '';
+      opt.textContent = (s.car || '?') + ' @ ' + (s.track || '?') + ' — ' + (s.session_type || '') + (timeStr ? ' [' + timeStr + ']' : '');
+      sel.appendChild(opt);
+    });
+    document.getElementById('race-refresh-group').style.display = sessions.length ? '' : 'none';
+    if (currentVal) sel.value = currentVal;
+    // Auto-load if already selected
+    if (sel.value) loadRaceTimeline();
+  } catch (e) {
+    console.error('loadRaceSessions:', e);
+    showToast('Failed to load race sessions: ' + e.message, 'error');
+  }
+}
+
+async function loadRaceTimeline() {
+  const sel = document.getElementById('race-session-select');
+  const sessionId = sel.value;
+  if (!sessionId) {
+    document.getElementById('race-content').style.display = 'none';
+    return;
+  }
+  
+  document.getElementById('race-content').style.display = 'none';
+  document.getElementById('race-error').style.display = 'none';
+  showLoading('race-content', 'Building race timeline...');
+
+  try {
+    const res = await fetch('/api/race/timeline?session_id=' + encodeURIComponent(sessionId));
+    const data = await res.json();
+    hideLoading('race-content');
+
+    if (data.error) {
+      document.getElementById('race-error-text').textContent = data.error;
+      document.getElementById('race-error').style.display = 'flex';
+      return;
+    }
+
+    renderRaceTimeline(data);
+    document.getElementById('race-content').style.display = 'block';
+  } catch (e) {
+    hideLoading('race-content');
+    showToast('Error loading race timeline: ' + e.message, 'error');
+  }
+}
+
+function renderRaceTimeline(data) {
+  // ── Header ──
+  document.getElementById('race-header').innerHTML =
+    '<div class="race-title">' + (data.car || '—') + '</div>' +
+    '<div class="race-meta">' + (data.track || '—') + '</div>' +
+    '<div class="race-meta" style="flex:1;"></div>' +
+    '<div class="race-meta">Total Laps: <span>' + data.total_laps + '</span></div>' +
+    '<div class="race-meta">Best Lap: <span>' + fmtTime(data.best_lap_time) + '</span></div>' +
+    '<div class="race-meta">Avg Lap: <span>' + fmtTime(data.avg_lap_time) + '</span></div>' +
+    (data.total_time ? '<div class="race-meta">Race Time: <span>' + fmtTime(data.total_time) + '</span></div>' : '');
+
+  // ── Stat cards ──
+  const stintCount = data.stints ? data.stints.length : 0;
+  const totalLaps = data.total_laps || 0;
+  const validLaps = data.stints ? data.stints.reduce(function(sum, s) { return sum + (s.laps_in_stint || 0); }, 0) : 0;
+  let totalFuel = 0;
+  if (data.stints) data.stints.forEach(function(s) { totalFuel += s.fuel_used || 0; });
+
+  document.getElementById('race-stats-grid').innerHTML =
+    '<div class="stat-card">' +
+      '<div class="stat-label">Stints</div>' +
+      '<div class="stat-value">' + stintCount + '</div>' +
+      '<div class="stat-sub">' + (stintCount === 1 ? '1 stint' : stintCount + ' stints') + '</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Total Laps</div>' +
+      '<div class="stat-value">' + totalLaps + '</div>' +
+      '<div class="stat-sub">' + validLaps + ' valid laps</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Best Lap</div>' +
+      '<div class="stat-value" style="color:var(--accent-green)">' + fmtTime(data.best_lap_time) + '</div>' +
+      '<div class="stat-sub">Session fastest</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Avg Lap Time</div>' +
+      '<div class="stat-value">' + fmtTime(data.avg_lap_time) + '</div>' +
+      '<div class="stat-sub">Overall average</div>' +
+    '</div>' +
+    (totalFuel > 0 ? '<div class="stat-card">' +
+      '<div class="stat-label">Fuel Used</div>' +
+      '<div class="stat-value">' + totalFuel.toFixed(1) + ' L</div>' +
+      '<div class="stat-sub">Total fuel consumed</div>' +
+    '</div>' : '');
+
+  // ── Stint bars ──
+  const stintBars = document.getElementById('race-stint-bars');
+  if (data.stints && data.stints.length > 0) {
+    stintBars.innerHTML = data.stints.map(function(s) {
+      const compound = s.compound || 'Unknown';
+      const cssClass = compound.replace(/\s+/g, ' ').trim();
+      return '<div class="stint-bar ' + cssClass + '" title="Stint ' + s.stint_number + ': Laps ' + s.start_lap + '\u2013' + s.end_lap + ', ' + compound + '">' +
+        '<span class="stint-lap-count">' + s.laps_in_stint + ' laps</span>' +
+        '<div class="stint-label">Stint ' + s.stint_number + '</div>' +
+        '<div class="stint-range">Laps ' + s.start_lap + '\u2013' + s.end_lap + '</div>' +
+        '<div class="stint-stats">' + compound + '</div>' +
+        '<div class="stint-stats">Best: ' + fmtTime(s.best_lap_time) + '</div>' +
+        (s.avg_lap_time ? '<div class="stint-stats">Avg: ' + fmtTime(s.avg_lap_time) + '</div>' : '') +
+      '</div>';
+    }).join('');
+  } else {
+    stintBars.innerHTML = '<div style="color:var(--text-muted);padding:1rem;">No stint data available.</div>';
+  }
+
+  // ── Weather timeline ──
+  const weatherDiv = document.getElementById('race-weather-timeline');
+  if (data.weather_timeline && data.weather_timeline.length > 0) {
+    weatherDiv.innerHTML = data.weather_timeline.map(function(w) {
+      const weatherClass = (w.weather || '').replace(/\s+/g, '');
+      return '<div class="weather-marker ' + weatherClass + '">' +
+        '<span class="weather-lap">Lap ' + w.lap_number + '</span>' +
+        '<span>' + (w.weather || '—') + '</span>' +
+        (w.track_temp != null ? '<span class="weather-temp">' + w.track_temp.toFixed(1) + '\u00b0C</span>' : '') +
+        (w.rain_intensity > 0 ? '<span class="weather-temp">\ud83c\udf27 ' + (w.rain_intensity * 100).toFixed(0) + '%</span>' : '') +
+      '</div>';
+    }).join('');
+  } else {
+    weatherDiv.innerHTML = '<div style="color:var(--text-muted);padding:0.5rem;">No weather changes recorded.</div>';
+  }
+
+  // ── Event log ──
+  const eventLog = document.getElementById('race-event-log');
+  if (data.events && data.events.length > 0) {
+    eventLog.innerHTML = data.events.map(function(e) {
+      const icons = {
+        'stint_start': '\u25b6',
+        'stint_end': '\u25a0',
+        'pit_in': '\u2b07',
+        'pit_out': '\u2b06',
+        'weather_change': '\ud83c\udf27',
+        'anomaly': '\u26a0',
+      };
+      const icon = icons[e.event_type] || '\u25cf';
+      return '<div class="event-item ' + (e.severity || 'info') + '">' +
+        '<span class="event-lap">L' + e.lap_number + '</span>' +
+        '<span class="event-icon">' + icon + '</span>' +
+        '<span class="event-desc">' + (e.description || '') + '</span>' +
+        (e.lap_time ? '<span class="event-time">' + fmtTime(e.lap_time) + '</span>' : '') +
+      '</div>';
+    }).join('');
+  } else {
+    eventLog.innerHTML = '<div class="event-item info"><span class="event-icon">i</span><span class="event-desc" style="color:var(--text-muted);">No events recorded.</span></div>';
+  }
+
+  // ── Lap time chart ──
+  renderRaceLapChart(data);
+}
+
+function renderRaceLapChart(data) {
+  const canvas = document.getElementById('race-lap-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (_raceChart) { _raceChart.destroy(); _raceChart = null; }
+
+  // We need lap data with stint numbers - fetch from /api/laps/chart or build from stints+events
+  // Since we can't easily get per-lap times from the summary, we'll fetch the chart data
+  if (!data.car || !data.track) {
+    ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">No lap time data for chart.</div>';
+    return;
+  }
+
+  // Fetch lap times for this car+track
+  fetch('/api/laps/chart?car=' + encodeURIComponent(data.car) + '&track=' + encodeURIComponent(data.track))
+    .then(function(r) { return r.json(); })
+    .then(function(chartData) {
+      if (!chartData.laps || chartData.laps.length < 2) {
+        ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">Not enough laps for chart.</div>';
+        return;
+      }
+
+      // Build datasets: color points by stint
+      var stintColors = {1: '#1dd1a1', 2: '#4a9eff', 3: '#ff6b6b', 4: '#ffa94d', 5: '#a29bfe', 6: '#fd79a8'};
+      var points = chartData.laps.map(function(l) {
+        var st = l.stint_number || l.stint_id || 1;
+        return {x: l.lap_number, y: l.lap_time, stint: st, compound: l.compound_front, fuel: l.fuel_start_l, age: l.tyre_age_laps};
+      });
+
+      // Group by stint for separate datasets
+      var stintGroups = {};
+      points.forEach(function(p) {
+        if (!stintGroups[p.stint]) stintGroups[p.stint] = [];
+        stintGroups[p.stint].push(p);
+      });
+
+      var datasets = [];
+      Object.keys(stintGroups).sort().forEach(function(stintId) {
+        var pts = stintGroups[stintId];
+        var color = stintColors[parseInt(stintId)] || '#7d8590';
+        datasets.push({
+          label: 'Stint ' + stintId + ' (' + (pts[0].compound || '?') + ')',
+          data: pts.map(function(p) { return {x: p.x, y: p.y}; }),
+          backgroundColor: color,
+          borderColor: color,
+          pointRadius: 4,
+          pointHoverRadius: 7,
+          showLine: false,
+          type: 'scatter',
+        });
+      });
+
+      // Add degradation model line if available
+      if (chartData.degradation && chartData.degradation.curve) {
+        datasets.push({
+          label: 'Degradation model',
+          data: chartData.degradation.curve.map(function(p) { return {x: p.age, y: p.predicted}; }),
+          borderColor: '#1dd1a1',
+          backgroundColor: 'rgba(29,209,161,0.1)',
+          pointRadius: 0,
+          borderWidth: 2,
+          borderDash: [6, 4],
+          showLine: true,
+          fill: false,
+        });
+      }
+
+      _raceChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {datasets: datasets},
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {duration: 300},
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: '#7d8590', font: {family: 'Inter, sans-serif', size: 10} }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15,15,15,0.95)',
+              bodyFont: {family: "'JetBrains Mono', monospace", size: 11},
+              cornerRadius: 4,
+              borderColor: '#262c35',
+              borderWidth: 1,
+              callbacks: {
+                label: function(context) {
+                  var raw = context.raw;
+                  if (!raw) return context.formattedValue;
+                  return 'Lap ' + raw.x + ': ' + raw.y.toFixed(3) + 's';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              title: {display: true, text: 'Lap Number', color: '#7d8590'},
+              ticks: {color: '#7d8590', stepSize: 1, precision: 0},
+              grid: {color: 'rgba(255,255,255,0.05)'}
+            },
+            y: {
+              title: {display: true, text: 'Lap Time (s)', color: '#7d8590'},
+              ticks: {color: '#7d8590'},
+              grid: {color: 'rgba(255,255,255,0.05)'}
+            }
+          }
+        }
+      });
+    })
+    .catch(function(e) {
+      console.error('Race chart error:', e);
+      ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);">Failed to load chart data.</div>' + (e.message || '');
+    });
+}
+
+/* ─── WEATHER RADAR ──────────────────────────────────────────── */
+async function loadWeatherRadar(car, track) {
+  var radarDiv = document.getElementById('weather-radar');
+  if (!radarDiv) return;
+
+  try {
+    var url = '/api/weather/radar?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track);
+    var res = await fetch(url);
+    var d = await res.json();
+
+    radarDiv.style.display = 'block';
+
+    // Icon and weather text
+    var icon = '☀️';
+    var weatherText = d.current_weather || 'DRY';
+    if (d.rain_intensity > 0.7) { icon = '🌧️'; weatherText += ' (Heavy Rain)'; }
+    else if (d.rain_intensity > 0.3) { icon = '🌦️'; weatherText += ' (Rain)'; }
+    else if (d.rain_intensity > 0.05) { icon = '⛅'; weatherText += ' (Light Rain)'; }
+    document.getElementById('wr-icon').textContent = icon;
+    document.getElementById('wr-weather-text').textContent = weatherText;
+
+    // Temperature
+    var tempStr = 'Track: ' + (d.track_temp != null ? d.track_temp.toFixed(1) + '°C' : '—');
+    document.getElementById('wr-temp').textContent = tempStr;
+
+    // Rain probability bar
+    var prob = 0;
+    if (d.rain_windows && d.rain_windows.length > 0) {
+      prob = Math.round(d.rain_windows[0].probability * 100);
+    }
+    document.getElementById('wr-rain-bar').style.width = prob + '%';
+    document.getElementById('wr-rain-pct').textContent = prob + '%';
+
+    // Time to rain countdown
+    var countdownEl = document.getElementById('wr-countdown');
+    var intensityEl = document.getElementById('wr-intensity');
+    countdownEl.className = 'countdown safe';
+    if (d.rain_windows && d.rain_windows.length > 0) {
+      var w = d.rain_windows[0];
+      if (w.expected_start_min != null && w.expected_start_min > 0) {
+        countdownEl.textContent = '~' + w.expected_start_min + ' min';
+        if (w.expected_start_min <= 5) countdownEl.className = 'countdown urgent';
+        else if (w.expected_start_min <= 15) countdownEl.className = 'countdown warning';
+      } else if (w.expected_start_min === 0 && w.probability > 0.3) {
+        countdownEl.textContent = 'NOW';
+        countdownEl.className = 'countdown urgent';
+      } else {
+        countdownEl.textContent = '—';
+      }
+      intensityEl.textContent = w.intensity.charAt(0).toUpperCase() + w.intensity.slice(1);
+    } else {
+      countdownEl.textContent = '—';
+      intensityEl.textContent = '—';
+    }
+
+    // Recommendation box
+    var recEl = document.getElementById('wr-recommendation');
+    var rec = d.recommendation || '☀️ No weather concerns — stay on current tyres';
+    recEl.innerHTML = '<span>' + rec + '</span>';
+    recEl.className = 'rec-box';
+    if (rec.includes('PIT NOW') || rec.includes('RAIN IS HERE')) {
+      recEl.classList.add('critical');
+    } else if (rec.includes('plan pit') || rec.includes('soon')) {
+      recEl.classList.add('warning');
+    } else if (rec.includes('Rain active') || rec.includes('Wet tyres')) {
+      recEl.classList.add('warning');
+    } else {
+      recEl.classList.add('success');
+    }
+  } catch (e) {
+    console.error('loadWeatherRadar:', e);
+    radarDiv.style.display = 'none';
+  }
+}
+
+/* ─── PIT PRACTICE ───────────────────────────────────────────── */
+let _pitChart = null;
+
+async function loadPitPractice() {
+  var car = document.getElementById('pit-car').value.trim();
+  var track = document.getElementById('pit-track').value.trim();
+
+  document.getElementById('pit-error').style.display = 'none';
+  document.getElementById('pit-content').style.display = 'none';
+
+  var url = '/api/pit-practice';
+  if (car || track) {
+    var params = [];
+    if (car) params.push('car=' + encodeURIComponent(car));
+    if (track) params.push('track=' + encodeURIComponent(track));
+    url += '?' + params.join('&');
+  }
+
+  showLoading('pit-content', 'Analyzing pit stops...');
+
+  try {
+    var res = await fetch(url);
+    var d = await res.json();
+    hideLoading('pit-content');
+
+    if (d.error) {
+      document.getElementById('pit-error-text').textContent = d.error;
+      document.getElementById('pit-error').style.display = 'flex';
+      return;
+    }
+
+    // Fill stats
+    document.getElementById('pit-total').textContent = d.total_pit_stops || 0;
+    document.getElementById('pit-avg').textContent = d.avg_loss != null ? d.avg_loss + 's' : '—';
+    document.getElementById('pit-best').textContent = d.best_loss != null ? d.best_loss + 's' : '—';
+    document.getElementById('pit-worst').textContent = d.worst_loss != null ? d.worst_loss + 's' : '—';
+
+    // Fill tips
+    var tipsDiv = document.getElementById('pit-tips');
+    if (d.tips && d.tips.length > 0) {
+      tipsDiv.innerHTML = d.tips.map(function(tip) {
+        return '<div class="pit-tip">' + tip + '</div>';
+      }).join('');
+    } else {
+      tipsDiv.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No improvement tips available yet. Complete more pit stops.</div>';
+    }
+
+    // Fill table
+    var tbody = document.getElementById('pit-tbody');
+    if (d.recent_pit_stops && d.recent_pit_stops.length > 0) {
+      tbody.innerHTML = d.recent_pit_stops.map(function(ps) {
+        var lossColor = ps.loss > 35 ? 'var(--accent-red)' : (ps.loss > 30 ? 'var(--accent-orange)' : 'var(--accent-green)');
+        return '<tr>' +
+          '<td style="font-family:var(--font-mono); font-size:0.75rem;">' + (ps.session_id ? ps.session_id.substring(0, 8) : '—') + '</td>' +
+          '<td class="num-col">' + ps.lap + '</td>' +
+          '<td class="num-col" style="color:' + lossColor + '; font-weight:600;">' + ps.loss + 's</td>' +
+          '<td>' + (ps.track || '—') + '</td>' +
+          '<td>' + (ps.car || '—') + '</td>' +
+          '<td>' + (ps.compound || '—') + '</td>' +
+          '<td class="num-col">' + (ps.pit_in_time != null ? ps.pit_in_time.toFixed(2) + 's' : '—') + '</td>' +
+          '<td class="num-col">' + (ps.pit_out_time != null ? ps.pit_out_time.toFixed(2) + 's' : '—') + '</td>' +
+        '</tr>';
+      }).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No pit stops detected in your data.</td></tr>';
+    }
+
+    // Build pit loss chart
+    buildPitChart(d);
+
+    document.getElementById('pit-content').style.display = 'block';
+  } catch (e) {
+    hideLoading('pit-content');
+    document.getElementById('pit-error-text').textContent = 'Network error: ' + e.message;
+    document.getElementById('pit-error').style.display = 'flex';
+  }
+}
+
+function buildPitChart(d) {
+  var canvas = document.getElementById('pit-chart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  if (_pitChart) { _pitChart.destroy(); _pitChart = null; }
+
+  if (!d.loss_history || d.loss_history.length < 2) {
+    ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem;">Need at least 2 pit stops for a chart.</div>';
+    return;
+  }
+
+  // Restore canvas if we replaced it
+  if (ctx.canvas.parentElement.innerHTML.indexOf('Need') > -1) {
+    ctx.canvas.parentElement.innerHTML = '<canvas id="pit-chart"></canvas>';
+    ctx = document.getElementById('pit-chart').getContext('2d');
+  }
+
+  var labels = d.loss_history.map(function(v, i) { return 'Stop ' + (i + 1); });
+
+  _pitChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Pit Loss (s)',
+        data: d.loss_history,
+        backgroundColor: d.loss_history.map(function(v) {
+          return v > 35 ? 'rgba(255,77,77,0.7)' : (v > 30 ? 'rgba(247,129,102,0.7)' : 'rgba(46,160,67,0.7)');
+        }),
+        borderColor: d.loss_history.map(function(v) {
+          return v > 35 ? '#ff4d4d' : (v > 30 ? '#f78166' : '#2ea043');
+        }),
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,15,15,0.95)',
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+          cornerRadius: 4,
+          borderColor: '#262c35',
+          borderWidth: 1,
+          callbacks: {
+            label: function(ctx) {
+              return ctx.parsed.y + 's lost';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#7d8590', font: { size: 10 } }
+        },
+        y: {
+          title: { display: true, text: 'Seconds Lost', color: '#7d8590', font: { size: 11 } },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#7d8590', font: { family: "'JetBrains Mono', monospace", size: 10 } }
         }
       }
     }
