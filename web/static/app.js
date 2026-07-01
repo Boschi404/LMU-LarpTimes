@@ -936,54 +936,46 @@ async function renderLapChart(car, track) {
     // Build datasets array
     var datasets = [];
 
-    // 1) Scatter: lap time per lap number
-    datasets.push({
-      label: 'Lap Time',
-      data: laps.map(function(l) {
-        return { x: l.lap_number, y: l.lap_time || 0 };
-      }),
-      backgroundColor: function(ctx) {
-        return ctx.dataIndex === bestIdx ? 'rgba(0, 255, 136, 0.9)' : 'rgba(255, 107, 0, 0.6)';
-      },
-      borderColor: function(ctx) {
-        return ctx.dataIndex === bestIdx ? '#00FF88' : '#FF6B00';
-      },
-      borderWidth: function(ctx) {
-        return ctx.dataIndex === bestIdx ? 2 : 1;
-      },
-      pointRadius: function(ctx) {
-        return ctx.dataIndex === bestIdx ? 8 : 6;
-      },
-      pointHoverRadius: 8,
-      showLine: true,
-      tension: 0.2,
-      borderColor: 'rgba(255, 107, 0, 0.2)',
-      backgroundColor: 'transparent',
-      borderWidth: 1,
-      fill: false,
-      order: 2,
-    });
-
-    // 2) Degradation model line (uses age as X, which is sequential within stint)
-    if (data.degradation && data.degradation.curve) {
+    // 1) Degradation model predicted stint (main data series)
+    if (data.degradation && data.degradation.curve && data.degradation.curve.length > 0) {
       datasets.push({
-        label: 'Degradation Model',
+        label: 'Stint Projection',
         data: data.degradation.curve.map(function(p) {
           return { x: p.age, y: p.predicted };
         }),
         type: 'line',
-        borderColor: 'rgba(0, 255, 136, 0.8)',
-        borderWidth: 2,
-        borderDash: [6, 4],
-        pointRadius: 0,
-        pointHoverRadius: 0,
+        borderColor: '#FF6B00',
+        backgroundColor: 'rgba(255, 107, 0, 0.08)',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: '#FF6B00',
+        pointBorderColor: '#FF6B00',
+        pointHoverRadius: 7,
         fill: false,
         showLine: true,
+        tension: 0.3,
         order: 1,
       });
     }
 
-    // 3) Best lap horizontal line
+    // 2) Actual lap times (small reference points, only if we have enough data)
+    if (laps.length >= 3) {
+      datasets.push({
+        label: 'Actual Laps',
+        data: laps.map(function(l) {
+          return { x: l.lap_number, y: l.lap_time || 0 };
+        }),
+        backgroundColor: 'rgba(90, 106, 122, 0.5)',
+        borderColor: 'rgba(90, 106, 122, 0.3)',
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        showLine: false,
+        type: 'scatter',
+        order: 3,
+      });
+    }
+
+    // 3) Best lap marker
     datasets.push({
       label: 'Best: ' + bestTime.toFixed(3) + 's',
       data: [
@@ -998,7 +990,7 @@ async function renderLapChart(car, track) {
       pointHoverRadius: 0,
       fill: false,
       showLine: true,
-      order: 3,
+      order: 4,
     });
 
     // Pit stop annotations
@@ -1052,27 +1044,23 @@ async function renderLapChart(car, track) {
             borderColor: '#283038',
             borderWidth: 1,
             padding: 8,
+            mode: 'index',
+            intersect: true,
             callbacks: {
               label: function(context) {
                 var raw = context.raw;
                 if (!raw) return '';
-                var lap = laps[context.dataIndex] || {};
-                var lines = [
-                  'Lap ' + raw.x + ': ' + raw.y.toFixed(3) + 's',
-                ];
-                if (lap.fuel_start_l != null) {
-                  lines.push('Fuel: ' + lap.fuel_start_l.toFixed(1) + 'L');
+                var label = context.dataset.label || '';
+                if (context.datasetIndex === 0) {
+                  // Stint Projection line
+                  return 'Lap ' + raw.x + ': ' + raw.y.toFixed(3) + 's (projected)';
+                } else if (context.datasetIndex === 1) {
+                  // Actual lap
+                  var lap = laps[context.dataIndex] || {};
+                  return 'Lap ' + raw.x + ': ' + raw.y.toFixed(3) + 's'
+                    + (lap.compound_front ? ' [' + lap.compound_front + ']' : '');
                 }
-                if (lap.compound_front) {
-                  lines.push('Compound: ' + lap.compound_front);
-                }
-                if (lap.tyre_age_laps != null) {
-                  lines.push('Tyre age: ' + lap.tyre_age_laps + ' laps');
-                }
-                if (context.dataIndex === bestIdx) {
-                  lines.push('★ BEST LAP');
-                }
-                return lines;
+                return label + ': ' + (raw.y ? raw.y.toFixed(3) + 's' : '');
               }
             }
           },
