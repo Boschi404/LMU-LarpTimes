@@ -1758,18 +1758,25 @@ function renderOptimalLapChart(data, bestLapDeltas) {
           grid: { color: 'rgba(255,255,255,0.04)' }
         },
         y: {
-          title: {
-            display: true,
-            text: 'Lap Time (s)',
-            color: '#5A6A7A',
-            font: { size: 11 }
-          },
-          ticks: {
-            color: '#5A6A7A',
-            font: { family: "'JetBrains Mono', monospace", size: 10 },
-            callback: function(v) { return v.toFixed(1); }
-          },
-          grid: { color: 'rgba(255,255,255,0.04)' }
+        title: {
+          display: true,
+          text: 'Lap Time (s)',
+          color: '#5A6A7A',
+          font: { size: 11 }
+        },
+        ticks: {
+          color: '#5A6A7A',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function(v) { return v.toFixed(1); }
+        },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        afterDataLimits: function(scale) {
+          var min = scale.min, max = scale.max;
+          var range = max - min;
+          if (range < 1) range = 1;
+          scale.min = min - 0.5;
+          scale.max = max + 0.5;
+        }
         }
       }
     }
