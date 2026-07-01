@@ -1105,14 +1105,20 @@ async function renderLapChart(car, track) {
               callback: function(v) { return v.toFixed(1); }
             },
             grid: { color: 'rgba(255,255,255,0.04)' },
-            // Scale Y from best-0.5 to worst+0.5 for focus on relevant range
-            afterDataLimits: function(scale) {
-              var min = scale.min, max = scale.max;
-              var range = max - min;
-              if (range < 1) range = 1;
-              scale.min = min - 0.5;
-              scale.max = max + 0.5;
-            }
+            min: (function() {
+              var m = Infinity;
+              for (var i = 0; i < laps.length; i++) {
+                if (laps[i].lap_time > 0 && laps[i].lap_time < m) m = laps[i].lap_time;
+              }
+              return m - 0.5;
+            })(),
+            max: (function() {
+              var m = -Infinity;
+              for (var i = 0; i < laps.length; i++) {
+                if (laps[i].lap_time > 0 && laps[i].lap_time > m) m = laps[i].lap_time;
+              }
+              return m + 0.5;
+            })(),
           }
         }
       }
@@ -1770,13 +1776,20 @@ function renderOptimalLapChart(data, bestLapDeltas) {
           callback: function(v) { return v.toFixed(1); }
         },
         grid: { color: 'rgba(255,255,255,0.04)' },
-        afterDataLimits: function(scale) {
-          var min = scale.min, max = scale.max;
-          var range = max - min;
-          if (range < 1) range = 1;
-          scale.min = min - 0.5;
-          scale.max = max + 0.5;
-        }
+        min: (function() {
+          var m = Infinity;
+          for (var i = 0; i < laps.length; i++) {
+            if (laps[i].lap_time > 0 && laps[i].lap_time < m) m = laps[i].lap_time;
+          }
+          return m - 0.5;
+        })(),
+        max: (function() {
+          var m = -Infinity;
+          for (var i = 0; i < laps.length; i++) {
+            if (laps[i].lap_time > 0 && laps[i].lap_time > m) m = laps[i].lap_time;
+          }
+          return m + 0.5;
+        })(),
         }
       }
     }
