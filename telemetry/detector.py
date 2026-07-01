@@ -37,6 +37,9 @@ class LapBoundaryDetector:
         self.pit_in_lap_time: Optional[float] = None
         self.in_pit_stop_sequence: bool = False
         self._lap_start_elapsed: float = 0.0
+        # Telemetry sample accumulation for speed traces
+        self._current_lap_samples: list = []
+        self._sample_counter: int = 0
         # Ensure the DB schema exists (safe to call multiple times)
         database.init_db(db_path=db_path)
 
@@ -136,6 +139,8 @@ class LapBoundaryDetector:
             if completed_lap == self.last_saved_lap:
                 print(f"[WARNING] Duplicate lap detected: {completed_lap}, skipping")
                 self.current_lap_number = frame.lap_number
+                self._current_lap_samples = []
+                self._sample_counter = 0
                 return None
 
             # 11. Validate lap time
@@ -146,6 +151,8 @@ class LapBoundaryDetector:
                 self.current_lap_number = frame.lap_number
                 self._take_lap_snapshots(frame)
                 self._lap_start_elapsed = frame.elapsed_time
+                self._current_lap_samples = []
+                self._sample_counter = 0
                 return None
 
             # 2. Save only valid laps
@@ -154,6 +161,8 @@ class LapBoundaryDetector:
                 self.current_lap_number = frame.lap_number
                 self.last_saved_lap = completed_lap
                 self._handle_stint_change(frame, completed_lap)
+                self._current_lap_samples = []
+                self._sample_counter = 0
                 return None
 
             current_wear = [(1.0 - w) * 100.0 for w in frame.tyre_wear]
@@ -200,6 +209,16 @@ class LapBoundaryDetector:
             print(f"[Detector] Lap {completed_lap} saved (id={lap_id}, time={frame.last_lap_time:.3f}s)")
             self.last_saved_lap = completed_lap
 
+            # Save telemetry samples for this completed lap
+            if self._current_lap_samples:
+                try:
+                    database.save_lap_samples(lap_id, self._current_lap_samples, db_path=self.db_path)
+                    print(f"[Detector] Saved {len(self._current_lap_samples)} telemetry samples for lap {completed_lap}")
+                except Exception as e:
+                    print(f"[Detector] Error saving telemetry samples: {e}")
+            self._current_lap_samples = []
+            self._sample_counter = 0
+
             if is_pit_in:
                 self.pit_in_lap_number = completed_lap
                 self.pit_in_lap_time = frame.last_lap_time
@@ -241,6 +260,32 @@ class LapBoundaryDetector:
             self._lap_start_elapsed = frame.elapsed_time
 
             return lap_id
+
+        # ── Telemetry sample accumulation ──
+        # Downsample: record ~1 sample per second (raw data is ~20Hz)
+        lap_elapsed = frame.elapsed_time - self._lap_start_elapsed
+        if self._lap_start_elapsed > 0 and lap_elapsed >= 0:
+            # Use a counter-based approach: record when elapsed crosses integer seconds
+            expected_idx = int(lap_elapsed)
+            if expected_idx >= self._sample_counter:
+                self._sample_counter = expected_idx + 1
+                sample = {
+                    'elapsed_seconds': lap_elapsed,
+                    'speed': frame.speed,
+                    'rpm': frame.rpm,
+                    'gear': frame.gear,
+                    'throttle': frame.throttle,
+                    'brake': frame.brake,
+                    'brake_temp_fl': frame.brake_temps[0] if frame.brake_temps else None,
+                    'brake_temp_fr': frame.brake_temps[1] if len(frame.brake_temps) > 1 else None,
+                    'brake_temp_rl': frame.brake_temps[2] if len(frame.brake_temps) > 2 else None,
+                    'brake_temp_rr': frame.brake_temps[3] if len(frame.brake_temps) > 3 else None,
+                    'tyre_temp_fl': frame.tyre_temps[0] if frame.tyre_temps else None,
+                    'tyre_temp_fr': frame.tyre_temps[1] if len(frame.tyre_temps) > 1 else None,
+                    'tyre_temp_rl': frame.tyre_temps[2] if len(frame.tyre_temps) > 2 else None,
+                    'tyre_temp_rr': frame.tyre_temps[3] if len(frame.tyre_temps) > 3 else None,
+                }
+                self._current_lap_samples.append(sample)
 
         return None
 

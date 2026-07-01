@@ -141,6 +141,7 @@ def _validate_import_payload(payload: Any) -> Optional[str]:
 @asynccontextmanager
 async def lifespan(app):
     database.init_db()
+    database.init_telemetry_samples_table()
     init_auth_db()
     # Security audit on startup (silent — only warnings/criticals shown)
     try:
@@ -773,6 +774,70 @@ async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = Non
         }
         for l in valid
     ]
+
+
+@app.get("/api/laps/{lap_id}/telemetry")
+async def get_lap_telemetry(lap_id: int):
+    """Return telemetry samples for a single lap."""
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    lap = next((l for l in laps if l['id'] == lap_id), None)
+    samples = database.get_lap_samples(lap_id)
+    track_dist = database.get_track_distance(lap.get('track', '')) if lap else None
+    return {
+        "samples": samples,
+        "lap": {
+            "id": lap['id'],
+            "lap_number": lap['lap_number'],
+            "lap_time": lap['lap_time'],
+            "track": lap.get('track'),
+            "car": lap.get('car'),
+        } if lap else None,
+        "track_distance_km": track_dist,
+    }
+
+
+@app.get("/api/laps/compare-telemetry")
+async def compare_lap_telemetry(lap_a: int, lap_b: int):
+    """Return telemetry samples for 2 laps for overlay comparison."""
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+
+    def find_lap(lid):
+        return next((l for l in laps if l['id'] == lid), None)
+
+    lap_a_data = find_lap(lap_a)
+    lap_b_data = find_lap(lap_b)
+    samples_a = database.get_lap_samples(lap_a)
+    samples_b = database.get_lap_samples(lap_b)
+
+    track_dist = None
+    if lap_a_data:
+        track_dist = database.get_track_distance(lap_a_data.get('track', ''))
+
+    # Normalize samples by distance (convert time-based to distance-based for overlay)
+    def normalize_samples(samples, total_time, track_km):
+        if not samples or not track_km:
+            return samples
+        result = []
+        cumulative_dist = 0.0
+        prev_time = samples[0]['elapsed_seconds'] if samples else 0.0
+        for s in samples:
+            dt = s['elapsed_seconds'] - prev_time
+            speed_ms = (s.get('speed', 0) or 0) / 3.6  # km/h to m/s
+            cumulative_dist += speed_ms * max(0, dt)
+            s['distance_km'] = cumulative_dist / 1000.0
+            s['distance_pct'] = (cumulative_dist / 1000.0 / track_km * 100) if track_km and track_km > 0 else 0
+            prev_time = s['elapsed_seconds']
+            result.append(s)
+        return result
+
+    norm_a = normalize_samples(samples_a, lap_a_data['lap_time'] if lap_a_data else 0, track_dist) if samples_a else []
+    norm_b = normalize_samples(samples_b, lap_b_data['lap_time'] if lap_b_data else 0, track_dist) if samples_b else []
+
+    return {
+        "lap_a": {"lap": lap_a_data, "samples": norm_a},
+        "lap_b": {"lap": lap_b_data, "samples": norm_b},
+        "track_distance_km": track_dist,
+    }
 
 
 @app.get("/api/laps/chart")

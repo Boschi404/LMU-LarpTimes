@@ -154,6 +154,8 @@ def init_db(db_path: Optional[str] = None) -> None:
 
     conn.commit()
     _migrate_db(conn, cursor)
+    # Ensure telemetry samples table exists
+    _init_telemetry_samples_table_inner(conn, cursor)
     conn.close()
 
 
@@ -1603,3 +1605,145 @@ def set_owner_email(
         conn.commit()
         conn.close()
     return email
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Telemetry Samples — per-frame speed/RPM/gear/throttle traces
+# ══════════════════════════════════════════════════════════════════════════════
+
+TELEMETRY_SAMPLES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS lap_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lap_id INTEGER NOT NULL,
+    elapsed_seconds REAL NOT NULL,
+    speed REAL,
+    rpm REAL,
+    gear INTEGER,
+    throttle REAL,
+    brake REAL,
+    brake_temp_fl REAL,
+    brake_temp_fr REAL,
+    brake_temp_rl REAL,
+    brake_temp_rr REAL,
+    tyre_temp_fl REAL,
+    tyre_temp_fr REAL,
+    tyre_temp_rl REAL,
+    tyre_temp_rr REAL,
+    FOREIGN KEY (lap_id) REFERENCES laps(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_lap_samples_lap ON lap_samples(lap_id);
+"""
+
+
+def _init_telemetry_samples_table_inner(conn, cursor):
+    """Create the lap_samples table if it doesn't exist (uses existing cursor)."""
+    cursor.executescript(TELEMETRY_SAMPLES_SCHEMA)
+    conn.commit()
+
+
+def init_telemetry_samples_table(db_path=None):
+    """Create the lap_samples table if it doesn't exist (standalone call)."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.executescript(TELEMETRY_SAMPLES_SCHEMA)
+    conn.commit()
+    conn.close()
+
+
+def save_lap_samples(lap_id: int, samples: list, db_path=None):
+    """Save telemetry samples for a lap.
+
+    samples: list of dicts with keys: elapsed_seconds, speed, rpm, gear, throttle, brake,
+             brake_temp_fl, brake_temp_fr, brake_temp_rl, brake_temp_rr,
+             tyre_temp_fl, tyre_temp_fr, tyre_temp_rl, tyre_temp_rr
+    """
+    if not samples:
+        return
+    conn = get_db_connection(db_path)
+    cur = conn.cursor()
+    cur.executemany(
+        """INSERT INTO lap_samples
+           (lap_id, elapsed_seconds, speed, rpm, gear, throttle, brake,
+            brake_temp_fl, brake_temp_fr, brake_temp_rl, brake_temp_rr,
+            tyre_temp_fl, tyre_temp_fr, tyre_temp_rl, tyre_temp_rr)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [(lap_id,
+          s.get('elapsed_seconds'), s.get('speed'), s.get('rpm'), s.get('gear'),
+          s.get('throttle'), s.get('brake'),
+          s.get('brake_temp_fl'), s.get('brake_temp_fr'),
+          s.get('brake_temp_rl'), s.get('brake_temp_rr'),
+          s.get('tyre_temp_fl'), s.get('tyre_temp_fr'),
+          s.get('tyre_temp_rl'), s.get('tyre_temp_rr'))
+         for s in samples]
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_lap_samples(lap_id: int, db_path=None) -> list:
+    """Get all telemetry samples for a lap, ordered by elapsed_seconds."""
+    conn = get_db_connection(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM lap_samples WHERE lap_id = ? ORDER BY elapsed_seconds ASC",
+        (lap_id,)
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_track_distance(track_name: str) -> float:
+    """Return approximate track length in km for a known track.
+    Falls back to 5.0 km if unknown."""
+    TRACK_DISTANCES = {
+        "Le Mans": 13.626,
+        "Monza": 5.793,
+        "Spa": 7.004,
+        "Silverstone": 5.891,
+        "Nürburgring": 5.148,
+        "Imola": 4.909,
+        "Sebring": 6.020,
+        "Daytona": 5.729,
+        "Fuji": 4.563,
+        "Interlagos": 4.309,
+        "Bahrain": 5.412,
+        "Yas Marina": 5.554,
+        "Bathurst": 6.213,
+        "Road Atlanta": 4.088,
+        "Laguna Seca": 3.602,
+        "Watkins Glen": 5.472,
+        "Circuit of the Americas": 5.513,
+        "Red Bull Ring": 4.318,
+        "Zandvoort": 4.259,
+        "Hungaroring": 4.381,
+        "Barcelona": 4.675,
+        "Monaco": 3.337,
+        "Suzuka": 5.807,
+        "Melbourne": 5.303,
+        "Baku": 6.003,
+        "Jeddah": 6.175,
+        "Miami": 5.410,
+        "Las Vegas": 6.201,
+        "Losail": 5.380,
+        "Shanghai": 5.451,
+        "Portimão": 4.653,
+        "Misano": 4.226,
+        "Paul Ricard": 5.842,
+        "Hockenheim": 4.574,
+        "Sepang": 5.543,
+        "Korea": 5.621,
+    }
+    if not track_name:
+        return 5.0
+    # Normalize for fuzzy matching: lowercase and remove diacritics
+    import unicodedata
+    def _normalize(s):
+        nfkd = unicodedata.normalize('NFKD', s)
+        return nfkd.encode('ascii', 'ignore').decode('ascii').lower()
+    track_norm = _normalize(track_name)
+    for name, dist in TRACK_DISTANCES.items():
+        name_norm = _normalize(name)
+        if name_norm in track_norm or track_norm in name_norm:
+            return dist
+    return 5.0  # default fallback

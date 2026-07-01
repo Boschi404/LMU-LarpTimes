@@ -43,6 +43,14 @@ class TelemetryFrame:
     last_sector2: float = 0.0  # cumulative (S1+S2)
     last_lap_time: float = 0.0
     delta_best: float = 0.0
+    # Telemetry trace fields (per-frame sampling)
+    speed: float = 0.0           # km/h
+    rpm: float = 0.0             # engine RPM
+    gear: int = 0                # gear number (-1=reverse, 0=neutral, 1+=forward)
+    throttle: float = 0.0        # 0.0 to 1.0
+    brake: float = 0.0           # 0.0 to 1.0
+    brake_temps: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])   # FL, FR, RL, RR
+    tyre_temps: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])     # FL, FR, RL, RR
 
 
 class TelemetrySource(ABC):
@@ -159,6 +167,46 @@ class LiveSharedMemorySource(TelemetrySource):
                     telem.mWheels[3].mWear
                 ]
 
+                # Read telemetry trace fields (with safe fallbacks)
+                try:
+                    speed_ms = telem.mSpeed
+                except AttributeError:
+                    speed_ms = 0.0
+                try:
+                    rpm_val = telem.mRpm
+                except AttributeError:
+                    rpm_val = 0.0
+                try:
+                    gear_val = telem.mGear
+                except AttributeError:
+                    gear_val = 0
+                try:
+                    throttle_val = telem.mThrottle
+                except AttributeError:
+                    throttle_val = 0.0
+                try:
+                    brake_val = telem.mBrake
+                except AttributeError:
+                    brake_val = 0.0
+                try:
+                    brake_temps = [
+                        telem.mWheels[0].mBrakeTemp,
+                        telem.mWheels[1].mBrakeTemp,
+                        telem.mWheels[2].mBrakeTemp,
+                        telem.mWheels[3].mBrakeTemp,
+                    ]
+                except AttributeError:
+                    brake_temps = [0.0, 0.0, 0.0, 0.0]
+                try:
+                    tyre_temps = [
+                        telem.mWheels[0].mTemperature,
+                        telem.mWheels[1].mTemperature,
+                        telem.mWheels[2].mTemperature,
+                        telem.mWheels[3].mTemperature,
+                    ]
+                except AttributeError:
+                    tyre_temps = [0.0, 0.0, 0.0, 0.0]
+
                 frame = TelemetryFrame(
                     track_name=track,
                     layout_name="",
@@ -182,7 +230,14 @@ class LiveSharedMemorySource(TelemetrySource):
                     last_sector1=scoring.mLastSector1,
                     last_sector2=scoring.mLastSector2,
                     last_lap_time=scoring.mLastLapTime,
-                    delta_best=telem.mDeltaBest
+                    delta_best=telem.mDeltaBest,
+                    speed=speed_ms * 3.6,  # m/s to km/h
+                    rpm=rpm_val,
+                    gear=gear_val,
+                    throttle=throttle_val,
+                    brake=brake_val,
+                    brake_temps=brake_temps,
+                    tyre_temps=tyre_temps,
                 )
                 return frame
             except Exception:
@@ -253,7 +308,14 @@ class LiveSharedMemorySource(TelemetrySource):
                     last_sector1=scoring.mLastSector1,
                     last_sector2=scoring.mLastSector2,
                     last_lap_time=scoring.mLastLapTime,
-                    delta_best=0.0
+                    delta_best=0.0,
+                    speed=getattr(telem, 'mSpeed', 0.0) * 3.6,
+                    rpm=getattr(telem, 'mRpm', 0.0),
+                    gear=getattr(telem, 'mGear', 0),
+                    throttle=getattr(telem, 'mThrottle', 0.0),
+                    brake=getattr(telem, 'mBrake', 0.0),
+                    brake_temps=[getattr(w, 'mBrakeTemp', 0.0) for w in telem.mWheels],
+                    tyre_temps=[getattr(w, 'mTemperature', 0.0) for w in telem.mWheels],
                 )
                 return frame
             except Exception:
@@ -367,7 +429,14 @@ class SyntheticReplaySource(TelemetrySource):
             last_sector1=self.last_sector1,
             last_sector2=self.last_sector2,
             last_lap_time=self.last_lap_time,
-            delta_best=random.uniform(-0.5, 0.5)
+            delta_best=random.uniform(-0.5, 0.5),
+            speed=random.uniform(180, 330),
+            rpm=random.uniform(4000, 9000),
+            gear=random.choice([-1, 0, 1, 2, 3, 4, 5, 6, 7]),
+            throttle=random.uniform(0.0, 1.0),
+            brake=random.uniform(0.0, 0.8),
+            brake_temps=[random.uniform(100, 800) for _ in range(4)],
+            tyre_temps=[random.uniform(60, 120) for _ in range(4)],
         )
 
         # 2. Advance physics/simulation for the next tick

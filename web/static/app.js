@@ -1313,3 +1313,208 @@ function buildCompChart(lapA, lapB, aFaster) {
     }
   });
 }
+
+/* ─── SPEED TRACE OVERLAY ─────────────────────────────────────── */
+let _speedTraceChart = null;
+let _speedTraceData = null;
+let _telemetryCurrentView = 'speed';
+
+async function loadTelemetryOverlay(lapA, lapB) {
+  if (!lapA || !lapB) return;
+  try {
+    const res = await fetch('/api/laps/compare-telemetry?lap_a=' + lapA.id + '&lap_b=' + lapB.id);
+    const data = await res.json();
+    _speedTraceData = data;
+    renderSpeedTraceChart(data);
+  } catch (e) {
+    console.error('loadTelemetryOverlay:', e);
+  }
+}
+
+function getTelemetryDataset(view, samples, label, color) {
+  var data = [];
+  switch (view) {
+    case 'speed':
+      data = samples.map(function(s) { return {x: s.distance_pct || 0, y: s.speed || 0}; });
+      break;
+    case 'rpm':
+      data = samples.map(function(s) { return {x: s.distance_pct || 0, y: s.rpm || 0}; });
+      break;
+    case 'gear':
+      data = samples.map(function(s) { return {x: s.distance_pct || 0, y: s.gear || 0}; });
+      break;
+    case 'throttle':
+      data = samples.map(function(s) { return {x: s.distance_pct || 0, y: (s.throttle || 0) * 100}; });
+      break;
+    default:
+      data = samples.map(function(s) { return {x: s.distance_pct || 0, y: s.speed || 0}; });
+  }
+  return {
+    label: label,
+    data: data,
+    borderColor: color,
+    backgroundColor: color + '22',
+    borderWidth: 2,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    tension: 0.2,
+    fill: false,
+    yAxisID: 'y',
+  };
+}
+
+function renderSpeedTraceChart(data) {
+  var canvas = document.getElementById('speed-trace-chart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  if (_speedTraceChart) _speedTraceChart.destroy();
+  _speedTraceChart = null;
+
+  if (!data || !data.lap_a || !data.lap_b) {
+    canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem;">No telemetry data available for these laps.</div>';
+    return;
+  }
+
+  var samplesA = data.lap_a.samples || [];
+  var samplesB = data.lap_b.samples || [];
+
+  if (!samplesA.length && !samplesB.length) {
+    canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem;">No telemetry data available for these laps.</div>';
+    return;
+  }
+
+  var view = _telemetryCurrentView || 'speed';
+  var lapALabel = 'Lap ' + (data.lap_a.lap ? data.lap_a.lap.lap_number : 'A');
+  var lapBLabel = 'Lap ' + (data.lap_b.lap ? data.lap_b.lap.lap_number : 'B');
+
+  var colorA = '#4a9eff';
+  var colorB = '#ff6b6b';
+
+  var dsA = getTelemetryDataset(view, samplesA, lapALabel, colorA);
+  var dsB = getTelemetryDataset(view, samplesB, lapBLabel, colorB);
+
+  var yTitle = '';
+  switch (view) {
+    case 'speed': yTitle = 'Speed (km/h)'; break;
+    case 'rpm': yTitle = 'RPM'; break;
+    case 'gear': yTitle = 'Gear'; break;
+    case 'throttle': yTitle = 'Throttle (%)'; break;
+  }
+
+  _speedTraceChart = new Chart(ctx, {
+    type: 'line',
+    data: {datasets: [dsA, dsB]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {duration: 300},
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: '#7d8590',
+            font: {family: 'Inter, sans-serif', size: 11},
+            usePointStyle: true,
+            pointStyle: 'line',
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15, 15, 15, 0.95)',
+          titleFont: {family: "'Geist', sans-serif"},
+          bodyFont: {family: "'JetBrains Mono', monospace"},
+          cornerRadius: 4,
+          borderColor: '#262c35',
+          borderWidth: 1,
+          callbacks: {
+            title: function(items) {
+              if (!items.length) return '';
+              var pct = items[0].parsed.x;
+              return 'Track Position: ' + (pct != null ? pct.toFixed(1) + '%' : '—');
+            },
+            label: function(ctx2) {
+              var raw = ctx2.raw || {};
+              var val = raw.y;
+              var label = ctx2.dataset.label || '';
+              var txt = label + ': ';
+              if (view === 'speed') txt += (val != null ? val.toFixed(1) + ' km/h' : '—');
+              else if (view === 'rpm') txt += (val != null ? val.toFixed(0) + ' RPM' : '—');
+              else if (view === 'gear') txt += (val != null ? 'Gear ' + val : '—');
+              else if (view === 'throttle') txt += (val != null ? val.toFixed(1) + '%' : '—');
+              // Additional data in tooltip
+              var samples = ctx2.datasetIndex === 0 ? samplesA : samplesB;
+              var closest = null;
+              var minDist = Infinity;
+              var pct2 = raw.x;
+              for (var i = 0; i < samples.length; i++) {
+                var d = Math.abs((samples[i].distance_pct || 0) - pct2);
+                if (d < minDist) { minDist = d; closest = samples[i]; }
+              }
+              if (closest && minDist < 5) {
+                var gearStr = closest.gear != null ? 'Gear ' + closest.gear : '—';
+                var brakeStr = closest.brake != null ? (closest.brake * 100).toFixed(0) + '%' : '—';
+                var throttleStr = closest.throttle != null ? (closest.throttle * 100).toFixed(0) + '%' : '—';
+                txt += ' | ' + gearStr + ' | Brk: ' + brakeStr + ' | Thr: ' + throttleStr;
+              }
+              return txt;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: {display: true, text: 'Track Position (%)', color: '#7d8590', font: {size: 11}},
+          ticks: {color: '#7d8590', font: {family: "'JetBrains Mono', monospace", size: 10}, callback: function(v) { return v.toFixed(0) + '%'; }},
+          grid: {color: 'rgba(255,255,255,0.05)'},
+          min: 0,
+          max: 100,
+        },
+        y: {
+          title: {display: true, text: yTitle, color: '#7d8590', font: {size: 11}},
+          ticks: {color: '#7d8590', font: {family: "'JetBrains Mono', monospace", size: 10}},
+          grid: {color: 'rgba(255,255,255,0.05)'},
+          beginAtZero: view === 'gear' ? false : true,
+        }
+      }
+    }
+  });
+}
+
+function switchTelemetryView(view) {
+  _telemetryCurrentView = view;
+  document.querySelectorAll('.telemetry-view-btn').forEach(function(btn) {
+    var isActive = btn.getAttribute('data-view') === view;
+    btn.classList.toggle('active', isActive);
+    if (isActive) {
+      btn.style.background = 'var(--accent-blue)';
+      btn.style.color = '#ffffff';
+      btn.style.borderColor = 'var(--accent-blue)';
+    } else {
+      btn.style.background = 'var(--surface-2)';
+      btn.style.color = 'var(--text-primary)';
+      btn.style.borderColor = 'var(--border-bright)';
+    }
+  });
+  if (_speedTraceData) {
+    renderSpeedTraceChart(_speedTraceData);
+  }
+}
+
+// Patch renderLapComparison to also load telemetry overlay
+var _origRenderLapComparison = renderLapComparison;
+renderLapComparison = function() {
+  _origRenderLapComparison();
+  var idA = parseInt(document.getElementById('comp-lap-a').value);
+  var idB = parseInt(document.getElementById('comp-lap-b').value);
+  if (idA && idB) {
+    var lapA = null, lapB = null;
+    for (var i = 0; i < _compLapsData.length; i++) {
+      if (_compLapsData[i].id === idA) lapA = _compLapsData[i];
+      if (_compLapsData[i].id === idB) lapB = _compLapsData[i];
+    }
+    if (lapA && lapB) {
+      loadTelemetryOverlay(lapA, lapB);
+    }
+  }
+};

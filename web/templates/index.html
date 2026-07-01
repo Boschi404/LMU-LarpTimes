@@ -880,6 +880,12 @@
       .sidebar { width: 100%; height: auto; position: relative; }
       .main-content { max-width: 100%; padding: 1rem; }
     }
+
+    .telemetry-view-btn.active {
+      background: var(--accent-blue) !important;
+      color: #ffffff !important;
+      border-color: var(--accent-blue) !important;
+    }
   </style>
 </head>
 <body>
@@ -1326,6 +1332,18 @@
         <div class="section-label">Field Comparison Chart</div>
         <div class="chart-wrapper">
           <canvas id="comp-chart"></canvas>
+        </div>
+
+        <div class="section-label" style="margin-top:2rem">Speed Trace Comparison</div>
+        <div id="telemetry-view-toggles" class="filter-bar" style="margin-bottom:1rem; padding:0.5rem 1rem; gap:0.5rem;">
+          <span style="font-size:0.7rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-right:0.5rem;">View:</span>
+          <button class="btn telemetry-view-btn active" data-view="speed" onclick="switchTelemetryView('speed')" style="font-size:0.75rem; padding:0.3rem 0.75rem; height:auto;">Speed</button>
+          <button class="btn telemetry-view-btn" data-view="rpm" onclick="switchTelemetryView('rpm')" style="font-size:0.75rem; padding:0.3rem 0.75rem; height:auto;">RPM</button>
+          <button class="btn telemetry-view-btn" data-view="gear" onclick="switchTelemetryView('gear')" style="font-size:0.75rem; padding:0.3rem 0.75rem; height:auto;">Gear</button>
+          <button class="btn telemetry-view-btn" data-view="throttle" onclick="switchTelemetryView('throttle')" style="font-size:0.75rem; padding:0.3rem 0.75rem; height:auto;">Throttle</button>
+        </div>
+        <div class="chart-wrapper" style="height:350px;">
+          <canvas id="speed-trace-chart"></canvas>
         </div>
       </div>
 
