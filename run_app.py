@@ -199,16 +199,12 @@ def _launch_overlay_subprocess():
 
     print(f"[Launcher] Launching overlay ({overlay_mode} mode): {' '.join(cmd)}")
     try:
-        # Force UTF-8 encoding for the overlay process to handle Unicode properly
-        my_env = os.environ.copy()
-        my_env["PYTHONIOENCODING"] = "utf-8"
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            env=my_env,
         )
         print(f"[Launcher] Overlay PID: {proc.pid}")
     except Exception as e:
