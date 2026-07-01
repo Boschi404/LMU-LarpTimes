@@ -34,6 +34,7 @@ class VoiceEngine:
         self._lock = threading.Lock()
         # phrase_hash -> timestamp for dedup (3 min window)
         self._recent_phrases: dict = {}
+        self._tts_available: bool = True  # set to False after first failure
 
     def speak(self, text: str) -> bool:
         """Generate TTS and play it. Returns True if played, False if skipped."""
@@ -73,6 +74,9 @@ class VoiceEngine:
 
     def _generate_wav(self, text: str) -> Optional[str]:
         """Generate WAV from text using edge-tts. Returns path to WAV file."""
+        if not self._tts_available:
+            return None
+
         cache_name = f"{hashlib.md5(text.encode()).hexdigest()[:16]}.wav"
         cache_path = os.path.join(self._cache_dir, cache_name)
 
@@ -87,9 +91,9 @@ class VoiceEngine:
             if os.path.exists(cache_path) and os.path.getsize(cache_path) > 1000:
                 return cache_path
         except ImportError:
-            pass  # edge-tts not installed, TTS unavailable
+            self._tts_available = False
         except Exception:
-            pass  # silently ignore TTS errors, fall back to WAV
+            self._tts_available = False
 
         return None
 
