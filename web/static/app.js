@@ -909,99 +909,93 @@ async function renderLapChart(car, track) {
     var canvas = document.getElementById('strat-chart');
     var ctx = canvas.getContext('2d');
 
-    // ── Compute fuel-corrected pace (removes the effect of fuel so you see pure tyre deg) ──
-    // Best estimate of fuel penalty: use alpha from degradation model if available, else 0.03s/lap
-    var alphaFuel = 0.03;
-    if (data.degradation && data.degradation.params) {
-      alphaFuel = data.degradation.params.alpha || 0.03;
+    // Sort laps by lap_number
+    var laps = data.laps.slice().sort(function(a, b) {
+      return a.lap_number - b.lap_number;
+    });
+
+    var lapNumbers = laps.map(function(l) { return l.lap_number; });
+    var lapTimes = laps.map(function(l) { return l.lap_time; });
+
+    // Find best lap
+    var bestIdx = 0;
+    var bestTime = Infinity;
+    for (var i = 0; i < laps.length; i++) {
+      if (laps[i].lap_time > 0 && laps[i].lap_time < bestTime) {
+        bestTime = laps[i].lap_time;
+        bestIdx = i;
+      }
     }
 
-    // Each point: lap_number, raw_lap_time, fuel_corrected (time minus fuel penalty)
-    var allPoints = data.laps.map(function(lap) {
-      return {
-        x: lap.lap_number,
-        y: lap.lap_time,
-        yc: lap.lap_time - alphaFuel * (lap.fuel_start_l || 0),
-        fuel: lap.fuel_start_l,
-        age: lap.tyre_age_laps,
-        stint_id: lap.stint_id,
-        compound: lap.compound_front,
-      };
-    });
-
-    // ── Stint colors and single legend entry per stint (no duplicates) ──
-    var stintColors = {
-      1: '#00FF88', 2: '#FF6B00', 3: '#FF2200',
-      4: '#FF8800', 5: '#AA66FF', 6: '#FF4466'
-    };
-
-    // Group points by stint (for color, not for legend)
-    var stints = {};  // stint_id -> {color, compound, lap_start, lap_end, fuel_start}
-    allPoints.forEach(function(p) {
-      var s = p.stint_id || 1;
-      if (!stints[s]) {
-        stints[s] = {
-          id: s, color: stintColors[s] || '#5A6A7A',
-          compound: p.compound || 'Medium', lap_start: p.x, lap_end: p.x,
-          fuel_start: p.fuel, fuel_end: p.fuel
-        };
-      }
-      stints[s].lap_end = p.x;
-      stints[s].fuel_end = p.fuel;
-    });
-    var stintList = Object.values(stints);
-
-    // ── Build chart datasets ──
+    // Build datasets array
     var datasets = [];
 
-    // 1) RAW pace (real lap times — includes fuel effect)
+    // 1) Scatter: every lap time
     datasets.push({
-      label: 'Lap time (real)',
-      data: allPoints.map(function(p) { return {x: p.x, y: p.y}; }),
-      backgroundColor: '#5A6A7A',
-      borderColor: '#5A6A7A',
-      pointRadius: 3,
-      pointHoverRadius: 5,
-      showLine: false,
-      type: 'scatter',
-      order: 4
-    });
-
-    // 2) FUEL-CORRECTED pace (pure tyre degradation, the real underlying signal)
-    datasets.push({
-      label: 'Tyre degradation (fuel-corrected)',
-      data: allPoints.map(function(p) { return {x: p.x, y: p.yc}; }),
+      label: 'Lap Time',
+      data: laps.map(function(l) {
+        return { x: l.lap_number, y: l.lap_time || 0 };
+      }),
       backgroundColor: function(ctx) {
-        return stintColors[ctx.raw.stint_id] || '#FF8800';
+        return ctx.dataIndex === bestIdx ? 'rgba(0, 255, 136, 0.9)' : 'rgba(255, 107, 0, 0.6)';
       },
-      borderColor: '#FF8800',
-      pointRadius: 4,
-      pointHoverRadius: 7,
-      showLine: false,
-      type: 'scatter',
-      order: 3
+      borderColor: function(ctx) {
+        return ctx.dataIndex === bestIdx ? '#00FF88' : '#FF6B00';
+      },
+      borderWidth: function(ctx) {
+        return ctx.dataIndex === bestIdx ? 2 : 1;
+      },
+      pointRadius: function(ctx) {
+        return ctx.dataIndex === bestIdx ? 8 : 6;
+      },
+      pointHoverRadius: 8,
+      showLine: true,
+      tension: 0.2,
+      borderColor: 'rgba(255, 107, 0, 0.2)',
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      fill: false,
+      order: 2,
     });
 
-    // 3) Degradation model line (the fit through fuel-corrected pace)
+    // 2) Degradation model line
     if (data.degradation && data.degradation.curve) {
       datasets.push({
-        label: 'Degradation model fit',
-        data: data.degradation.curve.map(function(p) { return {x: p.age, y: p.predicted}; }),
-        borderColor: '#00FF88',
-        backgroundColor: 'rgba(0,255,136,0.15)',
-        pointRadius: 0,
-        borderWidth: 2.5,
+        label: 'Degradation Model',
+        data: data.degradation.curve.map(function(p) {
+          return { x: p.age, y: p.predicted };
+        }),
+        type: 'line',
+        borderColor: 'rgba(0, 255, 136, 0.8)',
+        borderWidth: 2,
         borderDash: [6, 4],
-        showLine: true,
+        pointRadius: 0,
+        pointHoverRadius: 0,
         fill: false,
-        order: 1
+        showLine: true,
+        order: 1,
       });
     }
 
-    // 4) FUEL MASS line (how much fuel = how much lap time penalty)
-    // Show this as a separate small chart on the right axis? Simpler: add to tooltip only.
+    // 3) Best lap horizontal line
+    datasets.push({
+      label: 'Best: ' + bestTime.toFixed(3) + 's',
+      data: [
+        { x: lapNumbers[0], y: bestTime },
+        { x: lapNumbers[lapNumbers.length - 1], y: bestTime }
+      ],
+      type: 'line',
+      borderColor: 'rgba(0, 255, 136, 0.3)',
+      borderWidth: 1,
+      borderDash: [2, 4],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: false,
+      showLine: true,
+      order: 3,
+    });
 
-    // ── Pit stop annotations (one per stint transition) ──
+    // Pit stop annotations
     var pitAnnotations = {};
     if (data.pit_stops && data.pit_stops.length > 0) {
       data.pit_stops.forEach(function(ps) {
@@ -1011,12 +1005,12 @@ async function renderLapChart(car, track) {
           yMin: 0, yMax: 999,
           borderColor: '#FF2200',
           borderWidth: 2,
-          borderDash: [8, 4],
+          borderDash: [6, 3],
           label: {
             display: true,
             content: 'PIT ' + Math.round(ps.pit_loss) + 's',
             position: 'start',
-            backgroundColor: 'rgba(255,34,0,0.85)',
+            backgroundColor: 'rgba(255,34,0,0.8)',
             color: '#fff',
             padding: 3,
             font: {size: 10, weight: 'bold'}
@@ -1025,75 +1019,53 @@ async function renderLapChart(car, track) {
       });
     }
 
-    // ── Stint bands (background colors to show each stint's range) ──
-    stintList.forEach(function(st) {
-      pitAnnotations['stint-' + st.id] = {
-        type: 'box',
-        xMin: st.lap_start,
-        xMax: st.lap_end + 0.5,
-        backgroundColor: st.color + '14',  // very transparent
-        borderColor: st.color + '40',
-        borderWidth: 1,
-        borderDash: [2, 2],
-        label: {
-          display: true,
-          content: 'Stint ' + st.id + ' (' + st.compound + ')',
-          position: {x: 'center', y: 'start'},
-          color: st.color,
-          font: {size: 10, weight: 'bold'},
-          backgroundColor: 'rgba(10,14,24,0.7)',
-          padding: 3
-        }
-      };
-    });
-
-    // ── Chart options ──
     _lapChartInstance = new Chart(ctx, {
       type: 'scatter',
-      data: {datasets: datasets},
+      data: { datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: {duration: 300},
+        animation: { duration: 200 },
         plugins: {
           legend: {
+            display: true,
             position: 'top',
             labels: {
               color: '#5A6A7A',
-              font: {family: 'Inter, sans-serif', size: 11},
-              generateLabels: function(chart) {
-                // Build labels: 2 dataset labels + 1 per stint
-                var labels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
-                // Add stint info as legend entries
-                stintList.forEach(function(st) {
-                  labels.push({
-                    text: 'Stint ' + st.id + ': ' + st.compound + ' (' + st.lap_start + '–' + st.lap_end + ')',
-                    fillStyle: st.color,
-                    strokeStyle: st.color,
-                    lineWidth: 0,
-                    fontColor: '#5A6A7A',
-                    pointStyle: 'rect',
-                    hidden: false
-                  });
-                });
-                return labels;
-              }
+              font: { family: 'Inter, sans-serif', size: 11 },
+              usePointStyle: true,
+              pointStyle: 'circle',
+              padding: 12,
             }
           },
           tooltip: {
+            backgroundColor: 'rgba(10,12,14,0.95)',
+            titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+            bodyFont: { family: "'JetBrains Mono', monospace", size: 10 },
+            cornerRadius: 2,
+            borderColor: '#283038',
+            borderWidth: 1,
+            padding: 8,
             callbacks: {
-              label: function(ctx) {
-                var raw = ctx.raw || {};
-                var p = allPoints.find(function(x) { return x.x === raw.x; });
-                if (!p) return ctx.formattedValue;
+              label: function(context) {
+                var raw = context.raw;
+                if (!raw) return '';
+                var lap = laps[context.dataIndex] || {};
                 var lines = [
-                  'Lap ' + p.x + ' — ' + p.y.toFixed(2) + 's',
-                  'Stint ' + p.stint_id + ' (' + p.compound + ')',
-                  'Tyre age: ' + p.age + ' laps',
-                  'Fuel: ' + p.fuel.toFixed(1) + 'L (' + (p.fuel * 0.62).toFixed(1) + 'kg)',
-                  'Fuel penalty: +' + (alphaFuel * p.fuel).toFixed(2) + 's',
-                  'Pure tyre pace: ' + p.yc.toFixed(2) + 's'
+                  'Lap ' + raw.x + ': ' + raw.y.toFixed(3) + 's',
                 ];
+                if (lap.fuel_start_l != null) {
+                  lines.push('Fuel: ' + lap.fuel_start_l.toFixed(1) + 'L');
+                }
+                if (lap.compound_front) {
+                  lines.push('Compound: ' + lap.compound_front);
+                }
+                if (lap.tyre_age_laps != null) {
+                  lines.push('Tyre age: ' + lap.tyre_age_laps + ' laps');
+                }
+                if (context.dataIndex === bestIdx) {
+                  lines.push('★ BEST LAP');
+                }
                 return lines;
               }
             }
@@ -1105,14 +1077,34 @@ async function renderLapChart(car, track) {
         scales: {
           x: {
             type: 'linear',
-            title: {display: true, text: 'Lap Number', color: '#5A6A7A'},
-            ticks: {color: '#5A6A7A', stepSize: 1, precision: 0},
-            grid: {color: 'rgba(255,255,255,0.05)'}
+            title: {
+              display: true,
+              text: 'Lap Number',
+              color: '#5A6A7A',
+              font: { size: 11, family: 'Inter, sans-serif' }
+            },
+            min: 0,
+            ticks: {
+              color: '#5A6A7A',
+              stepSize: 1,
+              precision: 0,
+              font: { family: "'JetBrains Mono', monospace", size: 10 }
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' }
           },
           y: {
-            title: {display: true, text: 'Lap Time (s)', color: '#5A6A7A'},
-            ticks: {color: '#5A6A7A'},
-            grid: {color: 'rgba(255,255,255,0.05)'}
+            title: {
+              display: true,
+              text: 'Lap Time (s)',
+              color: '#5A6A7A',
+              font: { size: 11, family: 'Inter, sans-serif' }
+            },
+            ticks: {
+              color: '#5A6A7A',
+              font: { family: "'JetBrains Mono', monospace", size: 10 },
+              callback: function(v) { return v.toFixed(1); }
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' }
           }
         }
       }
