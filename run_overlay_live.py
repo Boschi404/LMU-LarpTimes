@@ -22,7 +22,7 @@ parser.add_argument("--modular", action="store_true",
 args, _unknown = parser.parse_known_args()
 
 if args.modular:
-    print("[Overlay] Launching MODULAR overlay (4 mini-windows + ⚙ menu)...")
+    print("[Overlay] Launching MODULAR overlay (mini-windows + settings menu)...")
     from overlay.app_new import run_overlay
 else:
     print("[Overlay] Launching FULL overlay (1 window, 3x3 grid)...")
