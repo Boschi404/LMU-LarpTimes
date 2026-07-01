@@ -886,6 +886,210 @@
       color: #ffffff !important;
       border-color: var(--accent-blue) !important;
     }
+
+    /* ─── RACE DIRECTOR ────────────────────────────────────────────── */
+    .race-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 2rem;
+      padding: 1rem 1.25rem;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+    .race-header .race-title {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .race-header .race-meta {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .race-header .race-meta span {
+      color: var(--accent-blue);
+    }
+
+    .stint-bars-container {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 1.5rem;
+      align-items: stretch;
+      overflow-x: auto;
+      padding: 0.5rem 0;
+    }
+    .stint-bar {
+      flex: 1;
+      min-width: 60px;
+      padding: 0.75rem 0.5rem;
+      border-radius: var(--radius);
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stint-bar:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .stint-bar .stint-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+    .stint-bar .stint-range {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      opacity: 0.7;
+    }
+    .stint-bar .stint-stats {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      margin-top: 2px;
+    }
+    .stint-bar.Soft {
+      background: linear-gradient(135deg, #f7d44a 0%, #e6b800 100%);
+      color: #1a1a1a;
+    }
+    .stint-bar.Medium {
+      background: linear-gradient(135deg, #ffa94d 0%, #e08610 100%);
+      color: #1a1a1a;
+    }
+    .stint-bar.Hard {
+      background: linear-gradient(135deg, #b0b8c4 0%, #7d8590 100%);
+      color: #1a1a1a;
+    }
+    .stint-bar.Intermediate {
+      background: linear-gradient(135deg, #6abf69 0%, #3a8a39 100%);
+      color: #ffffff;
+    }
+    .stint-bar.Wet, .stint-bar["Wet"], .stint-bar["Full Wet"] {
+      background: linear-gradient(135deg, #4a7db5 0%, #1f4a7a 100%);
+      color: #ffffff;
+    }
+    .stint-bar.Unknown {
+      background: linear-gradient(135deg, #2d333b 0%, #1c2128 100%);
+      color: var(--text-secondary);
+    }
+    .stint-bar .stint-lap-count {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 0.6rem;
+      opacity: 0.5;
+      font-family: var(--font-mono);
+    }
+
+    .event-log {
+      background: var(--surface-1);
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      max-height: 400px;
+      overflow-y: auto;
+      margin-bottom: 1.5rem;
+    }
+    .event-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border-dim);
+      font-size: 0.82rem;
+      transition: background 0.1s ease;
+    }
+    .event-item:last-child { border-bottom: none; }
+    .event-item:hover { background: rgba(255,255,255,0.02); }
+    .event-item .event-lap {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      min-width: 50px;
+      font-weight: 600;
+    }
+    .event-item .event-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 0.6rem;
+      font-weight: 700;
+    }
+    .event-item.info .event-icon { background: rgba(0,161,255,0.15); color: var(--accent-blue); }
+    .event-item.warning .event-icon { background: rgba(247,129,102,0.15); color: var(--accent-orange); }
+    .event-item.critical .event-icon { background: rgba(255,77,77,0.15); color: var(--accent-red); }
+    .event-item .event-desc {
+      flex: 1;
+      color: var(--text-primary);
+    }
+    .event-item .event-time {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .weather-timeline {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+      padding: 0.25rem 0;
+    }
+    .weather-marker {
+      flex: 1;
+      min-width: 40px;
+      padding: 0.5rem 0.25rem;
+      border-radius: 3px;
+      text-align: center;
+      font-size: 0.65rem;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .weather-marker.DRY { background: rgba(0,161,255,0.12); color: var(--accent-blue); }
+    .weather-marker.LightRain, .weather-marker.Drizzle { background: rgba(106,191,105,0.15); color: #6abf69; }
+    .weather-marker.MediumRain, .weather-marker.Rain { background: rgba(74,125,181,0.2); color: #6a9fd5; }
+    .weather-marker.HeavyRain, .weather-marker.WET, .weather-marker.Wet { background: rgba(31,74,122,0.3); color: #8ab8e0; }
+    .weather-marker .weather-temp {
+      font-size: 0.6rem;
+      opacity: 0.7;
+    }
+    .weather-marker .weather-lap {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      opacity: 0.6;
+    }
+
+    .race-selector-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      background: var(--surface-glass);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-dim);
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+      align-items: flex-end;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
   </style>
 </head>
 <body>
@@ -928,6 +1132,12 @@
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10"/>
         </svg>
         Optimal Lap
+      </button>
+      <button class="nav-btn" id="btn-race-director" onclick="showPage('race-director')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+        </svg>
+        Race Director
       </button>
     </nav>
 
@@ -1427,6 +1637,73 @@
         <div class="chart-wrapper" style="height:300px;">
           <canvas id="opt-chart"></canvas>
         </div>
+      </div>
+    </section>
+
+    <!-- PAGE: RACE DIRECTOR -->
+    <section class="page" id="page-race-director">
+      <h2>Race Director</h2>
+      <p class="description">
+        Full race session timeline — view stints, pit stops, weather changes, and lap time evolution for any race session.
+      </p>
+
+      <!-- Session selector -->
+      <div class="race-selector-bar">
+        <div class="filter-group">
+          <label for="race-session-select">Race Session</label>
+          <select id="race-session-select" onchange="loadRaceTimeline()" style="min-width:300px;">
+            <option value="">Select a race session...</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <button class="btn btn-primary" onclick="loadRaceTimeline()">Load Race</button>
+        </div>
+        <div class="filter-group" id="race-refresh-group" style="display:none;">
+          <button class="btn" onclick="loadRaceSessions()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Race content -->
+      <div id="race-content" style="display:none;">
+
+        <!-- Error / no-data -->
+        <div id="race-error" class="alert" style="display:none">
+          <span id="race-error-text"></span>
+        </div>
+
+        <!-- Header: car, track, stats -->
+        <div class="race-header" id="race-header"></div>
+
+        <!-- Key stat cards -->
+        <div class="grid-stats" id="race-stats-grid"></div>
+
+        <!-- Stint bars -->
+        <div class="section-label">Stint Overview</div>
+        <div id="race-stint-bars" class="stint-bars-container"></div>
+
+        <!-- Weather timeline -->
+        <div class="section-label">Weather Timeline</div>
+        <div id="race-weather-timeline" class="weather-timeline"></div>
+
+        <!-- Two-column: event log + lap time chart -->
+        <div class="chart-layout">
+          <div>
+            <div class="section-label">Event Log</div>
+            <div id="race-event-log" class="event-log">
+              <div class="event-item info">
+                <span class="event-icon" style="font-size:0.7rem;">i</span>
+                <span class="event-desc" style="color:var(--text-muted);">Select a race session to view events.</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="section-label">Lap Time Evolution</div>
+            <div class="chart-wrapper" style="height:400px;">
+              <canvas id="race-lap-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 

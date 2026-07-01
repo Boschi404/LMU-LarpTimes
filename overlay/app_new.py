@@ -37,7 +37,8 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMenu,
-    QWidgetAction, QCheckBox, QDialog, QSlider, QPushButton, QRadioButton
+    QWidgetAction, QCheckBox, QDialog, QInputDialog, QMessageBox,
+    QSlider, QPushButton, QRadioButton
 )
 
 import database
@@ -45,6 +46,7 @@ from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst, classify_qualifying_laps, TYRE_COLD, TYRE_IN_WINDOW, TYRE_DEGRADED
+from analysis.tyre_manager import estimate_remaining_life, TyreStatus
 from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import (
     AudioEngine, PracticeAdvisor, StrategyRefresher,
@@ -139,6 +141,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "hk_full_id":    1,
     "hk_modular_id": 2,
     "hk_hideall_id": 3,
+    "_current_profile": "last_used",
 }
 
 
@@ -152,6 +155,81 @@ def load_config() -> dict:
 def save_config(cfg: dict) -> None:
     with open(CONFIG_PATH, "w") as f:
         json.dump(cfg, f, indent=2)
+    # Auto-save layout to profile system
+    try:
+        if _active_profile_name:
+            _save_profile(_active_profile_name, cfg)
+        _save_profile("last_used", cfg)
+    except Exception:
+        pass  # Don't let profile save failures break config saving
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Profile system — save/load named layout snapshots
+# ══════════════════════════════════════════════════════════════════════════════
+
+PROFILES_DIR = paths.data_path("overlay", "profiles")
+_active_profile_name: Optional[str] = None  # set by OverlayManager when a profile is active
+
+
+def _ensure_profiles_dir() -> str:
+    os.makedirs(PROFILES_DIR, exist_ok=True)
+    return PROFILES_DIR
+
+
+def _extract_layout_keys(config: dict) -> dict:
+    """Return only layout-relevant keys from a config dict."""
+    keys = {}
+    for k, v in config.items():
+        if k.endswith(('_x', '_y', '_vis', '_enabled')):
+            keys[k] = v
+        elif k in ('in_game_only', 'tray_x', 'tray_y', 'warning_x', 'warning_y'):
+            keys[k] = v
+    return keys
+
+
+def get_profile_names() -> List[str]:
+    """Return sorted list of available profile names (excluding last_used)."""
+    _ensure_profiles_dir()
+    return sorted(
+        f[:-5] for f in os.listdir(PROFILES_DIR)
+        if f.endswith('.json') and f != 'last_used.json'
+    )
+
+
+def _save_profile(name: str, config: dict) -> None:
+    """Save layout keys from config into a named profile file."""
+    _ensure_profiles_dir()
+    path = os.path.join(PROFILES_DIR, f"{name}.json")
+    layout_keys = _extract_layout_keys(config)
+    with open(path, 'w') as f:
+        json.dump(layout_keys, f, indent=2)
+
+
+def load_profile(name: str) -> dict:
+    """Load a saved profile; returns {} if not found or corrupt."""
+    _ensure_profiles_dir()
+    path = os.path.join(PROFILES_DIR, f"{name}.json")
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def delete_profile(name: str) -> bool:
+    """Delete a named profile file. Returns True if successfully deleted."""
+    _ensure_profiles_dir()
+    path = os.path.join(PROFILES_DIR, f"{name}.json")
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+            return True
+        except OSError:
+            return False
+    return False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -513,24 +591,97 @@ class WeatherOverlay(MiniOverlay):
 
 
 class WearOverlay(MiniOverlay):
-    """Shows tyre wear percentages."""
+    """Shows tyre wear percentages and live remaining-life prediction."""
     component_key = "wear"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("USURA GOMME".upper())
         self._value.setFont(QFont(FONT_VALUE, 11, QFont.Weight.Bold))
+        # Status line for tyre prediction
+        self._status = QLabel("")
+        self._status.setFont(QFont(FONT_VALUE, 7, QFont.Weight.Medium))
+        self._status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
+        self._status.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self._status.setWordWrap(False)
+        layout = self.layout()
+        if layout is not None:
+            layout.addWidget(self._status)
+        self.setMinimumSize(160, 110)
 
-    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+    def update_value(
+        self,
+        frame: Optional[TelemetryFrame] = None,
+        tyre_status: Optional[Any] = None,
+        **_unused,
+    ):
         if frame is None:
             self._value.setText("—")
             self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_MUTED)};")
+            self._status.setText("")
             return
+
+        # Wear percentage display
         w = [(1.0 - w) * 100.0 for w in frame.tyre_wear]
         text = f"FL {w[0]:.0f}%  FR {w[1]:.0f}%  RL {w[2]:.0f}%  RR {w[3]:.0f}%"
-        color = qcolor_hex(ACCENT_AMBER) if min(w) < 40 else qcolor_hex(TEXT_PRIMARY)
+
+        # Colour based on tyre status or fallback to wear level
+        if tyre_status is not None:
+            remaining = tyre_status.remaining_laps
+            if remaining <= 0:
+                value_color = qcolor_hex(ACCENT_RED)
+            elif remaining <= 2:
+                value_color = qcolor_hex(ACCENT_RED)
+            elif remaining <= 5:
+                value_color = qcolor_hex(ACCENT_AMBER)
+            else:
+                value_color = qcolor_hex(ACCENT_GREEN)
+
+            # Build status text
+            status_parts = []
+            if remaining <= 0:
+                status_parts.append(f"CLIFF — pit now!")
+            elif remaining <= 2:
+                status_parts.append(f"⬇ pit in {remaining}L")
+            elif remaining <= 5:
+                status_parts.append(f"⬇ ~{remaining}L left")
+            else:
+                status_parts.append(f"✔ {remaining}L left")
+
+            # Temp indicator
+            ts = tyre_status.temp_status
+            if ts == "cold":
+                status_parts.append("❄ cold")
+            elif ts == "hot":
+                status_parts.append("🔥 hot")
+            elif ts == "degraded":
+                status_parts.append("⚠ overheated")
+            elif ts == "optimal":
+                status_parts.append("✓ temp OK")
+
+            self._status.setText("  ".join(status_parts))
+
+            # Colour the status line too
+            if remaining <= 0:
+                status_color = qcolor_hex(ACCENT_RED)
+            elif remaining <= 2:
+                status_color = qcolor_hex(ACCENT_RED)
+            elif remaining <= 5:
+                status_color = qcolor_hex(ACCENT_AMBER)
+            else:
+                status_color = qcolor_hex(ACCENT_GREEN)
+
+            self._status.setStyleSheet(
+                f"color: {status_color}; font-size: 8px; letter-spacing: 1px;"
+            )
+        else:
+            # Fallback: colour by wear level
+            value_color = qcolor_hex(ACCENT_AMBER) if min(w) < 40 else qcolor_hex(TEXT_PRIMARY)
+            self._status.setText("")
+            self._status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
+
         self._value.setText(text)
-        self._value.setStyleSheet(f"color: {color}; font-size: 9px;")
+        self._value.setStyleSheet(f"color: {value_color}; font-size: 9px;")
 
 
 class CompoundOverlay(MiniOverlay):
@@ -740,6 +891,7 @@ class OverlayManager(QObject):
 
     # Signals for hotkey polling
     toggle_all_signal = Signal()
+    profile_changed = Signal(str)  # emitted when a profile is loaded/saved
 
     def __init__(self, db_path: str = database.DEFAULT_DB_PATH):
         super().__init__()
@@ -781,6 +933,9 @@ class OverlayManager(QObject):
         self._user_wants_visible: bool = True
         self._session_type: Optional[str] = None
         self._qualy_data: Optional[Dict[str, Any]] = None
+        # Tyre age tracking
+        self._tyre_age_laps: int = 0
+        self._last_stint: int = 0
 
         # Audio + adaptive strategy
         self.audio_engine = AudioEngine(
@@ -795,6 +950,21 @@ class OverlayManager(QObject):
         self._hk_modular_id = int(self._cfg.get("hk_modular_id", 2))
         self._hk_hideall_id = int(self._cfg.get("hk_hideall_id", 3))
         self._register_hotkeys()
+
+        # Profile system — load stored profile on startup
+        global _active_profile_name
+        self._tray_widget = None  # will be set by run_overlay
+        stored_profile = self._cfg.get("_current_profile", "last_used")
+        profile_data = load_profile(stored_profile)
+        if profile_data:
+            _active_profile_name = stored_profile
+            self._current_profile = stored_profile
+            self._apply_profile_data(profile_data)
+        else:
+            # First run or profile missing — use defaults and enable auto-save
+            _active_profile_name = "last_used"
+            self._current_profile = "last_used"
+            self._cfg["_current_profile"] = "last_used"
 
     # ── Hotkey handling (Windows) ────────────────────────────────────────────
 
@@ -914,6 +1084,24 @@ class OverlayManager(QObject):
         menu.addSeparator()
         act_reset = menu.addAction("Reset posizioni di tutti i componenti")
         menu.addSeparator()
+        # ── Layout Profile section ──────────────────────────────────────
+        prof_header = menu.addAction(f"  PROFILI LAYOUT  [{self._current_profile}]")
+        prof_header.setEnabled(False)
+
+        act_save = menu.addAction("💾 Salva layout come...")
+        # Saved profile actions: click to load
+        saved_names = get_profile_names()
+        profile_actions: List[tuple] = []
+        for pname in saved_names:
+            label = f"✓ {pname}" if pname == self._current_profile else f"  {pname}"
+            act = menu.addAction(label)
+            profile_actions.append((act, pname))
+
+        menu.addSeparator()
+        act_delete = menu.addAction("✕ Elimina profilo...")
+        act_reset_def = menu.addAction("↺ Ripristina layout predefinito")
+        menu.addSeparator()
+
         act_audio_toggle = menu.addAction(
             "Disattiva audio" if self.audio_engine.enabled
             else "Attiva audio"
@@ -950,40 +1138,56 @@ class OverlayManager(QObject):
         elif chosen is act_reset:
             for ov in self.components.values():
                 ov.reset_position()
-        elif chosen is act_audio_toggle:
-            new_state = not self.audio_engine.enabled
-            self.audio_engine.enabled = new_state
-            self._cfg["audio_enabled"] = new_state
-            save_config(self._cfg)
-        elif chosen is act_audio_test:
-            self.audio_engine.clear_cooldowns()
-            self.audio_engine.play("pit_now", cooldown=False)
-        elif chosen is act_refresh:
-            self.refresher.request_refresh()
-        elif chosen is act_practice:
-            new_state = not self._cfg.get("practice_mode", True)
-            self._cfg["practice_mode"] = new_state
-            save_config(self._cfg)
-        # Community DB actions
-        elif act_cloud_optin is not None and chosen is act_cloud_optin:
-            import database as _db
-            user = _db.opt_in_to_community()
-            if user.get("user_id"):
-                self.refresher.request_refresh()
-        elif act_cloud_optout is not None and chosen is act_cloud_optout:
-            import database as _db
-            _db.opt_out_of_community(delete_cloud_data=False)
-        elif act_cloud_sync is not None and chosen is act_cloud_sync:
-            import database as _db
-            _db.push_pending_sessions()
-        elif act_cloud_pull is not None and chosen is act_cloud_pull:
-            import database as _db
-            _db.pull_remote_sessions()
-        elif chosen is act_open_web:
-            import webbrowser
-            webbrowser.open("http://127.0.0.1:8000/")
-        elif chosen is act_quit:
-            QApplication.quit()
+        # ── Profile actions ──────────────────────────────────────────
+        elif chosen is act_save:
+            self._prompt_save_profile()
+        elif chosen is act_delete:
+            self._prompt_delete_profile()
+        elif chosen is act_reset_def:
+            self._reset_to_default_layout()
+        else:
+            loaded = False
+            for act, pname in profile_actions:
+                if chosen is act:
+                    self.load_profile_by_name(pname)
+                    loaded = True
+                    break
+            if not loaded:
+                # ── Regular actions ──────────────────────────────────
+                if chosen is act_audio_toggle:
+                    new_state = not self.audio_engine.enabled
+                    self.audio_engine.enabled = new_state
+                    self._cfg["audio_enabled"] = new_state
+                    save_config(self._cfg)
+                elif chosen is act_audio_test:
+                    self.audio_engine.clear_cooldowns()
+                    self.audio_engine.play("pit_now", cooldown=False)
+                elif chosen is act_refresh:
+                    self.refresher.request_refresh()
+                elif chosen is act_practice:
+                    new_state = not self._cfg.get("practice_mode", True)
+                    self._cfg["practice_mode"] = new_state
+                    save_config(self._cfg)
+                # Community DB actions
+                elif act_cloud_optin is not None and chosen is act_cloud_optin:
+                    import database as _db
+                    user = _db.opt_in_to_community()
+                    if user.get("user_id"):
+                        self.refresher.request_refresh()
+                elif act_cloud_optout is not None and chosen is act_cloud_optout:
+                    import database as _db
+                    _db.opt_out_of_community(delete_cloud_data=False)
+                elif act_cloud_sync is not None and chosen is act_cloud_sync:
+                    import database as _db
+                    _db.push_pending_sessions()
+                elif act_cloud_pull is not None and chosen is act_cloud_pull:
+                    import database as _db
+                    _db.pull_remote_sessions()
+                elif chosen is act_open_web:
+                    import webbrowser
+                    webbrowser.open("http://127.0.0.1:8000/")
+                elif chosen is act_quit:
+                    QApplication.quit()
 
     # ── Auto-visibility (in_game_only) ───────────────────────────────────────
 
@@ -1010,6 +1214,13 @@ class OverlayManager(QObject):
         self._current_lap = frame.lap_number
         self._last_frame = frame
 
+        # Track tyre age: reset on stint change, increment on lap change
+        if frame.stint_number != self._last_stint:
+            self._tyre_age_laps = 0
+            self._last_stint = frame.stint_number
+        elif frame.lap_number > self._current_lap:
+            self._tyre_age_laps += 1
+
         # Delta
         delta = frame.delta_best
         self.delta_ov.update_value(delta)
@@ -1026,8 +1237,26 @@ class OverlayManager(QObject):
         # Weather
         self.weather_ov.update_value(frame)
 
-        # Wear
-        self.wear_ov.update_value(frame)
+        # Wear — compute tyre status prediction
+        try:
+            # Estimate historical cliff from our model
+            hist_cliff = None
+            if self._car and self._track:
+                laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+                if len(laps) >= 5:
+                    model = fit_degradation_model(laps)
+                    if model.cliff_lap < 999:
+                        hist_cliff = int(model.cliff_lap)
+            tyre_status = estimate_remaining_life(
+                current_wear=frame.tyre_wear,
+                tyre_age_laps=self._tyre_age_laps,
+                compound=frame.tyre_compounds[0] if frame.tyre_compounds else "Medium",
+                track_temp=frame.track_temp,
+                historical_cliff=hist_cliff,
+            )
+            self.wear_ov.update_value(frame, tyre_status=tyre_status)
+        except Exception:
+            self.wear_ov.update_value(frame)
 
         # Compound
         self.compound_ov.update_value(frame)
@@ -1256,6 +1485,130 @@ class OverlayManager(QObject):
         """Open the full settings modal dialog."""
         dialog = SettingsDialog(self)
         dialog.exec()
+
+    # ── Profile management ───────────────────────────────────────────────
+
+    @property
+    def current_profile_name(self) -> str:
+        return self._current_profile
+
+    def set_tray(self, tray_widget) -> None:
+        """Store reference to the tray widget for position + tooltip updates."""
+        self._tray_widget = tray_widget
+
+    def _apply_profile_data(self, data: dict) -> None:
+        """Apply layout data from a profile to the config and reposition all components."""
+        if not data:
+            return
+        # Merge profile data into cfg
+        for k, v in data.items():
+            self._cfg[k] = v
+        # Reposition and update visibility for all components
+        for key, ov in self.components.items():
+            x = self._cfg.get(f"{key}_x", DEFAULT_POSITIONS[key][0])
+            y = self._cfg.get(f"{key}_y", DEFAULT_POSITIONS[key][1])
+            ov.move(x, y)
+            vis = self._cfg.get(f"{key}_vis", True)
+            enabled = self._cfg.get(f"{key}_enabled", True)
+            if vis and enabled:
+                if not ov.isVisible():
+                    ov.show()
+            else:
+                ov.hide()
+        # Update tray position if stored
+        if self._tray_widget is not None:
+            tx = self._cfg.get("tray_x")
+            ty = self._cfg.get("tray_y")
+            if tx is not None and ty is not None:
+                self._tray_widget.move(tx, ty)
+        # Save merged config (triggers profile auto-save)
+        save_config(self._cfg)
+
+    def load_profile_by_name(self, name: str) -> None:
+        """Load a named profile and apply it, setting it as the active profile."""
+        global _active_profile_name
+        data = load_profile(name)
+        if not data:
+            return
+        _active_profile_name = name
+        self._current_profile = name
+        self._cfg["_current_profile"] = name
+        self._apply_profile_data(data)
+        self.profile_changed.emit(name)
+
+    def save_current_profile(self, name: str) -> None:
+        """Save current layout as a named profile and set it active."""
+        global _active_profile_name
+        _save_profile(name, self._cfg)
+        _active_profile_name = name
+        self._current_profile = name
+        self._cfg["_current_profile"] = name
+        save_config(self._cfg)  # also updates last_used
+        self.profile_changed.emit(name)
+
+    def delete_profile_by_name(self, name: str) -> bool:
+        """Delete a profile. If it was the active profile, fall back to last_used."""
+        if not delete_profile(name):
+            return False
+        if self._current_profile == name:
+            global _active_profile_name
+            # Fall back to last_used
+            _active_profile_name = "last_used"
+            self._current_profile = "last_used"
+            self._cfg["_current_profile"] = "last_used"
+            save_config(self._cfg)
+            self.profile_changed.emit("last_used")
+        return True
+
+    def _reset_to_default_layout(self) -> None:
+        """Reset all component positions, enabled states, and visibility to defaults."""
+        global _active_profile_name
+        for key, ov in self.components.items():
+            ov.reset_position()
+            self._cfg[f"{key}_enabled"] = True
+            self._cfg[f"{key}_vis"] = True
+            ov.show()
+        self._cfg["in_game_only"] = DEFAULT_CONFIG.get("in_game_only", False)
+        _active_profile_name = None
+        self._current_profile = "default"
+        self._cfg["_current_profile"] = "default"
+        save_config(self._cfg)
+        self.profile_changed.emit("default")
+
+    def _prompt_save_profile(self) -> None:
+        """Show input dialog to save current layout as a named profile."""
+        initial = self._current_profile if self._current_profile not in ("default", "last_used") else ""
+        name, ok = QInputDialog.getText(
+            None, "Salva layout",
+            "Nome del profilo:",
+            text=initial,
+        )
+        if ok and name.strip():
+            self.save_current_profile(name.strip())
+
+    def _prompt_delete_profile(self) -> None:
+        """Show selection dialog to choose and delete a profile."""
+        names = get_profile_names()
+        if not names:
+            QMessageBox.information(None, "Elimina profilo", "Nessun profilo salvato da eliminare.")
+            return
+        name, ok = QInputDialog.getItem(
+            None, "Elimina profilo",
+            "Seleziona il profilo da eliminare:",
+            names, 0, False,
+        )
+        if ok and name:
+            reply = QMessageBox.question(
+                None, "Conferma eliminazione",
+                f"Eliminare definitivamente il profilo \"{name}\"?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply == QMessageBox.Yes:
+                if self.delete_profile_by_name(name):
+                    QMessageBox.information(None, "Eliminato", f"Profilo \"{name}\" eliminato.")
+                else:
+                    QMessageBox.warning(None, "Errore", f"Impossibile eliminare il profilo \"{name}\".")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1512,6 +1865,8 @@ class ManagerTray(QWidget):
         super().__init__()
         self._manager = manager
         self._cfg = cfg
+        self._profile_name = "last_used"
+        self.setToolTip(f"Overlay Manager [{self._profile_name}]")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
@@ -1534,6 +1889,11 @@ class ManagerTray(QWidget):
         y = cfg.get("tray_y", 160)
         self.move(x, y)
         self.show()
+
+    def set_profile_name(self, name: str) -> None:
+        """Update the profile name shown in the tray tooltip."""
+        self._profile_name = name
+        self.setToolTip(f"Overlay Manager [{name}]")
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -1594,8 +1954,11 @@ def run_overlay(source: TelemetrySource, db_path: str = database.DEFAULT_DB_PATH
     manager = OverlayManager(db_path=db_path)
     cfg = load_config()
     tray = ManagerTray(manager, cfg)
+    manager.set_tray(tray)
     tray.menu_requested.connect(manager.show_settings_menu)
     tray.settings_requested.connect(manager.open_settings_dialog)
+    manager.profile_changed.connect(tray.set_profile_name)
+    tray.set_profile_name(manager.current_profile_name)
 
     # Hotkey polling timer
     hk_timer = QTimer()

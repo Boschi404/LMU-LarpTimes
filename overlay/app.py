@@ -32,6 +32,7 @@ from telemetry.source import TelemetrySource, TelemetryFrame
 from analysis.models import fit_degradation_model, fit_fuel_model
 from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst, TYRE_COLD, TYRE_IN_WINDOW, TYRE_DEGRADED
+from analysis.tyre_manager import estimate_remaining_life, TyreStatus
 from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRefresher
 from overlay.icons import settings_icon, icon_pixmap, clean_action_text
@@ -310,6 +311,9 @@ class OverlayWidget(QWidget):
         self._current_lap: int = 1
         self._session_type: Optional[str] = None
         self._qualy_data: Optional[Dict[str, Any]] = None
+        # Tyre age tracking
+        self._tyre_age_laps: int = 0
+        self._last_stint: int = 0
 
         self._user_wants_visible = True
 
@@ -479,6 +483,23 @@ class OverlayWidget(QWidget):
         wg.addWidget(c12, 0, 2)
         outer.addLayout(wg)
 
+        # Tyre status row
+        ts_row = QHBoxLayout()
+        ts_row.setContentsMargins(0, 0, 0, 0)
+        ts_row.setSpacing(8)
+        self._lbl_tyre_status_title = QLabel("GOMME:")
+        self._lbl_tyre_status_title.setFont(QFont(FONT_TITLE, 7, QFont.Weight.Bold))
+        self._lbl_tyre_status_title.setStyleSheet(
+            f"color: {qcolor_hex(TEXT_MUTED)}; letter-spacing: 1px;"
+        )
+        self._lbl_tyre_status = QLabel("\u2014")
+        self._lbl_tyre_status.setFont(QFont(FONT_VALUE, 8, QFont.Weight.Bold))
+        self._lbl_tyre_status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
+        self._lbl_tyre_status.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        ts_row.addWidget(self._lbl_tyre_status_title)
+        ts_row.addWidget(self._lbl_tyre_status, 1)
+        outer.addLayout(ts_row)
+
         # Warning
         self._lbl_warning = QLabel("")
         self._lbl_warning.setFont(QFont(FONT_TITLE, 8, QFont.Weight.Bold))
@@ -601,6 +622,13 @@ class OverlayWidget(QWidget):
         self._current_lap = frame.lap_number
         self._last_frame = frame
 
+        # Track tyre age: reset on stint change, increment on lap change
+        if frame.stint_number != self._last_stint:
+            self._tyre_age_laps = 0
+            self._last_stint = frame.stint_number
+        elif frame.lap_number > self._current_lap:
+            self._tyre_age_laps += 1
+
         self._lbl_track_car.setText(f"{frame.track_name} \u2014 {frame.car_name}")
 
         # Delta
@@ -659,6 +687,43 @@ class OverlayWidget(QWidget):
         self._lbl_cliff.setStyleSheet(
             f"color: {qcolor_hex(ACCENT_AMBER) if cliff < 5 else qcolor_hex(TEXT_PRIMARY)};"
         )
+
+        # Tyre status — live prediction of remaining life
+        try:
+            hist_cliff = None
+            if self._car and self._track:
+                laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+                if len(laps) >= 5:
+                    model = fit_degradation_model(laps)
+                    if model.cliff_lap < 999:
+                        hist_cliff = int(model.cliff_lap)
+            tyre_status = estimate_remaining_life(
+                current_wear=frame.tyre_wear,
+                tyre_age_laps=self._tyre_age_laps,
+                compound=frame.tyre_compounds[0] if frame.tyre_compounds else "Medium",
+                track_temp=frame.track_temp,
+                historical_cliff=hist_cliff,
+            )
+            remaining = tyre_status.remaining_laps
+            if remaining <= 0:
+                tyre_color = qcolor_hex(ACCENT_RED)
+                status_text = f"PIT NOW — cliff reached!  ({tyre_status.temp_status})"
+            elif remaining <= 2:
+                tyre_color = qcolor_hex(ACCENT_RED)
+                status_text = f"Pit in {remaining}L — near cliff  ({tyre_status.temp_status})"
+            elif remaining <= 5:
+                tyre_color = qcolor_hex(ACCENT_AMBER)
+                status_text = f"~{remaining}L before cliff  ({tyre_status.temp_status})"
+            else:
+                tyre_color = qcolor_hex(ACCENT_GREEN)
+                status_text = f"✔ OK — ~{remaining}L left  ({tyre_status.temp_status})"
+            self._lbl_tyre_status.setText(status_text)
+            self._lbl_tyre_status.setStyleSheet(
+                f"color: {tyre_color}; font-size: 8px; letter-spacing: 1px;"
+            )
+        except Exception as e:
+            self._lbl_tyre_status.setText("\u2014")
+            self._lbl_tyre_status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
 
         # Compound
         self._lbl_compound.setText(frame.tyre_compounds[0] or "\u2014")

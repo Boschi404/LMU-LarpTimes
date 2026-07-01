@@ -280,6 +280,37 @@ async def get_sessions():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# API — Race Director
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/race/sessions")
+async def get_race_sessions():
+    """Get all race sessions for the session selector."""
+    sessions = database.get_all_sessions()
+    races = [s for s in sessions if s.get("session_type") in ("RACE", "Qualifying")]
+    return races
+
+
+@app.get("/api/race/timeline")
+async def get_race_timeline(session_id: str):
+    """Get the full race timeline for a session."""
+    from analysis.race_director import build_race_timeline, race_summary_to_dict
+
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    session_laps = [l for l in laps if str(l.get("session_id", "")) == session_id]
+
+    if not session_laps:
+        # Try matching by session_uuid or id
+        session_laps = [l for l in laps if str(l.get("session_id", "")) == session_id]
+
+    if not session_laps:
+        return {"error": f"No laps found for session {session_id}"}
+
+    summary = build_race_timeline(session_laps, session_id)
+    return race_summary_to_dict(summary)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # API — Overlay Settings
 # ──────────────────────────────────────────────────────────────────────────────
 

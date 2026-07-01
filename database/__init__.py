@@ -589,6 +589,19 @@ def get_all_laps_by_session(
     return [dict(row) for row in rows]
 
 
+def get_all_sessions(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Get all sessions from the database."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, session_uuid as session_id, track, layout, car, session_type, started_at, completed_at "
+        "FROM sessions ORDER BY started_at DESC"
+    )
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
 def get_all_laps_for_archive(
     db_path: Optional[str] = None,
     include_deleted: bool = False

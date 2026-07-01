@@ -836,6 +836,9 @@ var _origShowPage = showPage;
 showPage = function(name) {
   _origShowPage(name);
   if (name === 'profilo') loadOwner();
+  if (name === 'race-director') {
+    loadRaceSessions();
+  }
 };
 
 
