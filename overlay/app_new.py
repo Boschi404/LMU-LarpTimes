@@ -52,6 +52,8 @@ from overlay.strategy_refresher import (
     AudioEngine, PracticeAdvisor, StrategyRefresher,
 )
 from overlay.icons import settings_icon, icon_pixmap, clean_action_text
+from overlay.voice_engine import VoiceEngine
+from analysis.race_engineer import RaceEngineer
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Design System (aligned with web UI & app.py)
@@ -937,11 +939,17 @@ class OverlayManager(QObject):
         self._tyre_age_laps: int = 0
         self._last_stint: int = 0
 
-        # Audio + adaptive strategy
+        # Audio + adaptive strategy + VoiceEngine + RaceEngineer
         self.audio_engine = AudioEngine(
             enabled=bool(self._cfg.get("audio_enabled", True)),
             volume=float(self._cfg.get("audio_volume", 1.0)),
         )
+        self.voice_engine = VoiceEngine(
+            volume=float(self._cfg.get("audio_volume", 1.0)),
+        )
+        self.voice_engine.enabled = bool(self._cfg.get("audio_enabled", True))
+        self.race_engineer = RaceEngineer()
+        self.audio_engine.voice_engine = self.voice_engine
         self.refresher = StrategyRefresher(self, interval_ms=5000)
         self.refresher.audio_cue.connect(self._play_audio_cue)
         self.refresher.plan_updated.connect(self._on_plan_updated)
@@ -1161,7 +1169,9 @@ class OverlayManager(QObject):
                     save_config(self._cfg)
                 elif chosen is act_audio_test:
                     self.audio_engine.clear_cooldowns()
-                    self.audio_engine.play("pit_now", cooldown=False)
+                    # Try VoiceEngine test first, fall back to WAV
+                    if not self.voice_engine.play_test():
+                        self.audio_engine.play("pit_now", cooldown=False)
                 elif chosen is act_refresh:
                     self.refresher.request_refresh()
                 elif chosen is act_practice:
@@ -1221,6 +1231,15 @@ class OverlayManager(QObject):
 
         self._current_lap = frame.lap_number
         self._last_frame = frame
+
+        # Run Race Engineer on every frame — gets highest-priority voice event
+        try:
+            re_event = self.race_engineer.update_from_frame(frame)
+            if re_event is not None:
+                self.voice_engine.speak(re_event.tts_text)
+                self.race_engineer.mark_spoken(re_event)
+        except Exception:
+            pass
 
         # Delta
         delta = frame.delta_best
@@ -1458,11 +1477,13 @@ class OverlayManager(QObject):
     def _on_plan_updated(self, plan: Dict[str, Any], reason: str):
         """Slot for StrategyRefresher.plan_updated signal."""
         pit_laps = plan.get("pit_laps", [])
-        # Convert relative pit laps → absolute (current_lap + p - 1)
+        # Convert relative pit laps -> absolute (current_lap + p - 1)
         if pit_laps:
             self._pit_plan = [self._current_lap + p - 1 for p in pit_laps]
         else:
             self._pit_plan = []
+        # Sync strategy info to RaceEngineer
+        self.race_engineer.update_strategy(self._pit_plan, self._current_lap, self._total_race_laps)
         # Trigger immediate UI refresh
         self._update_pit_display()
         # Low-fuel audio
@@ -1802,23 +1823,27 @@ class SettingsDialog(QDialog):
 
         layout.addStretch()
 
-    # ── Handlers ────────────────────────────────────────────────────────
+    # -- Handlers --------------------------------------------------------
 
     def _on_audio_toggle(self, state):
         self._manager.audio_engine.enabled = state
+        self._manager.voice_engine.enabled = state
         self._cfg["audio_enabled"] = state
         save_config(self._cfg)
 
     def _on_volume_change(self, val):
         volume = val / 100.0
         self._manager.audio_engine.volume = volume
+        self._manager.voice_engine.set_volume(volume)
         self._cfg["audio_volume"] = volume
         self._vol_value.setText(f"{val}%")
         save_config(self._cfg)
 
     def _on_test_sound(self):
         self._manager.audio_engine.clear_cooldowns()
-        self._manager.audio_engine.play("pit_now", cooldown=False)
+        # Try VoiceEngine test first, fall back to WAV
+        if not self._manager.voice_engine.play_test():
+            self._manager.audio_engine.play("pit_now", cooldown=False)
 
     def _on_comp_toggle(self, key, state):
         self._cfg[f"{key}_enabled"] = state

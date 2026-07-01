@@ -3,7 +3,7 @@ Real-time adaptive strategy refresher + audio cues for the LMU overlay.
 
 Three things live here:
 
-1. AudioEngine — plays short .wav cues on Windows via winsound.
+1. AudioEngine -- plays short .wav cues on Windows via winsound.
    Non-Windows: falls back to no-op. Audio cues:
      - "pit_now"   : box questo giro
      - "pit_soon"  : box fra N giri (N <= 2)
@@ -11,11 +11,14 @@ Three things live here:
      - "strategy_changed" : piano strategia cambiato (es. meteo)
      - "practice_complete": stint di pratica completato
 
-2. PracticeAdvisor — looks at how many clean laps exist for the
+   AudioEngine now also supports a VoiceEngine fallback: if `voice_engine`
+   is attached and `custom_text` is provided, it uses TTS instead of WAV.
+
+2. PracticeAdvisor -- looks at how many clean laps exist for the
    (car, track, compound) combination in the DB and suggests practice
    runs to enrich the model.
 
-3. StrategyRefresher — a QObject driven by a QTimer. Every N seconds,
+3. StrategyRefresher -- a QObject driven by a QTimer. Every N seconds,
    checks whether any of the strategy inputs have changed since the last
    calculation (weather, fuel, lap count, compound), and if so re-runs
    the strategist and emits a signal with the new plan + a reason.
@@ -41,6 +44,10 @@ class AudioEngine:
     """
     Plays short audio cues. Uses Windows winsound for .wav. On other
     platforms, prints a fallback to stdout (useful for tests + Linux dev).
+
+    Supports optional VoiceEngine integration: if `voice_engine` is set
+    and TTS text is passed via `play(custom_text=...)`, uses TTS instead
+    of WAV playback (falling back to WAV if TTS fails or is disabled).
     """
 
     # Cue names → path
@@ -61,6 +68,8 @@ class AudioEngine:
         # Resolve relative audio paths to absolute (based on the app root)
         self._cues: Dict[str, str] = {}
         self._resolve_paths()
+        # Optional VoiceEngine reference — set externally by overlay code
+        self.voice_engine: Optional[Any] = None
 
     def _resolve_paths(self):
         """Convert relative audio paths to absolute using paths.base_dir()."""
@@ -71,13 +80,25 @@ class AudioEngine:
             else:
                 self._cues[cue] = rel_path
 
-    def play(self, cue: str, cooldown: bool = True) -> bool:
+    def play(self, cue: str, cooldown: bool = True, custom_text: Optional[str] = None) -> bool:
         """
         Play a cue. Returns True if played, False if skipped (disabled,
         cooldown, no audio backend, etc.).
+
+        If `voice_engine` is attached and `custom_text` is provided, use TTS
+        instead of WAV file playback. Falls back to WAV if TTS returns False.
         """
         if not self.enabled:
             return False
+
+        # VoiceEngine path: if we have a voice_engine and custom_text, use TTS
+        if custom_text and self.voice_engine is not None:
+            if self.voice_engine.speak(custom_text):
+                if cooldown:
+                    self._last_play[cue] = time.monotonic()
+                return True
+            # TTS failed -- fall through to WAV fallback
+
         if cooldown:
             last = self._last_play.get(cue, 0.0)
             if (time.monotonic() - last) < self.cooldown_sec:

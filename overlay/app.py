@@ -37,6 +37,8 @@ from analysis.classes import detect_class
 from analysis.practice import analyze_practice_data
 from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRefresher
 from overlay.icons import settings_icon, icon_pixmap, clean_action_text
+from overlay.voice_engine import VoiceEngine
+from analysis.race_engineer import RaceEngineer
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Design System
@@ -270,17 +272,21 @@ class SettingsDialog(QDialog):
 
     def _on_audio(self, s):
         self._widget.audio_engine.enabled = s
+        self._widget.voice_engine.enabled = s
         self._save("audio_enabled", s)
 
     def _on_vol(self, v):
         vol = v / 100.0
         self._widget.audio_engine.volume = vol
+        self._widget.voice_engine.set_volume(vol)
         self._save("audio_volume", vol)
         self._volv.setText(f"{v}%")
 
     def _on_test(self):
         self._widget.audio_engine.clear_cooldowns()
-        self._widget.audio_engine.play("pit_now", cooldown=False)
+        # Try VoiceEngine test first, fall back to WAV
+        if not self._widget.voice_engine.play_test():
+            self._widget.audio_engine.play("pit_now", cooldown=False)
 
     def _save(self, k, v):
         self._cfg[k] = v
@@ -318,11 +324,18 @@ class OverlayWidget(QWidget):
 
         self._user_wants_visible = True
 
-        # Audio + refresher
+        # Audio + refresher + VoiceEngine + RaceEngineer
         self.audio_engine = AudioEngine(
             enabled=bool(self._cfg.get("audio_enabled", True)),
             volume=float(self._cfg.get("audio_volume", 1.0)),
         )
+        self.voice_engine = VoiceEngine(
+            volume=float(self._cfg.get("audio_volume", 1.0)),
+        )
+        self.voice_engine.enabled = bool(self._cfg.get("audio_enabled", True))
+        self.race_engineer = RaceEngineer()
+        # Connect VoiceEngine to AudioEngine for TTS fallback
+        self.audio_engine.voice_engine = self.voice_engine
         self.refresher = StrategyRefresher(self, interval_ms=5000)
         self.refresher.audio_cue.connect(self._play_audio_cue)
         self.refresher.plan_updated.connect(self._on_plan_updated)
@@ -631,6 +644,15 @@ class OverlayWidget(QWidget):
         self._current_lap = frame.lap_number
         self._last_frame = frame
 
+        # Run Race Engineer on every frame — gets highest-priority voice event
+        try:
+            re_event = self.race_engineer.update_from_frame(frame)
+            if re_event is not None:
+                self.voice_engine.speak(re_event.tts_text)
+                self.race_engineer.mark_spoken(re_event)
+        except Exception:
+            pass
+
         car_class = detect_class(frame.car_name)
         self._lbl_track_car.setText(f"{frame.track_name} — {frame.car_name}  [{car_class}]")
 
@@ -927,6 +949,8 @@ class OverlayWidget(QWidget):
         pit_laps = plan.get("pit_laps", [])
         self._pit_plan = [self._current_lap + p - 1 for p in pit_laps] if pit_laps else []
         self._update_pit()
+        # Sync strategy info to RaceEngineer
+        self.race_engineer.update_strategy(self._pit_plan, self._current_lap, self._total_race_laps)
         if self._last_frame:
             fl = self._estimate_fuel_laps(self._last_frame)
             if fl < 2 and not self._last_frame.in_pits:
