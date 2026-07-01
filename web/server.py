@@ -36,6 +36,7 @@ from analysis.models import fit_degradation_model, fit_fuel_model, DegradationMo
 from analysis.strategist import PitStrategist
 from analysis.qualifying import QualifyingAnalyst
 from analysis.weather import linear_rain_forecast, build_stint_weather_forecast
+from analysis.microsectors import compute_optimal_lap as _compute_optimal_lap
 
 import paths
 BASE_DIR = paths.base_dir()
@@ -1158,6 +1159,43 @@ async def get_qualifying_analysis(
         "mean_fuel_consumption": round(mean_fuel, 3),
         "result": result,
     }
+
+
+@app.get("/api/laps/optimal")
+async def get_optimal_lap(car: str, track: str):
+    """Compute optimal lap from micro-sector analysis."""
+    laps = database.get_all_laps_for_archive(include_deleted=False)
+    filtered = [l for l in laps
+                if l.get('car') == car and l.get('track') == track
+                and l.get('is_valid_lap') and not l.get('anomaly_flag')
+                and l.get('sector_1') and l.get('sector_2') and l.get('sector_3')]
+
+    if len(filtered) < 2:
+        return {
+            "error": f"Need at least 2 valid laps with sector data. Found {len(filtered)}.",
+            "car": car, "track": track,
+        }
+
+    track_dist = database.get_track_distance(track)
+
+    # Load telemetry samples if available for micro-sector splitting
+    telemetry_map = {}
+    for lap in filtered[:20]:  # limit to 20 laps to avoid perf issues
+        try:
+            samples = database.get_lap_samples(lap['id'])
+            if samples:
+                telemetry_map[lap['id']] = samples
+        except Exception:
+            pass
+
+    result = _compute_optimal_lap(
+        filtered,
+        telemetry_map=telemetry_map,
+        track_distance_km=track_dist,
+    )
+    result['car'] = car
+    result['track'] = track
+    return result
 
 
 @app.get("/api/practice")

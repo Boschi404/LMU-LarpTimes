@@ -12,6 +12,8 @@ function showPage(name) {
     loadSetupAdvice();
   } else if (name === 'compare') {
     loadLapComparison();
+  } else if (name === 'optimal') {
+    loadOptimalLap();
   } else {
     stopLapAutoRefresh();
   }
@@ -50,19 +52,21 @@ async function populateFilters() {
     fillSelect('strat-track', tracks);
     fillSelect('comp-car', cars);
     fillSelect('comp-track', tracks);
+    fillSelect('opt-car', cars);
+    fillSelect('opt-track', tracks);
 
     // Restore saved filter values
     restoreFilters('all');
 
     // Wire up filter change listeners for auto-save
-    var filterSelectors = ['prof-car','prof-track','prof-compound','arch-car','arch-track','arch-compound','arch-deleted','strat-car','strat-track','setup-car','setup-track','comp-car','comp-track'];
+    var filterSelectors = ['prof-car','prof-track','prof-compound','arch-car','arch-track','arch-compound','arch-deleted','strat-car','strat-track','setup-car','setup-track','comp-car','comp-track','opt-car','opt-track'];
     filterSelectors.forEach(function(id) {
       var el = document.getElementById(id);
       if (el) {
         el.addEventListener('change', function() {
           // Determine which page this filter belongs to
           var prefix = id.split('-')[0];
-          var pageMap = {prof:'profilo', arch:'archivio', strat:'strategia', setup:'setup', comp:'compare'};
+          var pageMap = {prof:'profilo', arch:'archivio', strat:'strategia', setup:'setup', comp:'compare', opt:'optimal'};
           saveFilters(pageMap[prefix] || 'all');
         });
       }
@@ -193,6 +197,7 @@ function saveFilters(page) {
   if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track');
   if (page === 'setup' || page === 'all') selectors.push('setup-car', 'setup-track');
   if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track');
+  if (page === 'optimal' || page === 'all') selectors.push('opt-car', 'opt-track');
   selectors.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -208,6 +213,7 @@ function restoreFilters(page) {
   if (page === 'strategia' || page === 'all') selectors.push('strat-car', 'strat-track');
   if (page === 'setup' || page === 'all') selectors.push('setup-car', 'setup-track');
   if (page === 'compare' || page === 'all') selectors.push('comp-car', 'comp-track');
+  if (page === 'optimal' || page === 'all') selectors.push('opt-car', 'opt-track');
   selectors.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -1518,3 +1524,142 @@ renderLapComparison = function() {
     }
   }
 };
+
+/* ─── OPTIMAL LAP (MICRO-SECTORS) ──────────────────────────────── */
+let _optChart = null;
+
+async function loadOptimalLap() {
+  const car = document.getElementById('opt-car').value.trim();
+  const track = document.getElementById('opt-track').value.trim();
+  if (!car || !track) {
+    showToast('Seleziona auto e pista.', 'warning');
+    return;
+  }
+
+  document.getElementById('opt-results').style.display = 'none';
+  showLoading('opt-results', 'Analisi micro-settori in corso...');
+
+  try {
+    const res = await fetch('/api/laps/optimal?car=' + encodeURIComponent(car) + '&track=' + encodeURIComponent(track));
+    const data = await res.json();
+    hideLoading('opt-results');
+
+    if (data.error) {
+      showToast(data.error, 'error');
+      return;
+    }
+
+    // Fill stat cards
+    document.getElementById('opt-best-lap').textContent = fmtTime(data.best_lap_time);
+    document.getElementById('opt-best-lap-num').textContent = 'Lap ' + data.best_lap_number;
+    document.getElementById('opt-optimal-lap').textContent = fmtTime(data.optimal_total_time);
+    document.getElementById('opt-gain').textContent = (data.improvement_potential > 0 ? '-' : '') + data.improvement_potential.toFixed(3) + 's';
+    document.getElementById('opt-gain-pct').textContent = data.improvement_percent + '% potenziale';
+    document.getElementById('opt-laps-count').textContent = data.num_laps_analyzed;
+
+    // Fill micro-sector table
+    const tbody = document.getElementById('opt-micro-tbody');
+    const bestLapDeltas = data.per_lap_deltas.find(function(d) { return d.lap_id === data.best_lap_id; });
+    let html = '';
+    for (let i = 0; i < data.num_micro_sectors; i++) {
+      const delta = bestLapDeltas ? bestLapDeltas.micro_deltas[i] : 0;
+      const deltaColor = delta <= 0.005 ? 'var(--accent-green)' : delta < 0.05 ? '#f78166' : delta < 0.1 ? '#ffa94d' : 'var(--accent-red)';
+      let priority;
+      if (delta <= 0.01) priority = '✅ On pace';
+      else if (delta < 0.05) priority = '⚡ Small gain';
+      else if (delta < 0.1) priority = '📈 Can improve';
+      else priority = '🎯 Major gain';
+
+      html += '<tr>' +
+        '<td><strong>' + data.micro_labels[i] + '</strong></td>' +
+        '<td class="num-col" style="color:var(--accent-green)">' + data.optimal_micro_times[i].toFixed(3) + '</td>' +
+        '<td class="num-col">' + (bestLapDeltas ? bestLapDeltas.micro_times[i].toFixed(3) : '—') + '</td>' +
+        '<td class="num-col" style="color:' + deltaColor + '">+' + Math.abs(delta).toFixed(3) + '</td>' +
+        '<td style="color:' + deltaColor + '; font-size:0.8rem;">' + priority + '</td>' +
+        '</tr>';
+    }
+    tbody.innerHTML = html;
+
+    // Build chart
+    renderOptimalLapChart(data, bestLapDeltas);
+
+    document.getElementById('opt-results').style.display = 'block';
+  } catch (e) {
+    hideLoading('opt-results');
+    showToast('Errore: ' + e.message, 'error');
+  }
+}
+
+function renderOptimalLapChart(data, bestLapDeltas) {
+  const ctx = document.getElementById('opt-chart');
+  if (!ctx) return;
+  if (_optChart) _optChart.destroy();
+
+  _optChart = new Chart(ctx.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: data.micro_labels,
+      datasets: [{
+        label: 'Optimal Time',
+        data: data.optimal_micro_times,
+        backgroundColor: 'rgba(0, 161, 255, 0.5)',
+        borderColor: '#00a1ff',
+        borderWidth: 1,
+        borderRadius: 2,
+      }, {
+        label: 'Best Lap (' + (data.best_lap_number ? 'Lap ' + data.best_lap_number : '') + ')',
+        data: bestLapDeltas ? bestLapDeltas.micro_times : [],
+        backgroundColor: 'rgba(46, 160, 67, 0.3)',
+        borderColor: '#2ea043',
+        borderWidth: 1,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#7d8590',
+            font: { family: 'Inter, sans-serif', size: 11 }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15, 15, 15, 0.95)',
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+          cornerRadius: 4,
+          borderColor: '#262c35',
+          borderWidth: 1,
+          callbacks: {
+            afterBody: function(context) {
+              const i = context[0].dataIndex;
+              const delta = bestLapDeltas ? bestLapDeltas.micro_deltas[i].toFixed(3) : '0.000';
+              return 'Δ: +' + Math.abs(delta) + 's' + (delta <= 0.01 ? ' (on pace)' : '');
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#7d8590', font: { size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            color: '#7d8590',
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            callback: function(v) { return v.toFixed(2) + 's'; }
+          },
+          title: {
+            display: true,
+            text: 'Time (s)',
+            color: '#7d8590',
+            font: { size: 11 }
+          }
+        }
+      }
+    }
+  });
+}

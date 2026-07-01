@@ -923,6 +923,12 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
         Lap Compare
       </button>
+      <button class="nav-btn" id="btn-optimal" onclick="showPage('optimal')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10"/>
+        </svg>
+        Optimal Lap
+      </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -1349,6 +1355,78 @@
 
       <div id="comp-empty" style="display:block; text-align:center; padding:3rem; color:var(--text-muted);">
         Select a car and track, then load laps and pick two to compare.
+      </div>
+    </section>
+
+    <!-- PAGE: OPTIMAL LAP -->
+    <section class="page" id="page-optimal">
+      <h2>Optimal Lap Analysis</h2>
+      <p class="description">
+        Micro-sector analysis splits each of the 3 standard sectors into 3 sub-sectors (9 total) and computes the
+        theoretical optimal lap from the best micro-sector times across all your laps. See exactly where you can gain time.
+      </p>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label for="opt-car">macchina</label>
+          <select id="opt-car"><option value="">Seleziona...</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="opt-track">pista</label>
+          <select id="opt-track"><option value="">Seleziona...</option></select>
+        </div>
+        <div class="filter-group">
+          <button class="btn btn-primary" onclick="loadOptimalLap()">Analyze</button>
+        </div>
+      </div>
+
+      <div id="opt-results" style="display:none;">
+        <!-- Summary stat cards -->
+        <div class="grid-stats">
+          <div class="stat-card">
+            <div class="stat-label">Miglior giro reale</div>
+            <div class="stat-value" id="opt-best-lap">—</div>
+            <div class="stat-sub" id="opt-best-lap-num"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Giro ottimale (teorico)</div>
+            <div class="stat-value" id="opt-optimal-lap" style="color:var(--accent-green)">—</div>
+            <div class="stat-sub">Somma migliori micro-settori</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Potenziale miglioramento</div>
+            <div class="stat-value" id="opt-gain" style="color:var(--accent-blue)">—</div>
+            <div class="stat-sub" id="opt-gain-pct"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Giri analizzati</div>
+            <div class="stat-value" id="opt-laps-count">—</div>
+            <div class="stat-sub">con dati di settore validi</div>
+          </div>
+        </div>
+
+        <!-- Micro-sector comparison table -->
+        <div class="section-label">Micro-Sector Breakdown</div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Micro-Sector</th>
+                <th class="text-right">Optimal Time</th>
+                <th class="text-right">Best Lap</th>
+                <th class="text-right">Δ</th>
+                <th>Priority</th>
+              </tr>
+            </thead>
+            <tbody id="opt-micro-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Micro-sector bar chart -->
+        <div class="section-label">Optimal vs Best Lap — Micro-Sector Times</div>
+        <div class="chart-wrapper" style="height:300px;">
+          <canvas id="opt-chart"></canvas>
+        </div>
       </div>
     </section>
 
