@@ -83,22 +83,13 @@ class VoiceEngine:
         try:
             import edge_tts
             import asyncio
-
-            # Adjust rate slightly based on volume (full volume = normal speed)
-            rate_str = ""
-            if self.volume < 0.5:
-                rate_str = "-10%"
-            elif self.volume > 0.9:
-                rate_str = "+0%"
-
-            communicate = edge_tts.Communicate(text, self.voice, rate=rate_str)
-            asyncio.run(communicate.save(cache_path))
+            asyncio.run(edge_tts.Communicate(text, self.voice).save(cache_path))
             if os.path.exists(cache_path) and os.path.getsize(cache_path) > 1000:
                 return cache_path
         except ImportError:
-            print("[VoiceEngine] edge-tts not installed — TTS unavailable")
-        except Exception as e:
-            print(f"[VoiceEngine] TTS generation error: {e}")
+            pass  # edge-tts not installed, TTS unavailable
+        except Exception:
+            pass  # silently ignore TTS errors, fall back to WAV
 
         return None
 
