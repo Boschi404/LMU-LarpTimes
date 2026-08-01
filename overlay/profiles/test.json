@@ -1,7 +1,4 @@
 {
-  "x": 390,
-  "y": 517,
-  "visible": true,
   "delta_x": 1610,
   "delta_y": 118,
   "delta_vis": true,
@@ -43,12 +40,5 @@
   "practice_vis": true,
   "practice_enabled": true,
   "in_game_only": false,
-  "audio_enabled": true,
-  "audio_volume": 1.0,
-  "practice_mode": true,
-  "hk_full_id": 1,
-  "hk_modular_id": 2,
-  "hk_hideall_id": 3,
-  "_current_profile": "test",
-  "overlay_mode": "modular"
+  "audio_enabled": true
 }

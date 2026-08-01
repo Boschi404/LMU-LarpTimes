@@ -31,9 +31,15 @@ import os
 import sys
 import time
 import platform
-from typing import Optional, List, Dict, Any, Set
+import logging
+from typing import Optional, List, Dict, Any, Set, TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QTimer, Signal
+
+if TYPE_CHECKING:
+    from overlay.overlay_manager import OverlayManager
+
+logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -188,7 +194,7 @@ class StrategyRefresher(QObject):
 
     def __init__(
         self,
-        manager,  # OverlayManager (avoid circular import)
+        manager: "OverlayManager",  # OverlayManager (avoid circular import)
         interval_ms: int = 5000,
     ):
         super().__init__()
@@ -243,6 +249,11 @@ class StrategyRefresher(QObject):
         return None
 
     def _plan_signature(self, plan: Optional[Dict[str, Any]]) -> str:
+        """Build a stable fingerprint string for a pit strategy plan.
+
+        Encodes stop count, pit lap numbers, and compound assignments so
+        we can detect when the plan materially changes between ticks.
+        """
         if not plan:
             return "none"
         pit_laps = plan.get("pit_laps", [])
@@ -251,6 +262,14 @@ class StrategyRefresher(QObject):
         return f"{plan.get('stops', 0)}|{tuple(pit_laps)}|{compounds}"
 
     def _tick(self):
+        """Timer callback: snapshot state, detect changes, re-strategise if needed.
+
+        On every timer interval this method takes a state snapshot and compares
+        it with the previous one.  If weather, fuel, lap, or track temperature
+        changed (or a manual refresh was requested) it triggers a full strategy
+        recalculation and emits plan_updated / audio_cue signals when the plan
+        differs from the last emitted signature.
+        """
         snap = self._current_state_snapshot()
         if snap is None:
             return
@@ -264,6 +283,7 @@ class StrategyRefresher(QObject):
         try:
             self._manager._refresh_strategy()
         except Exception:
+            logger.exception("Strategy refresh failed in _tick")
             return
 
         plan = getattr(self._manager, "_pit_plan", None)
@@ -332,9 +352,16 @@ class StrategyRefresher(QObject):
             )
             return result.get("optimal")
         except Exception:
+            logger.exception("_recompute_full_plan failed")
             return None
 
     def _safe_get_laps(self):
+        """Fetch lap-analysis data from the database, swallowing errors gracefully.
+
+        Returns an empty list if the database isn't available, the
+        car/track pair is unknown, or any other exception occurs — all
+        errors are logged via ``logger.exception``.
+        """
         import database
         m = self._manager
         try:
@@ -342,6 +369,7 @@ class StrategyRefresher(QObject):
                 m._car, m._track, db_path=m.db_path
             )
         except Exception:
+            logger.exception("_safe_get_laps failed")
             return []
 
     def _safe_get_pit_losses(self):
@@ -352,4 +380,5 @@ class StrategyRefresher(QObject):
                 m._car, m._track, db_path=m.db_path
             )
         except Exception:
+            logger.exception("_safe_get_pit_losses failed")
             return []

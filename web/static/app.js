@@ -1,3 +1,14 @@
+/* ─── HTML Sanitization ───────────────────────────────────────────── */
+function escapeHtml(str) {
+  if (str == null) return '';
+  var s = String(str);
+  return s.replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+}
+
 /* ─── Navigation ─────────────────────────────────────────────────── */
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -112,7 +123,7 @@ async function toggleOverlayMode() {
     _overlayInGameOnly = d.in_game_only;
     updateOverlayToggleUI();
   } catch (e) {
-    showToast('Errore salvataggio impostazioni overlay: ' + e.message, 'error');
+    showToast('Errore salvataggio impostazioni overlay: ' + escapeHtml(e.message), 'error');
     _overlayInGameOnly = !_overlayInGameOnly;
     updateOverlayToggleUI();
   }
@@ -173,7 +184,7 @@ function showLoading(containerId, message) {
   var overlay = document.createElement('div');
   overlay.className = 'loading-overlay';
   overlay.id = containerId + '-loading';
-  overlay.innerHTML = '<div class="spinner"></div><div class="spinner-text">' + (message || 'Caricamento...') + '</div>';
+  overlay.innerHTML = '<div class="spinner"></div><div class="spinner-text">' + escapeHtml(message || 'Caricamento...') + '</div>';
   el.appendChild(overlay);
   el.style.display = 'block';
 }
@@ -402,7 +413,7 @@ async function loadProfile() {
     }
   } catch (e) {
     hideLoading('prof-stats-area');
-    showToast('Errore fetch profilo: ' + e.message, 'error');
+    showToast('Errore fetch profilo: ' + escapeHtml(e.message), 'error');
   }
 }
 
@@ -454,7 +465,7 @@ async function loadLaps(silent) {
     renderLapsTable();
   } catch (e) {
     if (!silent) {
-      tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--red); text-align:center;">Error: ' + e.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="20" class="text-mono" style="color:var(--red); text-align:center;">Error: ' + escapeHtml(e.message) + '</td></tr>';
     }
   }
 }
@@ -492,7 +503,7 @@ function renderLapsTable() {
     var cls = deleted ? ' class="deleted"' : '';
     var validBadge = l.is_valid_lap ? '<span class="badge badge-valid">VALID</span>' : '<span class="badge badge-invalid">INVALID</span>';
     var pitBadge = l.is_pit_in_lap ? '<span class="badge badge-pit">IN</span> ' : (l.is_pit_out_lap ? '<span class="badge badge-pit">OUT</span> ' : '');
-    var anomStr = l.anomaly_flag ? '<span style="color:var(--amber); cursor:help;" title="' + (l.anomaly_reason || 'Anomalia rilevata') + '">\u26a0\ufe0f</span>' : '';
+    var anomStr = l.anomaly_flag ? '<span style="color:var(--amber); cursor:help;" title="' + escapeHtml(l.anomaly_reason || 'Anomalia rilevata') + '">\u26a0\ufe0f</span>' : '';
 
     var action = deleted
       ? '<button class="btn btn-restore" onclick="restoreLap(' + l.id + ')">Restore</button>'
@@ -506,18 +517,18 @@ function renderLapsTable() {
       wearBadge = '<span style="font-size:0.75rem; color:' + wColor + '">' + wearStart + ' \u2192 ' + wearEnd + '</span>';
     }
 
-    var compoundStr = l.compound_front || '—';
-    if (l.compound_rear) compoundStr += ' / ' + l.compound_rear;
+    var compoundStr = escapeHtml(l.compound_front || '—');
+    if (l.compound_rear) compoundStr += ' / ' + escapeHtml(l.compound_rear);
 
-    var weatherStr = l.weather_state || '—';
+    var weatherStr = escapeHtml(l.weather_state || '—');
     if (l.rain_intensity > 0) weatherStr += ' \ud83c\udf27';
 
     html += '<tr' + cls + '>' +
       '<td class="num-col">' + l.lap_number + '</td>' +
-      '<td>' + (l.track || '—') + '</td>' +
-      '<td>' + (l.car || '—') + '</td>' +
-      '<td><span class="class-badge" style="background:' + (l.class_color || 'var(--border)') + '22; color:' + (l.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (l.class_color || 'var(--border)') + '44;">' + (l.class_display || l.car_class || '—') + '</span></td>' +
-      '<td>' + (l.session_type || '—') + '</td>' +
+      '<td>' + escapeHtml(l.track || '—') + '</td>' +
+      '<td>' + escapeHtml(l.car || '—') + '</td>' +
+      '<td><span class="class-badge" style="background:' + (l.class_color || 'var(--border)') + '22; color:' + (l.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (l.class_color || 'var(--border)') + '44;">' + escapeHtml(l.class_display || l.car_class || '—') + '</span></td>' +
+      '<td>' + escapeHtml(l.session_type || '—') + '</td>' +
       '<td class="num-col">' + (l.stint_id != null ? l.stint_id : '—') + '</td>' +
       '<td class="num-col">' + fmtTime(l.lap_time) + '</td>' +
       '<td class="num-col">' + (l.sector_1 ? l.sector_1.toFixed(3) : '—') + '</td>' +
@@ -679,11 +690,11 @@ async function calculateStrategy() {
         trafficHtml = '<div class="section-label" style="margin-top: 1rem">Traffic Assessment</div>' +
           '<div class="table-container" style="padding: 1rem 1.25rem; margin-bottom: 1rem;">' +
           '<div style="display: flex; gap: var(--space-xl); flex-wrap: wrap;">' +
-          '<div><div class="stat-label">Car Class</div><div class="stat-value" style="font-size:1.2rem; color:' + (tr.own_class === 'Hypercar' ? '#FF2200' : tr.own_class === 'LMP2' ? '#FF6B00' : '#00FF88') + ';">' + (tr.own_class || '—') + '</div></div>' +
+          '<div><div class="stat-label">Car Class</div><div class="stat-value" style="font-size:1.2rem; color:' + (tr.own_class === 'Hypercar' ? '#FF2200' : tr.own_class === 'LMP2' ? '#FF6B00' : '#00FF88') + ';">' + escapeHtml(tr.own_class || '—') + '</div></div>' +
           '<div style="padding-left: var(--space-xl); border-left: 1px solid var(--border-subtle);"><div class="stat-label">Traffic Density</div><div class="stat-value text-mono" style="font-size:1.2rem;">' + (tr.traffic_density * 100).toFixed(0) + '%</div></div>' +
           '<div style="padding-left: var(--space-xl); border-left: 1px solid var(--border-subtle);"><div class="stat-label">Estimated Penalty/Lap</div><div class="stat-value text-mono" style="font-size:1.2rem; color:' + trafficColor + ';">+' + tr.estimated_penalty_per_lap.toFixed(2) + 's</div></div>' +
           '</div>' +
-          (tr.slower_classes && tr.slower_classes.length > 0 ? '<div style="margin-top: var(--space-md); font-size: 0.85rem; color: var(--ink-secondary);">Slower classes on track: <span style="font-weight:600;">' + tr.slower_classes.join(', ') + '</span></div>' : '') +
+          (tr.slower_classes && tr.slower_classes.length > 0 ? '<div style="margin-top: var(--space-md); font-size: 0.85rem; color: var(--ink-secondary);">Slower classes on track: <span style="font-weight:600;">' + escapeHtml(tr.slower_classes.join(', ')) + '</span></div>' : '') +
           (tr.estimated_penalty_per_lap > 0.5 ? '<div style="margin-top: var(--space-sm); font-size: 0.8rem; color: var(--status-warn);">⚠ Heavy traffic — consider fewer pit stops to minimise traffic exposure.</div>' : '') +
           '</div>';
       }
@@ -752,9 +763,9 @@ async function loadSetupAdvice() {
         var r = d.recommendations[i];
         var priorityColor = r.priority === 'high' ? 'var(--status-invalid)' : (r.priority === 'medium' ? 'var(--status-warn)' : 'var(--ink-secondary)');
         recHtml += '<div style="padding: var(--space-md); background: var(--surface-elevated); border-radius: var(--radius-sm); border-left: 4px solid ' + priorityColor + ';">' +
-          '<div style="font-weight: 600; margin-bottom: var(--space-xs);">' + r.title + '</div>' +
-          '<div style="font-size: 0.9rem; color: var(--ink-secondary); margin-bottom: var(--space-xs);">' + r.message + '</div>' +
-          '<div style="font-size: 0.8rem; color: var(--ink-muted);">Impact: ' + r.impact + '</div>' +
+          '<div style="font-weight: 600; margin-bottom: var(--space-xs);">' + escapeHtml(r.title) + '</div>' +
+          '<div style="font-size: 0.9rem; color: var(--ink-secondary); margin-bottom: var(--space-xs);">' + escapeHtml(r.message) + '</div>' +
+          '<div style="font-size: 0.8rem; color: var(--ink-muted);">Impact: ' + escapeHtml(r.impact) + '</div>' +
         '</div>';
       }
       recDiv.innerHTML = recHtml;
@@ -771,7 +782,7 @@ async function loadSetupAdvice() {
       var delta = bestWeatherTime ? (entry[1] - bestWeatherTime).toFixed(2) : '—';
       var deltaColor = delta === '—' || parseFloat(delta) <= 0 ? 'var(--status-valid)' : 'var(--status-invalid)';
       var deltaStr = delta === '—' ? '—' : ((delta > 0 ? '+' : '') + delta + 's');
-      wHtml += '<tr><td>' + entry[0] + '</td><td class="num-col">' + fmtTime(entry[1]) + '</td><td class="num-col" style="color: ' + deltaColor + ';">' + deltaStr + '</td></tr>';
+      wHtml += '<tr><td>' + escapeHtml(entry[0]) + '</td><td class="num-col">' + fmtTime(entry[1]) + '</td><td class="num-col" style="color: ' + deltaColor + ';">' + deltaStr + '</td></tr>';
     }
     weatherTbody.innerHTML = wHtml;
 
@@ -786,13 +797,24 @@ async function loadSetupAdvice() {
       if (temps && temps.length > 0) {
         tempRange = Math.min.apply(null, temps).toFixed(0) + '\u00b0C - ' + Math.max.apply(null, temps).toFixed(0) + '\u00b0C';
       }
-      cHtml += '<tr><td><strong>' + centry[0] + '</strong></td><td class="num-col">' + fmtTime(stats.avg_lap) + '</td><td class="num-col">' + stats.count +
+      cHtml += '<tr><td><strong>' + escapeHtml(centry[0]) + '</strong></td><td class="num-col">' + fmtTime(stats.avg_lap) + '</td><td class="num-col">' + stats.count +
         '</td><td class="num-col">' + stats.avg_wear_increase.toFixed(1) + '%</td><td>' + tempRange + '</td></tr>';
     }
     compoundTbody.innerHTML = cHtml;
 
     var tempTbody = document.getElementById('setup-temp-tbody');
     var tempEntries = Object.entries(d.temp_buckets || {}).sort(function(a, b) { return parseInt(a[0]) - parseInt(b[0]); });
+
+    // Compute overall best lap time across all temp buckets
+    var overallBest = null;
+    for (var tbi = 0; tbi < tempEntries.length; tbi++) {
+      var tbLaps = tempEntries[tbi][1];
+      for (var tli = 0; tli < tbLaps.length; tli++) {
+        var lt = tbLaps[tli]["lap_time"];
+        if (overallBest === null || lt < overallBest) overallBest = lt;
+      }
+    }
+
     var tHtml = '';
     for (var ti = 0; ti < tempEntries.length; ti++) {
       var tentry = tempEntries[ti];
@@ -800,7 +822,7 @@ async function loadSetupAdvice() {
       var times2 = laps2.map(function(ll) { return ll["lap_time"]; });
       var best2 = Math.min.apply(null, times2);
       var avg2 = times2.reduce(function(a2, b2) { return a2 + b2; }, 0) / times2.length;
-      var delta2 = overallBest ? (avg2 - overallBest).toFixed(2) : '—';
+      var delta2 = overallBest != null ? (avg2 - overallBest).toFixed(2) : '—';
       tHtml += '<tr><td>' + tentry[0] + '\u00b0C - ' + (parseInt(tentry[0]) + 5) + '\u00b0C</td>' +
         '<td class="num-col">' + laps2.length + '</td>' +
         '<td class="num-col">' + fmtTime(best2) + '</td>' +
@@ -1189,7 +1211,7 @@ async function loadLapComparison() {
   } catch (e) {
     hideLoading('comp-results');
     console.error('loadLapComparison:', e);
-    showToast('Error loading laps: ' + e.message, 'error');
+    showToast('Error loading laps: ' + escapeHtml(e.message), 'error');
   }
 }
 
@@ -1232,10 +1254,10 @@ function renderLapComparison() {
       '<div class="comp-row"><span class="comp-row-label">Fuel End</span><span class="comp-row-value">' + (lap.fuel_end_l != null ? lap.fuel_end_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Fuel Used</span><span class="comp-row-value">' + (lap.fuel_used_l != null ? lap.fuel_used_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Tyre Age</span><span class="comp-row-value">' + (lap.tyre_age_laps != null ? lap.tyre_age_laps + ' laps' : '\u2014') + '</span></div>' +
-      '<div class="comp-row"><span class="comp-row-label">Compound</span><span class="comp-row-value">' + (lap.compound_front || '\u2014') + '</span></div>' +
-      '<div class="comp-row"><span class="comp-row-label">Class</span><span class="comp-row-value"><span class="class-badge" style="background:' + (lap.class_color || 'var(--border)') + '22; color:' + (lap.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (lap.class_color || 'var(--border)') + '44;">' + (lap.class_display || lap.car_class || '\u2014') + '</span></span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Compound</span><span class="comp-row-value">' + escapeHtml(lap.compound_front || '\u2014') + '</span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Class</span><span class="comp-row-value"><span class="class-badge" style="background:' + (lap.class_color || 'var(--border)') + '22; color:' + (lap.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (lap.class_color || 'var(--border)') + '44;">' + escapeHtml(lap.class_display || lap.car_class || '\u2014') + '</span></span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Track Temp</span><span class="comp-row-value">' + (lap.track_temp != null ? lap.track_temp.toFixed(1) + '\u00b0C' : '\u2014') + '</span></div>' +
-      '<div class="comp-row"><span class="comp-row-label">Weather</span><span class="comp-row-value">' + (lap.weather_state || '\u2014') + '</span></div>';
+      '<div class="comp-row"><span class="comp-row-label">Weather</span><span class="comp-row-value">' + escapeHtml(lap.weather_state || '\u2014') + '</span></div>';
   }
 
   document.getElementById('comp-card-a').className = 'comp-card' + (aFaster ? ' faster' : ' slower');
@@ -1618,7 +1640,7 @@ async function loadOptimalLap() {
       else priority = '🎯 Major gain';
 
       html += '<tr>' +
-        '<td><strong>' + data.micro_labels[i] + '</strong></td>' +
+        '<td><strong>' + escapeHtml(data.micro_labels[i]) + '</strong></td>' +
         '<td class="num-col" style="color:var(--green)">' + data.optimal_micro_times[i].toFixed(3) + '</td>' +
         '<td class="num-col">' + (bestLapDeltas ? bestLapDeltas.micro_times[i].toFixed(3) : '—') + '</td>' +
         '<td class="num-col" style="color:' + deltaColor + '">+' + Math.abs(delta).toFixed(3) + '</td>' +
@@ -1806,7 +1828,7 @@ async function loadRaceSessions() {
     if (sel.value) loadRaceTimeline();
   } catch (e) {
     console.error('loadRaceSessions:', e);
-    showToast('Failed to load race sessions: ' + e.message, 'error');
+    showToast('Failed to load race sessions: ' + escapeHtml(e.message), 'error');
   }
 }
 
@@ -1837,15 +1859,15 @@ async function loadRaceTimeline() {
     document.getElementById('race-content').style.display = 'block';
   } catch (e) {
     hideLoading('race-content');
-    showToast('Error loading race timeline: ' + e.message, 'error');
+    showToast('Error loading race timeline: ' + escapeHtml(e.message), 'error');
   }
 }
 
 function renderRaceTimeline(data) {
   // ── Header ──
   document.getElementById('race-header').innerHTML =
-    '<div class="race-title">' + (data.car || '—') + '</div>' +
-    '<div class="race-meta">' + (data.track || '—') + '</div>' +
+    '<div class="race-title">' + escapeHtml(data.car || '—') + '</div>' +
+    '<div class="race-meta">' + escapeHtml(data.track || '—') + '</div>' +
     '<div class="race-meta" style="flex:1;"></div>' +
     '<div class="race-meta">Total Laps: <span>' + data.total_laps + '</span></div>' +
     '<div class="race-meta">Best Lap: <span>' + fmtTime(data.best_lap_time) + '</span></div>' +
@@ -1892,11 +1914,12 @@ function renderRaceTimeline(data) {
     stintBars.innerHTML = data.stints.map(function(s) {
       const compound = s.compound || 'Unknown';
       const cssClass = compound.replace(/\s+/g, ' ').trim();
-      return '<div class="stint-bar ' + cssClass + '" title="Stint ' + s.stint_number + ': Laps ' + s.start_lap + '\u2013' + s.end_lap + ', ' + compound + '">' +
+      var escCompound = escapeHtml(compound);
+      return '<div class="stint-bar ' + cssClass + '" title="Stint ' + s.stint_number + ': Laps ' + s.start_lap + '\u2013' + s.end_lap + ', ' + escCompound + '">' +
         '<span class="stint-lap-count">' + s.laps_in_stint + ' laps</span>' +
         '<div class="stint-label">Stint ' + s.stint_number + '</div>' +
         '<div class="stint-range">Laps ' + s.start_lap + '\u2013' + s.end_lap + '</div>' +
-        '<div class="stint-stats">' + compound + '</div>' +
+        '<div class="stint-stats">' + escCompound + '</div>' +
         '<div class="stint-stats">Best: ' + fmtTime(s.best_lap_time) + '</div>' +
         (s.avg_lap_time ? '<div class="stint-stats">Avg: ' + fmtTime(s.avg_lap_time) + '</div>' : '') +
       '</div>';
@@ -1912,7 +1935,7 @@ function renderRaceTimeline(data) {
       const weatherClass = (w.weather || '').replace(/\s+/g, '');
       return '<div class="weather-marker ' + weatherClass + '">' +
         '<span class="weather-lap">Lap ' + w.lap_number + '</span>' +
-        '<span>' + (w.weather || '—') + '</span>' +
+        '<span>' + escapeHtml(w.weather || '—') + '</span>' +
         (w.track_temp != null ? '<span class="weather-temp">' + w.track_temp.toFixed(1) + '\u00b0C</span>' : '') +
         (w.rain_intensity > 0 ? '<span class="weather-temp">\ud83c\udf27 ' + (w.rain_intensity * 100).toFixed(0) + '%</span>' : '') +
       '</div>';
@@ -1937,7 +1960,7 @@ function renderRaceTimeline(data) {
       return '<div class="event-item ' + (e.severity || 'info') + '">' +
         '<span class="event-lap">L' + e.lap_number + '</span>' +
         '<span class="event-icon">' + icon + '</span>' +
-        '<span class="event-desc">' + (e.description || '') + '</span>' +
+        '<span class="event-desc">' + escapeHtml(e.description || '') + '</span>' +
         (e.lap_time ? '<span class="event-time">' + fmtTime(e.lap_time) + '</span>' : '') +
       '</div>';
     }).join('');
@@ -2061,7 +2084,7 @@ function renderRaceLapChart(data) {
     })
     .catch(function(e) {
       console.error('Race chart error:', e);
-      ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);">Failed to load chart data.</div>' + (e.message || '');
+      ctx.canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);">Failed to load chart data.</div>' + escapeHtml(e.message || '');
     });
 }
 
@@ -2123,7 +2146,7 @@ async function loadWeatherRadar(car, track) {
     // Recommendation box
     var recEl = document.getElementById('wr-recommendation');
     var rec = d.recommendation || '☀️ No weather concerns — stay on current tyres';
-    recEl.innerHTML = '<span>' + rec + '</span>';
+    recEl.textContent = rec;
     recEl.className = 'rec-box';
     if (rec.includes('PIT NOW') || rec.includes('RAIN IS HERE')) {
       recEl.classList.add('critical');
@@ -2181,7 +2204,7 @@ async function loadPitPractice() {
     var tipsDiv = document.getElementById('pit-tips');
     if (d.tips && d.tips.length > 0) {
       tipsDiv.innerHTML = d.tips.map(function(tip) {
-        return '<div class="pit-tip">' + tip + '</div>';
+        return '<div class="pit-tip">' + escapeHtml(tip) + '</div>';
       }).join('');
     } else {
       tipsDiv.innerHTML = '<div style="color:var(--text-tertiary); font-size:0.85rem;">No improvement tips available yet. Complete more pit stops.</div>';
@@ -2196,9 +2219,9 @@ async function loadPitPractice() {
           '<td style="font-family:var(--font-mono); font-size:0.75rem;">' + (ps.session_id ? ps.session_id.substring(0, 8) : '—') + '</td>' +
           '<td class="num-col">' + ps.lap + '</td>' +
           '<td class="num-col" style="color:' + lossColor + '; font-weight:600;">' + ps.loss + 's</td>' +
-          '<td>' + (ps.track || '—') + '</td>' +
-          '<td>' + (ps.car || '—') + '</td>' +
-          '<td>' + (ps.compound || '—') + '</td>' +
+          '<td>' + escapeHtml(ps.track || '—') + '</td>' +
+          '<td>' + escapeHtml(ps.car || '—') + '</td>' +
+          '<td>' + escapeHtml(ps.compound || '—') + '</td>' +
           '<td class="num-col">' + (ps.pit_in_time != null ? ps.pit_in_time.toFixed(2) + 's' : '—') + '</td>' +
           '<td class="num-col">' + (ps.pit_out_time != null ? ps.pit_out_time.toFixed(2) + 's' : '—') + '</td>' +
         '</tr>';

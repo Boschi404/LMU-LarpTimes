@@ -9,7 +9,7 @@ Analyses the current data to tell the driver:
 This helps drivers run efficient practice sessions that yield good data
 for the race strategist and qualifying analyst.
 """
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List
 import numpy as np
 
 
@@ -24,6 +24,7 @@ def analyze_practice_data(
             "coverage": "none",
             "suggestions": [
                 {
+                    "type": "no_data",
                     "priority": "high",
                     "message": "Nessun giro registrato. Fai almeno 5 giri per iniziare.",
                     "action": "Guida in PRACTICE per 5+ giri"
@@ -44,6 +45,7 @@ def analyze_practice_data(
     if fuel_range < 20 and len(laps) >= 3:
         fuel_coverage = "poor"
         fuel_suggestion = {
+            "type": "fuel_range",
             "priority": "medium" if len(laps) >= 5 else "low",
             "message": (
                 f"Tutti i giri hanno ~{fuel_max:.0f}L di benzina. "
@@ -56,6 +58,7 @@ def analyze_practice_data(
         # Not enough low-fuel laps
         fuel_coverage = "partial"
         fuel_suggestion = {
+            "type": "fuel_range",
             "priority": "low" if len(laps) >= 8 else "medium",
             "message": (
                 f"Benzina tra {fuel_min:.0f}L e {fuel_max:.0f}L. "
@@ -81,6 +84,7 @@ def analyze_practice_data(
     if age_range < 5 and len(laps) >= 5:
         tyre_coverage = "poor"
         tyre_suggestion = {
+            "type": "tyre_age",
             "priority": "medium",
             "message": (
                 f"Gomme sempre tra {age_min} e {age_max} giri di età. "
@@ -92,6 +96,7 @@ def analyze_practice_data(
     elif laps_old < 2 and len(laps) >= 5:
         tyre_coverage = "partial"
         tyre_suggestion = {
+            "type": "tyre_age",
             "priority": "low",
             "message": (
                 f"Hai {laps_young} giri con gomme fresche ma solo {laps_old} "
@@ -110,18 +115,21 @@ def analyze_practice_data(
     compound_suggestions = []
     if "Soft" not in compounds:
         compound_suggestions.append({
+            "type": "missing_compound",
             "priority": "low",
             "message": "Prova la mescola Soft per vedere il guadagno sul giro singolo.",
             "action": "1 stint con Soft"
         })
     if "Medium" not in compounds:
         compound_suggestions.append({
+            "type": "missing_compound",
             "priority": "medium",
             "message": "Mancano dati con Medium (la mescola da gara più comune).",
             "action": "1 stint con Medium"
         })
     if "Hard" not in compounds:
         compound_suggestions.append({
+            "type": "missing_compound",
             "priority": "low",
             "message": "Hard non testata — utile in endurance o clima caldo.",
             "action": "1 stint con Hard"
@@ -138,6 +146,7 @@ def analyze_practice_data(
     if len(laps) < 3:
         assessment = "insufficient"
         suggestions.append({
+            "type": "few_laps",
             "priority": "high",
             "message": f"Solo {len(laps)} giri. Servono almeno 8-12 giri per modelli affidabili.",
             "action": "Continua a guidare"
@@ -145,6 +154,7 @@ def analyze_practice_data(
     elif len(laps) < 8:
         assessment = "minimum"
         suggestions.append({
+            "type": "few_laps",
             "priority": "high",
             "message": f"{len(laps)} giri — dati minimi. A 12+ giri le stime migliorano molto.",
             "action": "Fai 5+ giri ancora"

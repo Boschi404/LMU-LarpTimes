@@ -8,7 +8,6 @@ import os
 import time
 import hashlib
 import threading
-import winsound
 from typing import Optional
 
 import paths
@@ -34,7 +33,8 @@ class VoiceEngine:
         self._lock = threading.Lock()
         # phrase_hash -> timestamp for dedup (3 min window)
         self._recent_phrases: dict = {}
-        self._tts_available: bool = True  # set to False after first failure
+        self._tts_retry_after: float = 0.0  # timestamp after which TTS can be retried
+        self._tts_retry_interval: float = 300.0  # retry after 5 minutes
 
     def speak(self, text: str) -> bool:
         """Generate TTS and play it. Returns True if played, False if skipped."""
@@ -56,6 +56,17 @@ class VoiceEngine:
             try:
                 wav_path = self._generate_wav(text)
                 if wav_path and os.path.exists(wav_path):
+                    # winsound is Windows-only — import locally with fallback
+                    try:
+                        import winsound
+                    except ImportError:
+                        # On Linux/macOS: skip audio playback gracefully
+                        with self._lock:
+                            self._last_played = time.time()
+                            self._recent_phrases[phrase_hash] = time.time()
+                        print("[VoiceEngine] winsound not available — skipping playback (non-Windows OS)")
+                        return
+
                     with self._lock:
                         winsound.PlaySound(
                             wav_path,
@@ -74,7 +85,8 @@ class VoiceEngine:
 
     def _generate_wav(self, text: str) -> Optional[str]:
         """Generate WAV from text using edge-tts. Returns path to WAV file."""
-        if not self._tts_available:
+        # Respect retry cooldown after failures
+        if time.time() < self._tts_retry_after:
             return None
 
         cache_name = f"{hashlib.md5(text.encode()).hexdigest()[:16]}.wav"
@@ -91,9 +103,11 @@ class VoiceEngine:
             if os.path.exists(cache_path) and os.path.getsize(cache_path) > 1000:
                 return cache_path
         except ImportError:
-            self._tts_available = False
+            print(f"[VoiceEngine] edge-tts not installed — will retry in {self._tts_retry_interval:.0f}s")
+            self._tts_retry_after = time.time() + self._tts_retry_interval
         except Exception:
-            self._tts_available = False
+            print(f"[VoiceEngine] TTS generation failed — will retry in {self._tts_retry_interval:.0f}s")
+            self._tts_retry_after = time.time() + self._tts_retry_interval
 
         return None
 

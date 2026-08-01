@@ -18,8 +18,8 @@ import bcrypt
 import jwt
 
 
-# Default expiration: 30 days
-DEFAULT_JWT_EXPIRATION = 30 * 24 * 60 * 60
+# Default expiration: 24 hours (was 30 days — reduced for security S4)
+DEFAULT_JWT_EXPIRATION = 24 * 60 * 60
 
 
 def _get_jwt_secret() -> str:
@@ -40,6 +40,11 @@ def _get_jwt_secret() -> str:
     os.makedirs(os.path.dirname(secret_path), exist_ok=True)
     with open(secret_path, "w") as f:
         f.write(secret)
+    # Restrict permissions so only the owner can read (S5)
+    try:
+        os.chmod(secret_path, 0o600)
+    except (OSError, AttributeError):
+        pass  # Windows / unsupported platform
     return secret
 
 

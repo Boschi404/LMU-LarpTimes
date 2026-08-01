@@ -36,7 +36,7 @@
           --text-primary: #F0F4F8;
           --text-secondary: #C8D4E0;
           --text-tertiary: #5A6A7A;
-          --text-muted: #35404A;
+          --text-muted: #7A8A9A;
       
           --font-display: 'Rajdhani', sans-serif;
           --font-mono: 'JetBrains Mono', monospace;
@@ -44,6 +44,27 @@
       
           --radius: 2px;
           --radius-btn: 2px;
+          --radius-sm: 4px;
+
+          /* ─── Spacing scale ─────────────────────────────────────── */
+          --space-xs: 0.25rem;
+          --space-sm: 0.5rem;
+          --space-md: 1rem;
+          --space-xl: 2rem;
+
+          /* ─── Semantic ink (text aliases) ───────────────────────── */
+          --ink-primary: #F0F4F8;
+          --ink-secondary: #C8D4E0;
+          --ink-muted: #5A6A7A;
+
+          /* ─── Status feedback ───────────────────────────────────── */
+          --status-valid: #00FF88;
+          --status-invalid: #FF2200;
+          --status-warn: #FF6B00;
+
+          /* ─── Surface / border aliases ──────────────────────────── */
+          --surface-elevated: #161B20;
+          --border-subtle: #161B20;
         }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -258,6 +279,41 @@
       border-color: var(--amber);
       box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.2);
       outline: none;
+    }
+
+    /* ─── FOCUS-VISIBLE (keyboard navigation outline) ─────────────── */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid var(--amber);
+      outline-offset: 2px;
+    }
+
+    .nav-btn:focus-visible {
+      outline-offset: -2px;
+    }
+
+    /* ─── SKIP LINK ───────────────────────────────────────────────── */
+    .skip-link {
+      position: absolute;
+      top: -100px;
+      left: 8px;
+      background: var(--amber);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-weight: 700;
+      font-size: 0.85rem;
+      z-index: 10000;
+      text-decoration: none;
+      transition: top 0.2s ease;
+    }
+
+    .skip-link:focus {
+      top: 8px;
     }
 
     /* ─── BUTTONS ─────────────────────────────────────────────────── */
@@ -1307,6 +1363,9 @@
 </head>
 <body>
 
+  <!-- Skip to main content -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
   <!-- ─── SIDEBAR ─── -->
   <aside class="sidebar">
     <div class="brand">
@@ -1319,40 +1378,40 @@
       <div class="brand-text">LMU <span>LarpTimes</span></div>
     </div>
 
-    <nav>
-      <button class="nav-btn active" id="btn-profilo" onclick="showPage('profilo')">
+    <nav role="navigation" aria-label="Main navigation">
+      <button class="nav-btn active" id="btn-profilo" onclick="showPage('profilo')" aria-label="Tyre Profile Model" aria-current="page">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
         Tyre Profile Model
       </button>
-      <button class="nav-btn" id="btn-archivio" onclick="showPage('archivio')">
+      <button class="nav-btn" id="btn-archivio" onclick="showPage('archivio')" aria-label="Lap Archive">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
         Lap Archive
       </button>
-      <button class="nav-btn" id="btn-strategia" onclick="showPage('strategia')">
+      <button class="nav-btn" id="btn-strategia" onclick="showPage('strategia')" aria-label="Strategy Calculation">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>
         Strategy Calculation
       </button>
-      <button class="nav-btn" id="btn-setup" onclick="showPage('setup')">
+      <button class="nav-btn" id="btn-setup" onclick="showPage('setup')" aria-label="Setup Advisor">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Setup Advisor
       </button>
-      <button class="nav-btn" id="btn-compare" onclick="showPage('compare')">
+      <button class="nav-btn" id="btn-compare" onclick="showPage('compare')" aria-label="Lap Compare">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
         Lap Compare
       </button>
-      <button class="nav-btn" id="btn-optimal" onclick="showPage('optimal')">
+      <button class="nav-btn" id="btn-optimal" onclick="showPage('optimal')" aria-label="Optimal Lap">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10"/>
         </svg>
         Optimal Lap
       </button>
-      <button class="nav-btn" id="btn-race-director" onclick="showPage('race-director')">
+      <button class="nav-btn" id="btn-race-director" onclick="showPage('race-director')" aria-label="Race Director">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
         </svg>
         Race Director
       </button>
-      <button class="nav-btn" id="btn-pit-practice" onclick="showPage('pit-practice')">
+      <button class="nav-btn" id="btn-pit-practice" onclick="showPage('pit-practice')" aria-label="Pit Practice">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>
         </svg>
@@ -1373,9 +1432,9 @@
   </aside>
 
   <!-- ─── MAIN CONTENT ─── -->
-  <main class="main-content">
+  <main class="main-content" id="main-content">
     
-    <div id="offline-banner" style="display:none;">⚠️ Server offline — i dati non sono disponibili</div>
+    <div id="offline-banner" role="alert" style="display:none;">⚠️ Server offline — i dati non sono disponibili</div>
     
     <!-- PAGE: PROFILO -->
     <section class="page active" id="page-profilo">
@@ -2149,6 +2208,23 @@
 })();
 </script>
 <script src="/static/app.js?v=4"></script>
-<div id="toast-container"></div>
+<script>
+// Update aria-current on nav buttons when page changes
+(function() {
+  const origShowPage = window.showPage;
+  window.showPage = function(page) {
+    origShowPage(page);
+    document.querySelectorAll('.nav-btn').forEach(function(btn) {
+      var isActive = btn.id === 'btn-' + page;
+      if (isActive) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+    });
+  };
+})();
+</script>
+<div id="toast-container" role="alert" aria-live="polite"></div>
 </body>
 </html>

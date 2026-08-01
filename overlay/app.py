@@ -14,6 +14,7 @@ import json
 import os
 import threading
 import time
+import logging
 from typing import Optional, List, Dict, Any
 
 from PySide6.QtCore import (
@@ -921,6 +922,47 @@ class OverlayWidget(QWidget):
                     return fuel / mean_cons
         return fuel / 3.2
 
+    def _calculate_refuel(self, frame: TelemetryFrame) -> Optional[float]:
+        """Calculate how much fuel to add at next pit stop."""
+        if not self._car or not self._track:
+            return None
+        try:
+            laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+            if not laps:
+                return None
+            _, mean_cons = fit_fuel_model(laps)
+            if mean_cons <= 0:
+                return None
+
+            # If we have a pit plan, refuel for the next stint
+            if self._pit_plan:
+                nxt = next((l for l in self._pit_plan if l >= self._current_lap), None)
+                if nxt is not None:
+                    # Next stint: from nxt to next pit or race end
+                    remaining_laps = (self._total_race_laps or 60) - nxt
+                    next_stint_laps = remaining_laps
+                    # Check if there's another pit after this
+                    remaining_pits = [l for l in self._pit_plan if l > nxt]
+                    if remaining_pits:
+                        next_stint_laps = remaining_pits[0] - nxt
+                    stint_fuel = next_stint_laps * mean_cons
+                    current = frame.fuel
+                    if stint_fuel > current:
+                        return round(stint_fuel - current, 1)
+                    return None
+
+            # In pits → refuel to full
+            if frame.in_pits or frame.pit_state in [2, 3]:
+                if frame.fuel_capacity > 0:
+                    to_full = frame.fuel_capacity - frame.fuel
+                    if to_full > 1:
+                        return round(to_full, 1)
+
+            return None
+        except Exception:
+            logging.exception("Error in _calculate_refuel")
+            return None
+
     def _estimate_cliff_laps(self, frame: TelemetryFrame) -> int:
         if self._car and self._track:
             laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
@@ -947,7 +989,7 @@ class OverlayWidget(QWidget):
             if result.get("optimal"):
                 self._pit_plan = [self._current_lap + p - 1 for p in result["optimal"]["pit_laps"]]
         except Exception:
-            pass
+            logging.exception("Error in _refresh_strategy")
 
     def _play_audio_cue(self, cue: str):
         self.audio_engine.play(cue)

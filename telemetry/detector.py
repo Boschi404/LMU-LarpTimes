@@ -1,12 +1,38 @@
+import datetime
+import logging
 import numpy as np
 from typing import Dict, Any, List, Optional, Tuple
 import uuid
 import database
 from telemetry.source import TelemetryFrame
 
+logger = logging.getLogger(__name__)
+
+# Minimum valid lap time in seconds — laps shorter than this are discarded.
+MIN_LAP_TIME: float = 20.0
+# Default pit-stop time loss in seconds, used as a floor when no clean lap
+# history is available to compute a calculated loss.
+DEFAULT_PIT_LOSS: float = 30.0
+
 
 class LapBoundaryDetector:
-    def __init__(self, db_path: str = database.DEFAULT_DB_PATH, fallback_pit_loss: float = 30.0, on_session_complete=None, on_race_started=None, on_qualifying_started=None):
+    """Detect lap boundaries, pit stops, session changes, and stint changes.
+
+    Consumes :class:`TelemetryFrame` instances frame-by-frame via
+    :meth:`process_frame`.  Accumulates telemetry samples at ~1 Hz and
+    persists completed laps, pit stops, and stints to the SQLite database
+    managed by the ``database`` module.
+
+    Callbacks ``on_session_complete``, ``on_race_started``, and
+    ``on_qualifying_started`` allow downstream consumers to react to
+    session lifecycle events without polling.
+
+    Magic numbers that govern behavior are exposed as module-level
+    constants so they can be tuned without touching the core logic:
+    :data:`MIN_LAP_TIME` and :data:`DEFAULT_PIT_LOSS`.
+    """
+
+    def __init__(self, db_path: str = database.DEFAULT_DB_PATH, fallback_pit_loss: float = DEFAULT_PIT_LOSS, on_session_complete=None, on_race_started=None, on_qualifying_started=None):
         self.db_path = db_path
         self.fallback_pit_loss = fallback_pit_loss
         # Optional callback: on_session_complete(session_uuid: str)
@@ -49,12 +75,12 @@ class LapBoundaryDetector:
             try:
                 self.on_session_complete(self.session_uuid)
             except Exception:
-                pass
+                logger.exception("on_session_complete callback failed")
         self.track_name = frame.track_name
         self.session_type = frame.session_type
         self.car_name = frame.car_name
         self.session_uuid = str(uuid.uuid4())
-        started_at = __import__('datetime').datetime.now().isoformat()
+        started_at = datetime.datetime.now().isoformat()
         self.session_id = database.create_session(
             track=self.track_name,
             layout=frame.layout_name or "Standard",
@@ -69,12 +95,12 @@ class LapBoundaryDetector:
             try:
                 self.on_race_started(self.session_uuid, self.car_name, self.track_name)
             except Exception:
-                pass
+                logger.exception("on_race_started callback failed")
         elif self.session_type == "QUALIFYING" and self.on_qualifying_started:
             try:
                 self.on_qualifying_started(self.session_uuid, self.car_name, self.track_name)
             except Exception:
-                pass
+                logger.exception("on_qualifying_started callback failed")
         self._reset_stint_state(frame)
 
     def _reset_stint_state(self, frame: TelemetryFrame) -> None:
@@ -103,6 +129,21 @@ class LapBoundaryDetector:
         self._lap_start_elapsed = frame.elapsed_time
 
     def process_frame(self, frame: TelemetryFrame) -> Optional[int]:
+        """Ingest a single telemetry frame and persist lap data when a lap boundary is crossed.
+
+        This is the main entry-point called from the telemetry consumer loop.
+        It handles session creation/reset, lap-number tracking, lap-time
+        validation (using :data:`MIN_LAP_TIME`), pit-in / pit-out detection,
+        stint changes, telemetry sample accumulation, and lap persistence to
+        the database.
+
+        Args:
+            frame: The current :class:`TelemetryFrame` snapshot.
+
+        Returns:
+            The ``lap_id`` of the newly-saved lap when a valid lap boundary
+            is crossed, or ``None`` otherwise.
+        """
         if frame is None:
             return None
 
@@ -145,8 +186,8 @@ class LapBoundaryDetector:
 
             # 11. Validate lap time
             computed_lap_time = frame.elapsed_time - self._lap_start_elapsed
-            use_lap_time = frame.last_lap_time if (frame.last_lap_time and frame.last_lap_time >= 20.0) else computed_lap_time
-            if not use_lap_time or use_lap_time < 20.0:
+            use_lap_time = frame.last_lap_time if (frame.last_lap_time and frame.last_lap_time >= MIN_LAP_TIME) else computed_lap_time
+            if not use_lap_time or use_lap_time < MIN_LAP_TIME:
                 print(f"[WARNING] Discarding lap {completed_lap}: invalid lap_time={use_lap_time:.3f}s")
                 self.current_lap_number = frame.lap_number
                 self._take_lap_snapshots(frame)
@@ -202,7 +243,7 @@ class LapBoundaryDetector:
                 "ambient_temp": frame.ambient_temp,
                 "weather_state": frame.weather_state,
                 "rain_intensity": frame.rain_intensity,
-                "completed_at": __import__('datetime').datetime.now().isoformat(),
+                "completed_at": datetime.datetime.now().isoformat(),
             }
 
             lap_id = database.insert_lap(lap_data, db_path=self.db_path)
