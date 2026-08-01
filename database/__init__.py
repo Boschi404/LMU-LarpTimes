@@ -640,28 +640,78 @@ def get_all_sessions(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
 
 def get_all_laps_for_archive(
     db_path: Optional[str] = None,
-    include_deleted: bool = False
+    include_deleted: bool = False,
+    car: Optional[str] = None,
+    track: Optional[str] = None,
+    compound: Optional[str] = None,
+    car_class: Optional[str] = None,
+    session_id: Optional[int] = None,
+    owner_email: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Fetch all laps for the user interface archive table.
+    Fetch laps for the UI archive table with optional SQL-level filters.
+
+    All filter parameters are optional — when omitted, no filter is applied
+    (backward-compatible).  Pass them to push filtering to the database
+    instead of doing it in Python.
     """
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
-    
+
     query = """
         SELECT l.*, s.track, s.layout, s.car, s.session_type
         FROM laps l
         JOIN sessions s ON l.session_id = s.id
     """
+    conditions: list[str] = []
+    params: list = []
+
     if not include_deleted:
-        query += " WHERE l.is_deleted = 0"
-        
+        conditions.append("l.is_deleted = 0")
+
+    if car:
+        conditions.append("s.car = ?")
+        params.append(car)
+    if track:
+        conditions.append("s.track = ?")
+        params.append(track)
+    if compound:
+        conditions.append("l.compound_front = ?")
+        params.append(compound)
+    if session_id is not None:
+        conditions.append("l.session_id = ?")
+        params.append(session_id)
+    if owner_email:
+        conditions.append("l.owner_email = ?")
+        params.append(owner_email.lower())
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
     query += " ORDER BY l.id DESC"
-    
-    cursor.execute(query)
+
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+        if offset is not None:
+            query += " OFFSET ?"
+            params.append(offset)
+
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+
+    laps = [dict(row) for row in rows]
+
+    # car_class filter is post-SQL (requires class detection)
+    if car_class and laps:
+        from analysis.classes import add_class_to_laps
+        add_class_to_laps(laps)
+        laps = [l for l in laps if l.get("car_class") == car_class]
+
+    return laps
 
 
 def get_pit_stops_loss_by_session(
