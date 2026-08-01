@@ -414,12 +414,13 @@ async def get_race_timeline(session_id: str):
     """Get the full race timeline for a session."""
     from analysis.race_director import build_race_timeline, race_summary_to_dict
 
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    session_laps = [l for l in laps if str(l.get("session_id", "")) == session_id]
+    try:
+        sid_int = int(session_id)
+    except (ValueError, TypeError):
+        sid_int = None
 
-    if not session_laps:
-        # Try matching by session_uuid or id
-        session_laps = [l for l in laps if str(l.get("session_id", "")) == session_id]
+    laps = database.get_all_laps_for_archive(include_deleted=False, session_id=sid_int)
+    session_laps = laps  # Already filtered by session_id in SQL
 
     if not session_laps:
         return {"error": f"No laps found for session {session_id}"}
@@ -474,23 +475,17 @@ async def set_overlay_settings(request: Request):
 
 @app.get("/api/filters/cars")
 async def get_filter_cars():
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    cars = sorted({l.get("car", "") for l in laps if l.get("car")})
-    return cars
+    return database.get_distinct_cars()
 
 
 @app.get("/api/filters/tracks")
 async def get_filter_tracks():
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    tracks = sorted({l.get("track", "") for l in laps if l.get("track")})
-    return tracks
+    return database.get_distinct_tracks()
 
 
 @app.get("/api/filters/compounds")
 async def get_filter_compounds():
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    compounds = sorted({l.get("compound_front", "") for l in laps if l.get("compound_front")})
-    return compounds
+    return database.get_distinct_compounds()
 
 
 @app.get("/api/filters/classes")
@@ -512,10 +507,9 @@ async def get_setup_advice(car: str, track: str):
     - Tyre compound performance at different temps
     - Historical best laps under similar conditions
     """
-    laps = database.get_all_laps_for_archive(include_deleted=False)
+    laps = database.get_all_laps_for_archive(include_deleted=False, car=car, track=track)
 
-    car_laps = [l for l in laps if l.get("car") == car and l.get("track") == track]
-    valid_laps = [l for l in car_laps if l.get("is_valid_lap") == 1 and not l.get("is_pit_in_lap") and not l.get("is_pit_out_lap")]
+    valid_laps = [l for l in laps if l.get("is_valid_lap") == 1 and not l.get("is_pit_in_lap") and not l.get("is_pit_out_lap")]
 
     if not valid_laps:
         return {
@@ -880,30 +874,31 @@ async def get_laps(
     compound: Optional[str] = None,
     car_class: Optional[str] = None,
     owner_email: Optional[str] = None,
-    include_deleted: bool = False
+    include_deleted: bool = False,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ):
-    """Restituisce tutti i giri, opzionalmente filtrati.
+    """Restituisce tutti i giri, opzionalmente filtrati con paginazione server-side.
 
     Se `owner_email` è passato, filtra solo i giri di quell'utente.
     Se non è passato, restituisce tutti i giri (modalità admin).
     Supporta filtro `car_class` per filtrare per classe (Hypercar/LMP2/GT3).
+    Paginazione: ?limit=50&offset=0 (default: senza limiti).
     """
-    laps = database.get_all_laps_for_archive(include_deleted=include_deleted)
-    if car:
-        laps = [l for l in laps if l.get("car") == car]
-    if track:
-        laps = [l for l in laps if l.get("track") == track]
-    if compound:
-        laps = [l for l in laps if l.get("compound_front") == compound]
-    if owner_email:
-        owner = owner_email.strip().lower()
-        laps = [l for l in laps if (l.get("owner_email") or "").lower() == owner]
+    laps = database.get_all_laps_for_archive(
+        include_deleted=include_deleted,
+        car=car,
+        track=track,
+        compound=compound,
+        car_class=car_class,
+        owner_email=owner_email.strip().lower() if owner_email else None,
+        limit=limit,
+        offset=offset,
+    )
 
-    # Add car_class info to every lap
+    # Add car_class info to every lap (already done in get_all_laps_for_archive if car_class filter used,
+    # but we also need it for display even when not filtering by class)
     add_class_to_laps(laps)
-
-    if car_class:
-        laps = [l for l in laps if l.get("car_class") == car_class]
 
     return laps
 
@@ -912,13 +907,8 @@ async def get_laps(
 async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = None):
     """Return all valid laps, optionally filtered by car+track, ordered by lap_number ASC.
     Each lap includes car_class and class_color fields."""
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    filtered = laps
-    if car:
-        filtered = [l for l in filtered if l.get("car") == car]
-    if track:
-        filtered = [l for l in filtered if l.get("track") == track]
-    valid = [l for l in filtered if l.get("is_valid_lap") == 1 and not l.get("anomaly_flag")]
+    laps = database.get_all_laps_for_archive(include_deleted=False, car=car, track=track)
+    valid = [l for l in laps if l.get("is_valid_lap") == 1 and not l.get("anomaly_flag")]
     valid.sort(key=lambda l: l.get("lap_number", 0))
     # Add class info
     add_class_to_laps(valid)
@@ -950,8 +940,8 @@ async def get_laps_compare(car: Optional[str] = None, track: Optional[str] = Non
 @app.get("/api/laps/{lap_id}/telemetry")
 async def get_lap_telemetry(lap_id: int):
     """Return telemetry samples for a single lap, with car class info."""
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    lap = next((l for l in laps if l['id'] == lap_id), None)
+    lap_results = database.get_all_laps_for_archive(include_deleted=False, lap_id=lap_id)
+    lap = lap_results[0] if lap_results else None
     # Add class info
     if lap:
         add_class_to_laps([lap])
@@ -976,10 +966,9 @@ async def get_lap_telemetry(lap_id: int):
 @app.get("/api/laps/compare-telemetry")
 async def compare_lap_telemetry(lap_a: int, lap_b: int):
     """Return telemetry samples for 2 laps for overlay comparison."""
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-
     def find_lap(lid):
-        return next((l for l in laps if l['id'] == lid), None)
+        results = database.get_all_laps_for_archive(include_deleted=False, lap_id=lid)
+        return results[0] if results else None
 
     lap_a_data = find_lap(lap_a)
     lap_b_data = find_lap(lap_b)
@@ -1279,8 +1268,8 @@ async def get_strategy(
     if traffic_density > 0:
         own_class = detect_class(car)
         # Determine which slower classes might be on track
-        all_laps = database.get_all_laps_for_archive(include_deleted=False)
-        unique_cars = {l.get("car", "") for l in all_laps if l.get("track") == track}
+        all_laps = database.get_all_laps_for_archive(include_deleted=False, track=track)
+        unique_cars = {l.get("car", "") for l in all_laps}
         slower_classes = set()
         for other_car in unique_cars:
             other_class = detect_class(other_car)
@@ -1395,10 +1384,9 @@ async def get_qualifying_analysis(
 @app.get("/api/laps/optimal")
 async def get_optimal_lap(car: str, track: str):
     """Compute optimal lap from micro-sector analysis."""
-    laps = database.get_all_laps_for_archive(include_deleted=False)
+    laps = database.get_all_laps_for_archive(include_deleted=False, car=car, track=track)
     filtered = [l for l in laps
-                if l.get('car') == car and l.get('track') == track
-                and l.get('is_valid_lap') and not l.get('anomaly_flag')
+                if l.get('is_valid_lap') and not l.get('anomaly_flag')
                 and l.get('sector_1') and l.get('sector_2') and l.get('sector_3')]
 
     if len(filtered) < 2:
@@ -1440,11 +1428,11 @@ async def get_traffic_estimate(
 
     Returns per-class traffic penalty estimates and the car's own class.
     """
-    all_laps = database.get_all_laps_for_archive(include_deleted=False)
+    all_laps = database.get_all_laps_for_archive(include_deleted=False, track=track)
     own_class = detect_class(car)
 
     # Find unique classes present on this track
-    unique_cars = {l.get("car", "") for l in all_laps if l.get("track") == track}
+    unique_cars = {l.get("car", "") for l in all_laps}
     classes_present = set()
     for oc in unique_cars:
         classes_present.add(detect_class(oc))
@@ -1508,13 +1496,9 @@ async def get_pit_practice(
     Returns avg/best/worst pit loss, recent pit stop records, improvement tips.
     Filters by car and/or track if provided.
     """
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    
-    # Apply filters
-    if car:
-        laps = [l for l in laps if l.get("car") == car]
-    if track:
-        laps = [l for l in laps if l.get("track") == track]
+    laps = database.get_all_laps_for_archive(
+        include_deleted=False, car=car, track=track
+    )
     
     # Sort by session_id and lap_number for proper pit detection
     laps.sort(key=lambda l: (l.get("session_id", ""), l.get("lap_number", 0)))
@@ -1546,13 +1530,9 @@ async def get_weather_radar(
     and provides rain probability, time-to-rain estimation, and
     pit/tire change recommendations.
     """
-    laps = database.get_all_laps_for_archive(include_deleted=False)
-    
-    # Filter by car/track if specified
-    if car:
-        laps = [l for l in laps if l.get("car") == car]
-    if track:
-        laps = [l for l in laps if l.get("track") == track]
+    laps = database.get_all_laps_for_archive(
+        include_deleted=False, car=car, track=track
+    )
     
     if not laps:
         return {

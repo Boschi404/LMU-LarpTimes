@@ -646,6 +646,7 @@ def get_all_laps_for_archive(
     compound: Optional[str] = None,
     car_class: Optional[str] = None,
     session_id: Optional[int] = None,
+    lap_id: Optional[int] = None,
     owner_email: Optional[str] = None,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
@@ -683,6 +684,9 @@ def get_all_laps_for_archive(
     if session_id is not None:
         conditions.append("l.session_id = ?")
         params.append(session_id)
+    if lap_id is not None:
+        conditions.append("l.id = ?")
+        params.append(lap_id)
     if owner_email:
         conditions.append("l.owner_email = ?")
         params.append(owner_email.lower())
@@ -712,6 +716,53 @@ def get_all_laps_for_archive(
         laps = [l for l in laps if l.get("car_class") == car_class]
 
     return laps
+
+
+def get_distinct_cars(db_path: Optional[str] = None) -> List[str]:
+    """Return distinct car names from non-deleted laps (SQL-level)."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT s.car
+        FROM laps l
+        JOIN sessions s ON l.session_id = s.id
+        WHERE l.is_deleted = 0
+        ORDER BY s.car
+    """)
+    rows = [r["car"] for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_distinct_tracks(db_path: Optional[str] = None) -> List[str]:
+    """Return distinct track names from non-deleted laps (SQL-level)."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT s.track
+        FROM laps l
+        JOIN sessions s ON l.session_id = s.id
+        WHERE l.is_deleted = 0
+        ORDER BY s.track
+    """)
+    rows = [r["track"] for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_distinct_compounds(db_path: Optional[str] = None) -> List[str]:
+    """Return distinct compound_front values from non-deleted laps (SQL-level)."""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT l.compound_front
+        FROM laps l
+        WHERE l.is_deleted = 0 AND l.compound_front != ''
+        ORDER BY l.compound_front
+    """)
+    rows = [r["compound_front"] for r in cursor.fetchall()]
+    conn.close()
+    return rows
 
 
 def get_pit_stops_loss_by_session(
@@ -909,60 +960,87 @@ def export_sessions(
     )
     session_rows = cursor.fetchall()
 
-    exported_sessions = []
+    if not session_rows:
+        conn.close()
+        return {
+            "version": 1,
+            "exported_at": _dt.now().isoformat(),
+            "session_count": 0,
+            "lap_count": 0,
+            "sessions": [],
+        }
+
+    # Collect all session UUIDs for batch queries
+    session_uuids = [s_row["session_uuid"] for s_row in session_rows]
+    placeholders = ", ".join(["?"] * len(session_uuids))
+
+    # ── Batch: stints ─────────────────────────────────────────────────
+    cursor.execute(
+        "SELECT st.id, " + ", ".join(SHAREABLE_STINT_COLUMNS) +
+        ", s.session_uuid "
+        "FROM stints st "
+        "JOIN sessions s ON st.session_id = s.id "
+        f"WHERE s.session_uuid IN ({placeholders}) "
+        "ORDER BY s.id, st.stint_number",
+        tuple(session_uuids),
+    )
+    stints_by_uuid: Dict[str, list] = {}
+    for row in cursor.fetchall():
+        uid = row["session_uuid"]
+        sd = {c: row[c] for c in SHAREABLE_STINT_COLUMNS}
+        sd["stint_db_id"] = row["id"]
+        stints_by_uuid.setdefault(uid, []).append(sd)
+
+    # ── Batch: laps ───────────────────────────────────────────────────
+    cursor.execute(
+        "SELECT s.session_uuid, "
+        "       COALESCE(st.stint_number, 1) AS stint_number, " +
+        "       " + ", ".join(
+            f"l.{c}" for c in SHAREABLE_LAP_COLUMNS
+            if c not in ("session_uuid", "stint_number")
+        ) + " "
+        "FROM laps l "
+        "JOIN sessions s ON l.session_id = s.id "
+        "LEFT JOIN stints st ON l.stint_id = st.id "
+        f"WHERE s.session_uuid IN ({placeholders}) "
+        "ORDER BY s.id, l.lap_number",
+        tuple(session_uuids),
+    )
+    laps_by_uuid: Dict[str, list] = {}
     total_laps = 0
+    for row in cursor.fetchall():
+        uid = row["session_uuid"]
+        lap_dict = _row_to_dict(cursor, row, SHAREABLE_LAP_COLUMNS)
+        laps_by_uuid.setdefault(uid, []).append(lap_dict)
+        total_laps += 1
+
+    # ── Batch: pit stops ──────────────────────────────────────────────
+    cursor.execute(
+        "SELECT p.lap_number AS pit_lap_number, p.pit_loss, "
+        "       p.in_lap_number, p.out_lap_number, "
+        "       s.session_uuid "
+        "FROM pit_stops p "
+        "JOIN sessions s ON p.session_id = s.id "
+        f"WHERE s.session_uuid IN ({placeholders}) "
+        "ORDER BY s.id, p.lap_number",
+        tuple(session_uuids),
+    )
+    pit_by_uuid: Dict[str, list] = {}
+    for row in cursor.fetchall():
+        uid = row["session_uuid"]
+        ps_dict = {c: row[c] for c in SHAREABLE_PIT_COLUMNS}
+        pit_by_uuid.setdefault(uid, []).append(ps_dict)
+
+    # ── Assemble ──────────────────────────────────────────────────────
+    exported_sessions = []
     for s_row in session_rows:
         sess_dict = _row_to_dict(cursor, s_row, SHAREABLE_SESSION_COLUMNS)
-        session_uuid = sess_dict["session_uuid"]
-
-        # Stints
-        cursor.execute(
-            "SELECT id, " + ", ".join(SHAREABLE_STINT_COLUMNS) +
-            " FROM stints WHERE session_id = (SELECT id FROM sessions WHERE session_uuid = ?)"
-            " ORDER BY stint_number",
-            (session_uuid,),
-        )
-        stints = []
-        for st_row in cursor.fetchall():
-            sd = {c: st_row[c] for c in SHAREABLE_STINT_COLUMNS}
-            sd["stint_db_id"] = st_row["id"]
-            stints.append(sd)
-
-        # Laps
-        cursor.execute(
-            "SELECT s.session_uuid AS session_uuid, "
-            "       COALESCE(st.stint_number, 1) AS stint_number, " +
-            "       " + ", ".join(
-                f"l.{c}" for c in SHAREABLE_LAP_COLUMNS
-                if c not in ("session_uuid", "stint_number")
-            ) + " "
-            "FROM laps l "
-            "JOIN sessions s ON l.session_id = s.id "
-            "LEFT JOIN stints st ON l.stint_id = st.id "
-            "WHERE s.session_uuid = ? "
-            "ORDER BY l.lap_number",
-            (session_uuid,),
-        )
-        laps = [_row_to_dict(cursor, r, SHAREABLE_LAP_COLUMNS) for r in cursor.fetchall()]
-        total_laps += len(laps)
-
-        # Pit stops
-        cursor.execute(
-            "SELECT p.lap_number AS pit_lap_number, p.pit_loss, "
-            "       p.in_lap_number, p.out_lap_number "
-            "FROM pit_stops p "
-            "JOIN sessions s ON p.session_id = s.id "
-            "WHERE s.session_uuid = ? "
-            "ORDER BY p.lap_number",
-            (session_uuid,),
-        )
-        pit_stops = [{c: r[c] for c in SHAREABLE_PIT_COLUMNS} for r in cursor.fetchall()]
-
+        uid = sess_dict["session_uuid"]
         exported_sessions.append({
             "session": sess_dict,
-            "stints": stints,
-            "laps": laps,
-            "pit_stops": pit_stops,
+            "stints": stints_by_uuid.get(uid, []),
+            "laps": laps_by_uuid.get(uid, []),
+            "pit_stops": pit_by_uuid.get(uid, []),
         })
 
     conn.close()
@@ -1039,175 +1117,182 @@ def import_sessions(
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
 
-    sessions_added = 0
-    laps_added = 0
-    laps_skipped = 0
-    laps_overwritten = 0
-    pit_stops_added = 0
+    # Explicit transaction — all-or-nothing import
+    cursor.execute("BEGIN IMMEDIATE")
+    try:
+        sessions_added = 0
+        laps_added = 0
+        laps_skipped = 0
+        laps_overwritten = 0
+        pit_stops_added = 0
 
-    for entry in payload.get("sessions", []):
-        sess = entry.get("session", {})
-        session_uuid = sess.get("session_uuid")
-        if not session_uuid:
-            continue
-
-        existing_id = _find_session_by_uuid(cursor, session_uuid)
-        if existing_id is None:
-            cursor.execute(
-                "INSERT INTO sessions (session_uuid, track, layout, car, "
-                "session_type, started_at, completed_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    session_uuid,
-                    sess.get("track", ""),
-                    sess.get("layout", ""),
-                    sess.get("car", ""),
-                    sess.get("session_type", ""),
-                    sess.get("started_at", ""),
-                    sess.get("completed_at", ""),
-                ),
-            )
-            session_id = cursor.lastrowid
-            sessions_added += 1
-        else:
-            session_id = existing_id
-
-        # Stints: dedup by (session_id, stint_number)
-        stint_id_by_number: Dict[int, int] = {}
-        for stint in entry.get("stints", []):
-            sn = int(stint.get("stint_number", 1) or 1)
-            existing_stint = _find_stint_by_number(cursor, session_id, sn)
-            if existing_stint is not None:
-                stint_id_by_number[sn] = existing_stint
-                continue
-            cursor.execute(
-                "INSERT INTO stints (session_id, stint_number, compound_front, "
-                "compound_rear, start_lap, end_lap, start_fuel_l, end_fuel_l) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    session_id,
-                    sn,
-                    stint.get("compound_front", "Medium"),
-                    stint.get("compound_rear", "Medium"),
-                    stint.get("start_lap", 1),
-                    stint.get("end_lap"),
-                    stint.get("start_fuel_l", 0.0),
-                    stint.get("end_fuel_l"),
-                ),
-            )
-            stint_id_by_number[sn] = cursor.lastrowid
-
-        # Laps
-        for lap in entry.get("laps", []):
-            ln = int(lap.get("lap_number", 0) or 0)
-            if ln <= 0:
-                continue
-            existing_lap = _find_lap_by_session_and_number(cursor, session_id, ln)
-            if existing_lap is not None and not overwrite_existing:
-                laps_skipped += 1
+        for entry in payload.get("sessions", []):
+            sess = entry.get("session", {})
+            session_uuid = sess.get("session_uuid")
+            if not session_uuid:
                 continue
 
-            stint_number = int(lap.get("stint_number", 1) or 1)
-            stint_db_id = stint_id_by_number.get(stint_number)
-
-            lap_values = (
-                session_id,
-                stint_db_id,
-                ln,
-                float(lap.get("lap_time", 0.0) or 0.0),
-                float(lap.get("sector_1", 0.0) or 0.0),
-                float(lap.get("sector_2", 0.0) or 0.0),
-                float(lap.get("sector_3", 0.0) or 0.0),
-                int(lap.get("is_valid_lap", 1) or 0),
-                int(lap.get("is_pit_in_lap", 0) or 0),
-                int(lap.get("is_pit_out_lap", 0) or 0),
-                lap.get("compound_front", "Medium"),
-                lap.get("compound_rear", "Medium"),
-                int(lap.get("tyre_age_laps", 1) or 1),
-                float(lap.get("wear_pct_start_FL", 0.0) or 0.0),
-                float(lap.get("wear_pct_start_FR", 0.0) or 0.0),
-                float(lap.get("wear_pct_start_RL", 0.0) or 0.0),
-                float(lap.get("wear_pct_start_RR", 0.0) or 0.0),
-                float(lap.get("wear_pct_end_FL", 0.0) or 0.0),
-                float(lap.get("wear_pct_end_FR", 0.0) or 0.0),
-                float(lap.get("wear_pct_end_RL", 0.0) or 0.0),
-                float(lap.get("wear_pct_end_RR", 0.0) or 0.0),
-                float(lap.get("fuel_start_l", 0.0) or 0.0),
-                float(lap.get("fuel_end_l", 0.0) or 0.0),
-                float(lap.get("fuel_used_l", 0.0) or 0.0),
-                float(lap.get("track_temp", 25.0) or 25.0),
-                float(lap.get("ambient_temp", 20.0) or 20.0),
-                lap.get("weather_state", "DRY"),
-                float(lap.get("rain_intensity", 0.0) or 0.0),
-                lap.get("completed_at", ""),
-                int(lap.get("anomaly_flag", 0) or 0),
-                lap.get("anomaly_reason"),
-                int(lap.get("is_deleted", 0) or 0),
-            )
-
-            if existing_lap is not None and overwrite_existing:
+            existing_id = _find_session_by_uuid(cursor, session_uuid)
+            if existing_id is None:
                 cursor.execute(
-                    "UPDATE laps SET session_id=?, stint_id=?, lap_number=?, "
-                    "lap_time=?, sector_1=?, sector_2=?, sector_3=?, "
-                    "is_valid_lap=?, is_pit_in_lap=?, is_pit_out_lap=?, "
-                    "compound_front=?, compound_rear=?, tyre_age_laps=?, "
-                    "wear_pct_start_FL=?, wear_pct_start_FR=?, "
-                    "wear_pct_start_RL=?, wear_pct_start_RR=?, "
-                    "wear_pct_end_FL=?, wear_pct_end_FR=?, "
-                    "wear_pct_end_RL=?, wear_pct_end_RR=?, "
-                    "fuel_start_l=?, fuel_end_l=?, fuel_used_l=?, "
-                    "track_temp=?, ambient_temp=?, weather_state=?, "
-                    "rain_intensity=?, completed_at=?, anomaly_flag=?, "
-                    "anomaly_reason=?, is_deleted=? WHERE id=?",
-                    lap_values + (existing_lap,),
+                    "INSERT INTO sessions (session_uuid, track, layout, car, "
+                    "session_type, started_at, completed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        session_uuid,
+                        sess.get("track", ""),
+                        sess.get("layout", ""),
+                        sess.get("car", ""),
+                        sess.get("session_type", ""),
+                        sess.get("started_at", ""),
+                        sess.get("completed_at", ""),
+                    ),
                 )
-                laps_overwritten += 1
+                session_id = cursor.lastrowid
+                sessions_added += 1
             else:
+                session_id = existing_id
+
+            # Stints: dedup by (session_id, stint_number)
+            stint_id_by_number: Dict[int, int] = {}
+            for stint in entry.get("stints", []):
+                sn = int(stint.get("stint_number", 1) or 1)
+                existing_stint = _find_stint_by_number(cursor, session_id, sn)
+                if existing_stint is not None:
+                    stint_id_by_number[sn] = existing_stint
+                    continue
                 cursor.execute(
-                    "INSERT INTO laps (session_id, stint_id, lap_number, "
-                    "lap_time, sector_1, sector_2, sector_3, "
-                    "is_valid_lap, is_pit_in_lap, is_pit_out_lap, "
-                    "compound_front, compound_rear, tyre_age_laps, "
-                    "wear_pct_start_FL, wear_pct_start_FR, "
-                    "wear_pct_start_RL, wear_pct_start_RR, "
-                    "wear_pct_end_FL, wear_pct_end_FR, "
-                    "wear_pct_end_RL, wear_pct_end_RR, "
-                    "fuel_start_l, fuel_end_l, fuel_used_l, "
-                    "track_temp, ambient_temp, weather_state, "
-                    "rain_intensity, completed_at, anomaly_flag, "
-                    "anomaly_reason, is_deleted) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-                    "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-                    "?, ?, ?, ?)",
-                    lap_values,
+                    "INSERT INTO stints (session_id, stint_number, compound_front, "
+                    "compound_rear, start_lap, end_lap, start_fuel_l, end_fuel_l) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        session_id,
+                        sn,
+                        stint.get("compound_front", "Medium"),
+                        stint.get("compound_rear", "Medium"),
+                        stint.get("start_lap", 1),
+                        stint.get("end_lap"),
+                        stint.get("start_fuel_l", 0.0),
+                        stint.get("end_fuel_l"),
+                    ),
                 )
-                laps_added += 1
+                stint_id_by_number[sn] = cursor.lastrowid
 
-        # Pit stops
-        for ps in entry.get("pit_stops", []):
-            cursor.execute(
-                "INSERT INTO pit_stops (session_id, lap_number, pit_loss, "
-                "in_lap_number, out_lap_number) VALUES (?, ?, ?, ?, ?)",
-                (
+            # Laps
+            for lap in entry.get("laps", []):
+                ln = int(lap.get("lap_number", 0) or 0)
+                if ln <= 0:
+                    continue
+                existing_lap = _find_lap_by_session_and_number(cursor, session_id, ln)
+                if existing_lap is not None and not overwrite_existing:
+                    laps_skipped += 1
+                    continue
+
+                stint_number = int(lap.get("stint_number", 1) or 1)
+                stint_db_id = stint_id_by_number.get(stint_number)
+
+                lap_values = (
                     session_id,
-                    int(ps.get("pit_lap_number", 0) or 0),
-                    float(ps.get("pit_loss", 0.0) or 0.0),
-                    int(ps.get("in_lap_number", 0) or 0),
-                    int(ps.get("out_lap_number", 0) or 0),
-                ),
-            )
-            pit_stops_added += 1
+                    stint_db_id,
+                    ln,
+                    float(lap.get("lap_time", 0.0) or 0.0),
+                    float(lap.get("sector_1", 0.0) or 0.0),
+                    float(lap.get("sector_2", 0.0) or 0.0),
+                    float(lap.get("sector_3", 0.0) or 0.0),
+                    int(lap.get("is_valid_lap", 1) or 0),
+                    int(lap.get("is_pit_in_lap", 0) or 0),
+                    int(lap.get("is_pit_out_lap", 0) or 0),
+                    lap.get("compound_front", "Medium"),
+                    lap.get("compound_rear", "Medium"),
+                    int(lap.get("tyre_age_laps", 1) or 1),
+                    float(lap.get("wear_pct_start_FL", 0.0) or 0.0),
+                    float(lap.get("wear_pct_start_FR", 0.0) or 0.0),
+                    float(lap.get("wear_pct_start_RL", 0.0) or 0.0),
+                    float(lap.get("wear_pct_start_RR", 0.0) or 0.0),
+                    float(lap.get("wear_pct_end_FL", 0.0) or 0.0),
+                    float(lap.get("wear_pct_end_FR", 0.0) or 0.0),
+                    float(lap.get("wear_pct_end_RL", 0.0) or 0.0),
+                    float(lap.get("wear_pct_end_RR", 0.0) or 0.0),
+                    float(lap.get("fuel_start_l", 0.0) or 0.0),
+                    float(lap.get("fuel_end_l", 0.0) or 0.0),
+                    float(lap.get("fuel_used_l", 0.0) or 0.0),
+                    float(lap.get("track_temp", 25.0) or 25.0),
+                    float(lap.get("ambient_temp", 20.0) or 20.0),
+                    lap.get("weather_state", "DRY"),
+                    float(lap.get("rain_intensity", 0.0) or 0.0),
+                    lap.get("completed_at", ""),
+                    int(lap.get("anomaly_flag", 0) or 0),
+                    lap.get("anomaly_reason"),
+                    int(lap.get("is_deleted", 0) or 0),
+                )
 
-    conn.commit()
-    conn.close()
+                if existing_lap is not None and overwrite_existing:
+                    cursor.execute(
+                        "UPDATE laps SET session_id=?, stint_id=?, lap_number=?, "
+                        "lap_time=?, sector_1=?, sector_2=?, sector_3=?, "
+                        "is_valid_lap=?, is_pit_in_lap=?, is_pit_out_lap=?, "
+                        "compound_front=?, compound_rear=?, tyre_age_laps=?, "
+                        "wear_pct_start_FL=?, wear_pct_start_FR=?, "
+                        "wear_pct_start_RL=?, wear_pct_start_RR=?, "
+                        "wear_pct_end_FL=?, wear_pct_end_FR=?, "
+                        "wear_pct_end_RL=?, wear_pct_end_RR=?, "
+                        "fuel_start_l=?, fuel_end_l=?, fuel_used_l=?, "
+                        "track_temp=?, ambient_temp=?, weather_state=?, "
+                        "rain_intensity=?, completed_at=?, anomaly_flag=?, "
+                        "anomaly_reason=?, is_deleted=? WHERE id=?",
+                        lap_values + (existing_lap,),
+                    )
+                    laps_overwritten += 1
+                else:
+                    cursor.execute(
+                        "INSERT INTO laps (session_id, stint_id, lap_number, "
+                        "lap_time, sector_1, sector_2, sector_3, "
+                        "is_valid_lap, is_pit_in_lap, is_pit_out_lap, "
+                        "compound_front, compound_rear, tyre_age_laps, "
+                        "wear_pct_start_FL, wear_pct_start_FR, "
+                        "wear_pct_start_RL, wear_pct_start_RR, "
+                        "wear_pct_end_FL, wear_pct_end_FR, "
+                        "wear_pct_end_RL, wear_pct_end_RR, "
+                        "fuel_start_l, fuel_end_l, fuel_used_l, "
+                        "track_temp, ambient_temp, weather_state, "
+                        "rain_intensity, completed_at, anomaly_flag, "
+                        "anomaly_reason, is_deleted) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+                        "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+                        "?, ?, ?, ?)",
+                        lap_values,
+                    )
+                    laps_added += 1
 
-    return {
-        "sessions_added": sessions_added,
-        "laps_added": laps_added,
-        "laps_skipped": laps_skipped,
-        "laps_overwritten": laps_overwritten,
-        "pit_stops_added": pit_stops_added,
-    }
+            # Pit stops
+            for ps in entry.get("pit_stops", []):
+                cursor.execute(
+                    "INSERT INTO pit_stops (session_id, lap_number, pit_loss, "
+                    "in_lap_number, out_lap_number) VALUES (?, ?, ?, ?, ?)",
+                    (
+                        session_id,
+                        int(ps.get("pit_lap_number", 0) or 0),
+                        float(ps.get("pit_loss", 0.0) or 0.0),
+                        int(ps.get("in_lap_number", 0) or 0),
+                        int(ps.get("out_lap_number", 0) or 0),
+                    ),
+                )
+                pit_stops_added += 1
+
+        conn.commit()
+
+        return {
+            "sessions_added": sessions_added,
+            "laps_added": laps_added,
+            "laps_skipped": laps_skipped,
+            "laps_overwritten": laps_overwritten,
+            "pit_stops_added": pit_stops_added,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

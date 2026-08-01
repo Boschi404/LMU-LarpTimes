@@ -149,7 +149,19 @@ function fmtTime(secs) {
   return m > 0 ? m + ':' + s : s + ' s';
 }
 
-/* ─── Toast Notifications ───────────────────────────────────────── */
+/* ─── Point Decimation for Chart.js Performance ──────────────────── */
+function decimatePoints(data, maxPoints) {
+  maxPoints = maxPoints || 500;
+  if (!data || !data.length || data.length <= maxPoints) return data;
+  var step = Math.max(1, Math.floor(data.length / maxPoints));
+  var result = [];
+  for (var i = 0; i < data.length; i += step) {
+    result.push(data[i]);
+  }
+  return result;
+}
+
+/* ─── Toast Notifications
 function showToast(message, type) {
   type = type || 'info';
   var container = document.getElementById('toast-container');
@@ -298,7 +310,8 @@ function buildDegradChart(curve, rawPoints) {
 
   const labels = curve.map(function(p) { return p.age; });
   const predicted = curve.map(function(p) { return p.predicted_time; });
-  const scatterData = rawPoints.map(function(p) { return { x: p.tyre_age, y: p.lap_time }; });
+  const decimatedRaw = decimatePoints(rawPoints, 500);
+  const scatterData = decimatedRaw.map(function(p) { return { x: p.tyre_age, y: p.lap_time }; });
 
   const rootStyle = getComputedStyle(document.documentElement);
   const colorPrimary = rootStyle.getPropertyValue('--border-focus').trim() || '#FF6B00';
@@ -424,10 +437,11 @@ function startLapAutoRefresh() {
   stopLapAutoRefresh();
   if (!document.getElementById('page-archivio').classList.contains('active')) return;
   _lapsAutoTimer = setInterval(function() {
-    if (document.getElementById('page-archivio').classList.contains('active')) {
-      loadLaps(true);
-    }
-  }, 3000);
+    // Throttling: skip refresh if not on archivio page or tab is hidden
+    if (!document.getElementById('page-archivio').classList.contains('active')) return;
+    if (document.hidden) return;
+    loadLaps(true);
+  }, 15000);
 }
 
 function stopLapAutoRefresh() {
@@ -963,6 +977,9 @@ async function renderLapChart(car, track) {
     }
     if (yMin === Infinity) { yMin = 220; yMax = 230; }
 
+    // Decimate laps for chart display performance (keep max 500 points)
+    laps = decimatePoints(laps, 500);
+
     // Build datasets array
     var datasets = [];
 
@@ -1453,6 +1470,10 @@ function renderSpeedTraceChart(data) {
   var samplesA = data.lap_a.samples || [];
   var samplesB = data.lap_b.samples || [];
 
+  // Decimate telemetry samples for chart performance
+  samplesA = decimatePoints(samplesA, 500);
+  samplesB = decimatePoints(samplesB, 500);
+
   if (!samplesA.length && !samplesB.length) {
     canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:0.85rem;">No telemetry data available for these laps.</div>';
     return;
@@ -1697,6 +1718,12 @@ function renderOptimalLapChart(data, bestLapDeltas) {
     if (laps[i].lap_time > 0 && laps[i].lap_time > yMax) yMax = laps[i].lap_time;
   }
   if (yMin === Infinity) { yMin = 220; yMax = 230; }
+
+  // Decimate laps for chart display performance (keep max 500 points)
+  laps = decimatePoints(laps, 500);
+  lapNumbers = laps.map(function(l) { return l.lap_number; });
+  lapTimes = laps.map(function(l) { return l.lap_time; });
+  gaps = laps.map(function(l) { return l.total_gap; });
 
   _optChart = new Chart(ctx.getContext('2d'), {
     type: 'scatter',
@@ -1994,9 +2021,12 @@ function renderRaceLapChart(data) {
         return;
       }
 
+      // Decimate lap data for chart performance (keep max 500 points)
+      var displayLaps = decimatePoints(chartData.laps, 500);
+
       // Build datasets: color points by stint
       var stintColors = {1: '#00FF88', 2: '#FF6B00', 3: '#FF2200', 4: '#FF8800', 5: '#AA66FF', 6: '#FF4466'};
-      var points = chartData.laps.map(function(l) {
+      var points = displayLaps.map(function(l) {
         var st = l.stint_number || l.stint_id || 1;
         return {x: l.lap_number, y: l.lap_time, stint: st, compound: l.compound_front, fuel: l.fuel_start_l, age: l.tyre_age_laps};
       });
@@ -2026,9 +2056,10 @@ function renderRaceLapChart(data) {
 
       // Add degradation model line if available
       if (chartData.degradation && chartData.degradation.curve) {
+        var decCurve = decimatePoints(chartData.degradation.curve, 500);
         datasets.push({
           label: 'Degradation model',
-          data: chartData.degradation.curve.map(function(p) { return {x: p.age, y: p.predicted}; }),
+          data: decCurve.map(function(p) { return {x: p.age, y: p.predicted}; }),
           borderColor: '#00FF88',
           backgroundColor: 'rgba(0,255,136,0.1)',
           pointRadius: 0,
