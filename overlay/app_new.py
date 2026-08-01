@@ -54,35 +54,18 @@ from overlay.strategy_refresher import (
 from overlay.icons import settings_icon, icon_pixmap, clean_action_text
 from overlay.voice_engine import VoiceEngine
 from analysis.race_engineer import RaceEngineer
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Design System — v2 Cockpit (aligned with web UI & app.py)
-# ══════════════════════════════════════════════════════════════════════════════
-
-BG_DEEP = QColor(7, 8, 9)
-BG_APP = QColor(10, 12, 14)
-BG_SURFACE = QColor(15, 19, 23)
-BG_ELEVATED = QColor(22, 27, 32)
-BG_INSET = QColor(30, 37, 44)
-BORDER = QColor(30, 37, 44)
-BORDER_STRONG = QColor(40, 48, 56)
-
-ACCENT_AMBER = QColor(255, 107, 0)
-ACCENT_AMBER_BRIGHT = QColor(255, 136, 0)
-ACCENT_RED = QColor(255, 34, 0)
-ACCENT_GREEN = QColor(0, 255, 136)
-ACCENT_BLUE = QColor(0, 136, 255)
-ACCENT_PURPLE = QColor(170, 102, 255)
-ACCENT_CYAN = QColor(0, 200, 255)
-
-TEXT_PRIMARY = QColor(240, 244, 248)
-TEXT_SECONDARY = QColor(200, 212, 224)
-TEXT_TERTIARY = QColor(90, 106, 122)
-TEXT_MUTED = QColor(53, 64, 74)
-
-FONT_DISPLAY = "Rajdhani"
-FONT_MONO = "JetBrains Mono"
-FONT_UI = "Inter"
+from overlay.shared import (
+    BG_DEEP, BG_APP, BG_SURFACE, BG_ELEVATED, BG_INSET,
+    BORDER, BORDER_STRONG,
+    ACCENT_AMBER, ACCENT_AMBER_BRIGHT, ACCENT_RED, ACCENT_GREEN,
+    ACCENT_BLUE, ACCENT_PURPLE, ACCENT_CYAN,
+    TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_MUTED,
+    FONT_DISPLAY, FONT_MONO, FONT_UI,
+    qcolor_hex, load_config, save_config, DEFAULT_CONFIG,
+    _save_profile, _ensure_profiles_dir, _extract_layout_keys,
+    PROFILES_DIR, set_active_profile_name,
+    CONFIG_PATH,
+)
 
 # Default positions per component
 DEFAULT_POSITIONS = {
@@ -113,87 +96,9 @@ COMPONENT_LABELS = {
 }
 
 
-def qcolor_hex(c: QColor) -> str:
-    return '#%02x%02x%02x' % (c.red(), c.green(), c.blue())
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Config persistence
-# ══════════════════════════════════════════════════════════════════════════════
-
-import paths
-CONFIG_PATH = paths.data_path("overlay", "overlay_config.json")
-
-DEFAULT_CONFIG: Dict[str, Any] = {
-    # Full overlay (app.py) position + visibility
-    "x": 50, "y": 50, "visible": True,
-    # Modulare: per ogni componente {x, y, vis, enabled}
-    "delta_x": 50,  "delta_y": 50,  "delta_vis": True, "delta_enabled": True,
-    "fuel_x":  220, "fuel_y": 50,  "fuel_vis":  True, "fuel_enabled":  True,
-    "cliff_x": 390, "cliff_y": 50,  "cliff_vis": True, "cliff_enabled": True,
-    "pit_x":   560, "pit_y": 50,  "pit_vis":   True, "pit_enabled":   True,
-    "weather_x": 50,  "weather_y": 120, "weather_vis": True, "weather_enabled": True,
-    "wear_x": 220, "wear_y": 120, "wear_vis": True, "wear_enabled": True,
-    "compound_x": 390, "compound_y": 120, "compound_vis": True, "compound_enabled": True,
-    "sectors_x": 560, "sectors_y": 120, "sectors_vis": True, "sectors_enabled": True,
-    "qualy_x": 50,  "qualy_y": 190, "qualy_vis": True, "qualy_enabled": True,
-    "practice_x": 50, "practice_y": 260, "practice_vis": True, "practice_enabled": True,
-    # Global toggles
-    "in_game_only": False,
-    # Audio
-    "audio_enabled": True,
-    "audio_volume": 1.0,
-    # Practice mode (suggests practice laps when data is scarce)
-    "practice_mode": True,
-    # Hotkey IDs (used by app.py & app_new.py; both share the same registry)
-    "hk_full_id":    1,
-    "hk_modular_id": 2,
-    "hk_hideall_id": 3,
-    "_current_profile": "last_used",
-}
-
-
-def load_config() -> dict:
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r") as f:
-            return {**DEFAULT_CONFIG, **json.load(f)}
-    return dict(DEFAULT_CONFIG)
-
-
-def save_config(cfg: dict) -> None:
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(cfg, f, indent=2)
-    # Auto-save layout to profile system
-    try:
-        if _active_profile_name:
-            _save_profile(_active_profile_name, cfg)
-        _save_profile("last_used", cfg)
-    except Exception:
-        pass  # Don't let profile save failures break config saving
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Profile system — save/load named layout snapshots
 # ══════════════════════════════════════════════════════════════════════════════
-
-PROFILES_DIR = paths.data_path("overlay", "profiles")
-_active_profile_name: Optional[str] = None  # set by OverlayManager when a profile is active
-
-
-def _ensure_profiles_dir() -> str:
-    os.makedirs(PROFILES_DIR, exist_ok=True)
-    return PROFILES_DIR
-
-
-def _extract_layout_keys(config: dict) -> dict:
-    """Return only layout-relevant keys from a config dict."""
-    keys = {}
-    for k, v in config.items():
-        if k.endswith(('_x', '_y', '_vis', '_enabled')):
-            keys[k] = v
-        elif k in ('in_game_only', 'tray_x', 'tray_y', 'warning_x', 'warning_y'):
-            keys[k] = v
-    return keys
 
 
 def get_profile_names() -> List[str]:
@@ -203,15 +108,6 @@ def get_profile_names() -> List[str]:
         f[:-5] for f in os.listdir(PROFILES_DIR)
         if f.endswith('.json') and f != 'last_used.json'
     )
-
-
-def _save_profile(name: str, config: dict) -> None:
-    """Save layout keys from config into a named profile file."""
-    _ensure_profiles_dir()
-    path = os.path.join(PROFILES_DIR, f"{name}.json")
-    layout_keys = _extract_layout_keys(config)
-    with open(path, 'w') as f:
-        json.dump(layout_keys, f, indent=2)
 
 
 def load_profile(name: str) -> dict:
@@ -966,17 +862,16 @@ class OverlayManager(QObject):
         self._register_hotkeys()
 
         # Profile system — load stored profile on startup
-        global _active_profile_name
         self._tray_widget = None  # will be set by run_overlay
         stored_profile = self._cfg.get("_current_profile", "last_used")
         profile_data = load_profile(stored_profile)
         if profile_data:
-            _active_profile_name = stored_profile
+            set_active_profile_name(stored_profile)
             self._current_profile = stored_profile
             self._apply_profile_data(profile_data)
         else:
             # First run or profile missing — use defaults and enable auto-save
-            _active_profile_name = "last_used"
+            set_active_profile_name("last_used")
             self._current_profile = "last_used"
             self._cfg["_current_profile"] = "last_used"
 
@@ -1554,11 +1449,10 @@ class OverlayManager(QObject):
 
     def load_profile_by_name(self, name: str) -> None:
         """Load a named profile and apply it, setting it as the active profile."""
-        global _active_profile_name
         data = load_profile(name)
         if not data:
             return
-        _active_profile_name = name
+        set_active_profile_name(name)
         self._current_profile = name
         self._cfg["_current_profile"] = name
         self._apply_profile_data(data)
@@ -1566,9 +1460,8 @@ class OverlayManager(QObject):
 
     def save_current_profile(self, name: str) -> None:
         """Save current layout as a named profile and set it active."""
-        global _active_profile_name
         _save_profile(name, self._cfg)
-        _active_profile_name = name
+        set_active_profile_name(name)
         self._current_profile = name
         self._cfg["_current_profile"] = name
         save_config(self._cfg)  # also updates last_used
@@ -1579,9 +1472,8 @@ class OverlayManager(QObject):
         if not delete_profile(name):
             return False
         if self._current_profile == name:
-            global _active_profile_name
             # Fall back to last_used
-            _active_profile_name = "last_used"
+            set_active_profile_name("last_used")
             self._current_profile = "last_used"
             self._cfg["_current_profile"] = "last_used"
             save_config(self._cfg)
@@ -1590,14 +1482,13 @@ class OverlayManager(QObject):
 
     def _reset_to_default_layout(self) -> None:
         """Reset all component positions, enabled states, and visibility to defaults."""
-        global _active_profile_name
         for key, ov in self.components.items():
             ov.reset_position()
             self._cfg[f"{key}_enabled"] = True
             self._cfg[f"{key}_vis"] = True
             ov.show()
         self._cfg["in_game_only"] = DEFAULT_CONFIG.get("in_game_only", False)
-        _active_profile_name = None
+        set_active_profile_name(None)
         self._current_profile = "default"
         self._cfg["_current_profile"] = "default"
         save_config(self._cfg)

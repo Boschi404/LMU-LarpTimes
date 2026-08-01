@@ -29,9 +29,9 @@ def qt_app():
 @pytest.fixture
 def tmp_config_path(tmp_path, monkeypatch):
     """Redirect overlay_config.json to a temp file for the test."""
-    import overlay.app_new as app_new
+    import overlay.shared as shared_mod
     cfg_file = tmp_path / "overlay_config.json"
-    monkeypatch.setattr(app_new, "CONFIG_PATH", str(cfg_file))
+    monkeypatch.setattr(shared_mod, "CONFIG_PATH", str(cfg_file))
     return cfg_file
 
 

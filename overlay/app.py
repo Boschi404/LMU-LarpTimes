@@ -40,62 +40,15 @@ from overlay.strategy_refresher import AudioEngine, PracticeAdvisor, StrategyRef
 from overlay.icons import settings_icon, icon_pixmap, clean_action_text
 from overlay.voice_engine import VoiceEngine
 from analysis.race_engineer import RaceEngineer
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Design System — v2 Cockpit
-# ══════════════════════════════════════════════════════════════════════════════
-
-BG_DEEP = QColor(7, 8, 9)
-BG_APP = QColor(10, 12, 14)
-BG_SURFACE = QColor(15, 19, 23)
-BG_ELEVATED = QColor(22, 27, 32)
-BG_INSET = QColor(30, 37, 44)
-BORDER = QColor(30, 37, 44)
-BORDER_STRONG = QColor(40, 48, 56)
-
-ACCENT_AMBER = QColor(255, 107, 0)
-ACCENT_AMBER_BRIGHT = QColor(255, 136, 0)
-ACCENT_RED = QColor(255, 34, 0)
-ACCENT_GREEN = QColor(0, 255, 136)
-ACCENT_BLUE = QColor(0, 136, 255)
-ACCENT_PURPLE = QColor(170, 102, 255)
-ACCENT_CYAN = QColor(0, 200, 255)
-
-TEXT_PRIMARY = QColor(240, 244, 248)
-TEXT_SECONDARY = QColor(200, 212, 224)
-TEXT_TERTIARY = QColor(90, 106, 122)
-TEXT_MUTED = QColor(53, 64, 74)
-
-FONT_DISPLAY = "Rajdhani"
-FONT_MONO = "JetBrains Mono"
-FONT_UI = "Inter"
-
-
-def qcolor_hex(c: QColor) -> str:
-    return '#%02x%02x%02x' % (c.red(), c.green(), c.blue())
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Config persistence
-# ══════════════════════════════════════════════════════════════════════════════
-
-import paths
-CONFIG_PATH = paths.data_path("overlay", "overlay_config.json")
-DEFAULT_CONFIG = {
-    "x": 50, "y": 50, "visible": True, "in_game_only": False,
-    "audio_enabled": True, "audio_volume": 1.0, "practice_mode": True,
-}
-
-
-def load_config() -> dict:
-    if os.path.exists(CONFIG_PATH):
-        return {**DEFAULT_CONFIG, **json.load(open(CONFIG_PATH))}
-    return dict(DEFAULT_CONFIG)
-
-
-def save_config(cfg: dict) -> None:
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(cfg, f, indent=2)
+from overlay.shared import (
+    BG_DEEP, BG_APP, BG_SURFACE, BG_ELEVATED, BG_INSET,
+    BORDER, BORDER_STRONG,
+    ACCENT_AMBER, ACCENT_AMBER_BRIGHT, ACCENT_RED, ACCENT_GREEN,
+    ACCENT_BLUE, ACCENT_PURPLE, ACCENT_CYAN,
+    TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_MUTED,
+    FONT_DISPLAY, FONT_MONO, FONT_UI,
+    qcolor_hex, load_config, save_config,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
