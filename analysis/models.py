@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, List, Tuple, Union
 
 
 def huber_loss(residuals: np.ndarray, delta: float = 1.35) -> float:
@@ -18,12 +18,12 @@ class DegradationModelFit:
     """
     def __init__(
         self,
-        base_time: float,
-        alpha: float,
-        beta_1: float,
-        beta_2: float,
-        cliff_lap: float,
-        huber_loss_val: float
+        base_time: float = 0.0,
+        alpha: float = 0.0,
+        beta_1: float = 0.0,
+        beta_2: float = 0.0,
+        cliff_lap: float = 999.0,
+        huber_loss_val: float = 0.0,
     ):
         self.base_time = base_time
         self.alpha = alpha  # fuel weight coefficient (sec/liter)

@@ -8,10 +8,13 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import paths
 
-# Setup path for vendored dependencies
-VENDOR_PATH = paths.data_path("vendor")
-sys.path.insert(0, os.path.join(VENDOR_PATH, "pyLMUSharedMemory"))
-sys.path.insert(0, os.path.join(VENDOR_PATH, "pyRfactor2SharedMemory"))
+def _ensure_vendor_paths() -> None:
+    """Add vendored shared-memory packages to sys.path once (lazy, not at import-time)."""
+    vendor = paths.data_path("vendor")
+    for sub in ("pyLMUSharedMemory", "pyRfactor2SharedMemory"):
+        p = os.path.join(vendor, sub)
+        if p not in sys.path:
+            sys.path.insert(0, p)
 
 
 @dataclass
@@ -85,6 +88,7 @@ class LiveSharedMemorySource(TelemetrySource):
         self.running = False
 
     def start(self) -> None:
+        _ensure_vendor_paths()
         self.running = True
         from lmu_data import SimInfo as LMUSimInfo
         self.lmu_info = LMUSimInfo()

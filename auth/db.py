@@ -34,7 +34,22 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 import paths
-from .crypto import hash_password, verify_password, create_jwt
+from .crypto import hash_password, verify_password, create_jwt, DEFAULT_JWT_EXPIRATION
+
+
+# ── Timing-attack mitigation (S5) ───────────────────────────────────────────
+# Dummy bcrypt hash so that authenticate_user always runs a full bcrypt
+# comparison, even when the email doesn't exist — preventing timing side
+# channels that would reveal which emails are registered.
+_DUMMY_HASH: Optional[str] = None
+
+
+def _get_dummy_hash() -> str:
+    """Return (and cache) a dummy bcrypt hash for timing-attack mitigation."""
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = hash_password("__dummy_timing_mitigation_v1__")
+    return _DUMMY_HASH
 
 
 # The local users DB lives next to laps DB so a single SQLite file
@@ -174,6 +189,10 @@ def create_user(
 def authenticate_user(email: str, password: str) -> Optional[User]:
     """
     Verify email + password. Returns the User on success, None on failure.
+
+    Timing-attack mitigation (S5): always runs a full bcrypt comparison,
+    even when the email doesn't exist, so attackers can't enumerate valid
+    emails by measuring response time.
     """
     conn = _get_conn()
     cur = conn.cursor()
@@ -184,8 +203,11 @@ def authenticate_user(email: str, password: str) -> Optional[User]:
     row = cur.fetchone()
     conn.close()
     if not row:
+        # User not found — still run bcrypt to prevent timing leak
+        verify_password(password, _get_dummy_hash())
         return None
-    if not verify_password(password, row["password_hash"] or ""):
+    if not verify_password(password, row["password_hash"] or _get_dummy_hash()):
+        # Always verify — fall back to dummy hash if password_hash is null
         return None
     return _row_to_user(row)
 
@@ -264,7 +286,7 @@ def set_current_user(user_id: str) -> str:
         auth_provider=user.auth_provider,
     )
     expires_at = time.strftime(
-        "%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + 30 * 24 * 60 * 60)
+        "%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() + DEFAULT_JWT_EXPIRATION)
     )
     now = time.strftime("%Y-%m-%dT%H:%M:%S")
     conn = _get_conn()

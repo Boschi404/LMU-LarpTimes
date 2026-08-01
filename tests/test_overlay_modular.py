@@ -267,5 +267,5 @@ def test_settings_menu_has_4_component_checkboxes(tmp_config_path, qt_app):
         for a in menu.actions()
         if isinstance(a, QWidgetAction) and isinstance(a.defaultWidget(), QCheckBox)
     ]
-    assert checkboxes == ["Delta", "Carburante", "Cliff gomme", "Pit stop"]
+    assert checkboxes == [COMPONENT_LABELS[k] for k in COMPONENT_ORDER]
     mgr.hide_all()

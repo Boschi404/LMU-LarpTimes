@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from enum import IntEnum
 import time
+import logging
 
 from analysis.tyre_manager import estimate_remaining_life, TyreStatus
 from analysis.weather_radar import analyze_rain_risk, RainWindow
@@ -94,7 +95,7 @@ class RaceEngineer:
         self._lap_counter = 0
         self._session_start_lap = 0     # track which lap we told session start
 
-    def update_from_frame(self, frame) -> Optional[RaceEngineerEvent]:
+    def update_from_frame(self, frame: "TelemetryFrame") -> Optional[RaceEngineerEvent]:
         """Process a telemetry frame and return the highest-priority event to speak."""
         if not frame:
             return None
@@ -245,7 +246,7 @@ class RaceEngineer:
                 if event:
                     events.append(event)
             except Exception:
-                pass
+                logging.exception("Error in race engineer event evaluation")
 
         if not events:
             return None
@@ -426,7 +427,7 @@ class RaceEngineer:
                             event_id=f"traffic_{int(penalty)}",
                         )
             except Exception:
-                pass
+                logging.exception("Error in traffic evaluation")
         return None
 
     def _evaluate_performance(self) -> Optional[RaceEngineerEvent]:

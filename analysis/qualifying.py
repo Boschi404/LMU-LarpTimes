@@ -6,7 +6,7 @@ Detects outlap / hotlap / inlap patterns and suggests:
   - Optimal inlap pace
   - Fuel saving potential vs current setup
 """
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from analysis.models import DegradationModelFit
 
 
@@ -78,7 +78,7 @@ _COMPOUND_WINDOW_END: Dict[str, int] = {
     "Medium": 3,
     "Hard": 4,
 }
-_WET_COMPOUNDS = {"Wet", "Intermediate", "FullWet", "Wet"}
+_WET_COMPOUNDS = {"Wet", "Intermediate", "FullWet"}
 
 
 def estimate_tyre_temp_window(

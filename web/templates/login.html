@@ -44,7 +44,39 @@ body {
   outline: none; transition: border-color 0.2s;
 }
 .form-group input:focus { border-color: #FF6B00; }
-.form-group input::placeholder { color: #35404A; }
+.form-group input::placeholder { color: #7A8A9A; }
+
+/* Focus-visible: keyboard navigation outline */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #FF6B00;
+  outline-offset: 2px;
+}
+
+.tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  background: #FF6B00;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 2px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  z-index: 10000;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
 .btn {
   width: 100%; padding: 12px; background: #FF6B00; border: none;
   border-radius: 2px; color: #fff; font-size: 15px; font-weight: 600;
@@ -56,53 +88,58 @@ body {
 .btn-secondary { background: #283038; margin-top: 4px; }
 .btn-secondary:hover { background: #35404A; }
 .error-msg { color: #FF2200; font-size: 13px; margin-top: 12px; display: none; }
-.info-msg { color: #00FF88; font-size: 13px; margin-top: 12px; display: none;}
-.footer { margin-top: 24px; font-size: 12px; color: #35404A; }
+.error-msg[role="alert"] { display: none; }
+.info-msg { color: #00FF88; font-size: 13px; margin-top: 12px; display: none; }
+.info-msg[role="alert"] { display: none; }
+
 .form-box { display: none; }
 .form-box.active { display: block; }
 </style>
 </head>
 <body>
-<div class="card">
+
+<a href="#login-main" class="skip-link">Skip to main content</a>
+
+<div class="card" id="login-main">
   <div class="brand-bar"></div>
   <h1>LMU LarpTimes</h1>
   <p class="subtitle">Pit Strategist</p>
 
-  <div class="tabs">
-    <button class="tab active" onclick="switchTab('login')" id="tab-login">Accedi</button>
-    <button class="tab" onclick="switchTab('register')" id="tab-register">Registrati</button>
+  <div class="tabs" role="tablist" aria-label="Authentication options">
+    <button class="tab active" onclick="switchTab('login')" id="tab-login" role="tab" aria-selected="true" aria-controls="form-login">Accedi</button>
+    <button class="tab" onclick="switchTab('register')" id="tab-register" role="tab" aria-selected="false" aria-controls="form-register">Registrati</button>
   </div>
 
-  <div id="form-login" class="form-box active">
+  <form id="form-login" class="form-box active" onsubmit="event.preventDefault(); doLogin();">
     <div class="form-group">
-      <label>Email</label>
+      <label for="login-email">Email</label>
       <input id="login-email" type="email" placeholder="tu@example.com" autocomplete="email">
     </div>
     <div class="form-group">
-      <label>Password</label>
+      <label for="login-password">Password</label>
       <input id="login-password" type="password" placeholder="●●●●●●" autocomplete="current-password">
     </div>
-    <button class="btn" id="login-btn" onclick="doLogin()">Accedi</button>
-    <div class="error-msg" id="login-error"></div>
-  </div>
+    <button class="btn" id="login-btn" type="submit">Accedi</button>
+    <div class="error-msg" id="login-error" role="alert"></div>
+  </form>
 
-  <div id="form-register" class="form-box">
+  <form id="form-register" class="form-box" onsubmit="event.preventDefault(); doRegister();">
     <div class="form-group">
-      <label>Email</label>
+      <label for="reg-email">Email</label>
       <input id="reg-email" type="email" placeholder="tu@example.com" autocomplete="email">
     </div>
     <div class="form-group">
-      <label>Nome visualizzato</label>
+      <label for="reg-name">Nome visualizzato</label>
       <input id="reg-name" type="text" placeholder="Il tuo nome">
     </div>
     <div class="form-group">
-      <label>Password</label>
+      <label for="reg-password">Password</label>
       <input id="reg-password" type="password" placeholder="min 4 caratteri" autocomplete="new-password">
     </div>
-    <button class="btn" id="reg-btn" onclick="doRegister()">Crea account</button>
-    <div class="error-msg" id="reg-error"></div>
-    <div class="info-msg" id="reg-info"></div>
-  </div>
+    <button class="btn" id="reg-btn" type="submit">Crea account</button>
+    <div class="error-msg" id="reg-error" role="alert"></div>
+    <div class="info-msg" id="reg-info" role="alert"></div>
+  </form>
 
   <p class="footer">I tuoi dati restano sul tuo computer.</p>
 </div>
@@ -112,8 +149,13 @@ let currentTab = 'login';
 
 function switchTab(tab) {
   currentTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
+  var activeTab = document.getElementById('tab-' + tab);
+  activeTab.classList.add('active');
+  activeTab.setAttribute('aria-selected', 'true');
   document.querySelectorAll('.form-box').forEach(f => f.classList.remove('active'));
   document.getElementById('form-' + tab).classList.add('active');
   document.getElementById('login-error').style.display = 'none';

@@ -48,9 +48,9 @@ def test_audio_engine_disabled_returns_false():
 def test_audio_engine_missing_file_does_not_raise():
     from overlay.strategy_refresher import AudioEngine
     eng = AudioEngine(enabled=True)
-    # No file at DEFAULT_CUES path → returns False but doesn't crash
-    result = eng.play("pit_now", cooldown=False)
-    assert result is False  # missing file
+    # Use a non-existent cue → path resolution yields empty string → returns False
+    result = eng.play("nonexistent_cue", cooldown=False)
+    assert result is False  # unknown cue
 
 
 def test_audio_engine_clear_cooldowns():
@@ -71,11 +71,11 @@ def test_audio_engine_cooldown_logic():
     eng = AudioEngine(enabled=True)
     eng.cooldown_sec = 10.0
     # Simulate a recent play
-    eng._last_play["pit_now"] = time.monotonic()
+    eng._last_play["test_cue"] = time.monotonic()
     # Calling play with cooldown=True (default) must be blocked
-    assert eng.play("pit_now") is False
-    # cooldown=False bypasses
-    assert eng.play("pit_now", cooldown=False) is False
+    assert eng.play("test_cue") is False
+    # cooldown=False bypasses the cooldown check — non-existent cue still returns False
+    assert eng.play("test_cue", cooldown=False) is False  # unknown cue, no file
 
 
 def test_audio_engine_volume_clamped():
@@ -112,9 +112,12 @@ def test_practice_advisor_few_laps():
 def test_practice_advisor_enough_laps_no_suggestions():
     from overlay.strategy_refresher import PracticeAdvisor
     laps = (
-        [{"compound_front": "Soft", "lap_time": 100.0, "is_valid_lap": 1}] * 8 +
-        [{"compound_front": "Medium", "lap_time": 100.0, "is_valid_lap": 1}] * 12 +
-        [{"compound_front": "Hard", "lap_time": 100.0, "is_valid_lap": 1}] * 8
+        [{"compound_front": "Soft", "lap_time": 100.0, "is_valid_lap": 1,
+          "fuel_start_l": 50.0, "fuel_used_l": 3.0, "tyre_age_laps": 5}] * 8 +
+        [{"compound_front": "Medium", "lap_time": 100.0, "is_valid_lap": 1,
+          "fuel_start_l": 25.0, "fuel_used_l": 3.0, "tyre_age_laps": 2}] * 12 +
+        [{"compound_front": "Hard", "lap_time": 100.0, "is_valid_lap": 1,
+          "fuel_start_l": 10.0, "fuel_used_l": 3.0, "tyre_age_laps": 10}] * 8
     )
     suggestions = PracticeAdvisor.advise(laps)
     # With 8/12/8 across S/M/H, we should have 0 or very few suggestions

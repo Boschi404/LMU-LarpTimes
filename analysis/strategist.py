@@ -175,4 +175,3 @@ class PitStrategist:
             "alternatives": results,
             "laps_used": laps_remaining,
         }
-print("Pit strategist module written.")

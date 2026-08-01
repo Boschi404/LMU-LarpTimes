@@ -8,6 +8,19 @@ import paths
 
 DEFAULT_DB_PATH = paths.data_path("lmu_pit_strategist.db")
 
+# ── Schema cache: avoids PRAGMA table_info on every INSERT ───────────
+_laps_schema_cache: Optional[set] = None
+
+
+def _get_laps_columns(conn: sqlite3.Connection) -> set:
+    """Return the set of column names in the laps table (cached)."""
+    global _laps_schema_cache
+    if _laps_schema_cache is None:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(laps)")
+        _laps_schema_cache = {r[1] for r in cursor.fetchall()}
+    return _laps_schema_cache
+
 
 def get_db_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
     """
@@ -19,6 +32,7 @@ def get_db_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
+    conn.execute("PRAGMA busy_timeout=5000;")
     return conn
 
 
@@ -152,6 +166,15 @@ def init_db(db_path: Optional[str] = None) -> None:
         INSERT OR IGNORE INTO db_users (id, opt_in_global) VALUES (1, 0)
     """)
 
+    # ── Performance indexes ──────────────────────────────────────────
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_uuid ON sessions(session_uuid)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_car_track ON sessions(car, track)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_laps_session_id ON laps(session_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_laps_session_lap ON laps(session_id, lap_number)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stints_session_id ON stints(session_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stints_session_stint ON stints(session_id, stint_number)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pit_stops_session_id ON pit_stops(session_id)")
+
     conn.commit()
     _migrate_db(conn, cursor)
     # Ensure telemetry samples table exists
@@ -273,6 +296,19 @@ def _migrate_db(conn, cursor) -> None:
                 print("[Migration] stint_number made nullable")
     except Exception:
         pass
+
+    # ── Performance indexes (migration for pre-existing DBs) ──────────
+    try:
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_uuid ON sessions(session_uuid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_car_track ON sessions(car, track)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_laps_session_id ON laps(session_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_laps_session_lap ON laps(session_id, lap_number)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stints_session_id ON stints(session_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stints_session_stint ON stints(session_id, stint_number)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pit_stops_session_id ON pit_stops(session_id)")
+    except Exception:
+        pass
+
     conn.commit()
 
 
@@ -375,8 +411,7 @@ def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
 
-    cursor.execute("PRAGMA table_info(laps)")
-    existing_cols = {r[1] for r in cursor.fetchall()}
+    existing_cols = _get_laps_columns(conn)
 
     # Map new field names to old column names if needed
     has_stint_id = "stint_id" in existing_cols
@@ -445,7 +480,8 @@ def insert_lap(lap_data: Dict[str, Any], db_path: Optional[str] = None) -> int:
 
     placeholders = ", ".join(["?"] * len(fields))
     columns = ", ".join(fields)
-    cursor.execute(f"INSERT INTO laps ({columns}) VALUES ({placeholders})", values)
+    query = "INSERT INTO laps (" + columns + ") VALUES (" + placeholders + ")"
+    cursor.execute(query, values)
     lap_id = cursor.lastrowid
     conn.commit()
     conn.close()

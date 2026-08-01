@@ -117,4 +117,3 @@ def detect_anomalies_for_session(
         else:
             # Reset to clean if it was previously flagged
             database.update_lap_anomaly(lap_id, False, None, db_path=db_path)
-print("Anomaly detector module written.")

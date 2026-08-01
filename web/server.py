@@ -17,6 +17,7 @@ FastAPI server che espone:
 import os
 import sys
 import time
+import logging
 import json as _json
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
@@ -45,6 +46,7 @@ from analysis.classes import (
     get_available_classes,
     CLASS_PARAMS,
     compute_traffic_adjusted_pace,
+    estimate_traffic_penalty,
 )
 from analysis.microsectors import compute_optimal_lap as _compute_optimal_lap
 
@@ -61,10 +63,21 @@ STATIC_DIR = os.path.join(BASE_DIR, "web", "static")
 _rate_limit_store: Dict[str, List[float]] = {}
 _RATE_LIMIT = 200  # max requests per minute per IP
 
+# Login-specific rate limiter (S3): 5 requests per minute per IP
+_login_rate_store: Dict[str, List[float]] = {}
+_LOGIN_RATE_LIMIT = 5  # max login attempts per minute per IP
+
+# Login lockout tracking (S3): after 5 consecutive failures, lock IP for 15 min
+_login_failures: Dict[str, dict] = {}  # {ip: {"count": int, "locked_until": float}}
+_LOGIN_MAX_FAILURES = 5
+_LOGIN_LOCKOUT_SECONDS = 15 * 60  # 15 minutes
+
 
 def reset_rate_limit():
     """Clear the rate-limit counter (useful in tests)."""
     _rate_limit_store.clear()
+    _login_rate_store.clear()
+    _login_failures.clear()
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers and enforce basic rate limiting."""
@@ -74,6 +87,36 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if not request.url.path.startswith("/static"):
             client_ip = request.client.host if request.client else "127.0.0.1"
             now = time.time()
+
+            # ── Login-specific rate limiting (S3): 5 req/min for /api/auth/login ─
+            if request.url.path == "/api/auth/login":
+                # Check lockout first
+                lock = _login_failures.get(client_ip)
+                if lock and lock.get("locked_until", 0) > now:
+                    remaining = int(lock["locked_until"] - now)
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "error": f"Account locked — troppi tentativi falliti. "
+                                     f"Riprova tra {remaining // 60}m {remaining % 60}s."
+                        },
+                    )
+                # Rate-limit login attempts
+                if client_ip in _login_rate_store:
+                    _login_rate_store[client_ip] = [
+                        t for t in _login_rate_store[client_ip]
+                        if now - t < 60
+                    ]
+                else:
+                    _login_rate_store[client_ip] = []
+                if len(_login_rate_store[client_ip]) >= _LOGIN_RATE_LIMIT:
+                    return JSONResponse(
+                        status_code=429,
+                        content={"error": "rate limit exceeded (5 login attempts/min)"},
+                    )
+                _login_rate_store[client_ip].append(now)
+
+            # General rate limiting
             # Clean old entries
             if client_ip in _rate_limit_store:
                 _rate_limit_store[client_ip] = [
@@ -166,6 +209,28 @@ app = FastAPI(title="LMU Pit Strategist", version="1.0.0", lifespan=lifespan)
 app.add_middleware(SecurityHeadersMiddleware)
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Global exception handler — prevents HTML 500 pages, always returns JSON
+# ══════════════════════════════════════════════════════════════════════════════
+
+_logger = logging.getLogger("lmuserver")
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    _logger.error(
+        "Unhandled exception on %s %s — %s: %s",
+        request.method, request.url.path, type(exc).__name__, exc,
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "detail": str(exc),
+        },
+    )
+
 # Serve static files (JS, CSS, images)
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -220,8 +285,29 @@ async def register(request: Request):
     display_name = (body.get("display_name") or email.split("@")[0]).strip()
     if not email or "@" not in email:
         return JSONResponse(status_code=400, content={"error": "Email non valida"})
-    if len(password) < 4:
-        return JSONResponse(status_code=400, content={"error": "Password troppo corta (min 4 caratteri)"})
+
+    # ── Password complexity validation (S4) ─────────────────────────
+    if len(password) < 8:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Password troppo corta (min 8 caratteri)"},
+        )
+    if not any(c.isupper() for c in password):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "La password deve contenere almeno una lettera maiuscola"},
+        )
+    if not any(c.islower() for c in password):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "La password deve contenere almeno una lettera minuscola"},
+        )
+    if not any(c.isdigit() for c in password):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "La password deve contenere almeno una cifra"},
+        )
+    # ─────────────────────────────────────────────────────────────────
     try:
         user = AuthManager.register_email(email=email, password=password, display_name=display_name)
     except ValueError as e:
@@ -232,15 +318,37 @@ async def register(request: Request):
 
 @app.post("/api/auth/login")
 async def login(request: Request):
-    """Login con email + password."""
+    """Login con email + password. Lockout dopo 5 fallimenti consecutivi (S3)."""
     body = await request.json()
     email = (body.get("email") or "").strip().lower()
     password = body.get("password") or ""
     if not email:
         return JSONResponse(status_code=400, content={"error": "Email richiesta"})
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
     user = AuthManager.login_email(email, password)
     if not user:
+        # ── Track login failure for lockout (S3) ─────────────────
+        now = time.time()
+        entry = _login_failures.get(client_ip)
+        if entry is None:
+            _login_failures[client_ip] = {"count": 1, "locked_until": 0}
+        else:
+            # Reset counter if lockout expired
+            if entry.get("locked_until", 0) > 0 and entry["locked_until"] <= now:
+                entry["count"] = 1
+                entry["locked_until"] = 0
+            else:
+                entry["count"] = entry.get("count", 0) + 1
+            if entry["count"] >= _LOGIN_MAX_FAILURES:
+                entry["locked_until"] = now + _LOGIN_LOCKOUT_SECONDS
+        # ──────────────────────────────────────────────────────────
         return JSONResponse(status_code=401, content={"error": "Email o password errati"})
+
+    # ── Login successful — clear failure counter (S3) ────────────
+    _login_failures.pop(client_ip, None)
+    # ─────────────────────────────────────────────────────────────
+
     token = AuthManager.get_token()
     return {"user": user.to_dict(), "token": token}
 
@@ -1181,7 +1289,6 @@ async def get_strategy(
             if params_other["avg_speed_kmh"] < params_own["avg_speed_kmh"]:
                 slower_classes.add(other_class)
 
-        from analysis.classes import compute_traffic_adjusted_pace
         # Estimate the traffic penalty per lap
         total_penalty = 0.0
         for sc in slower_classes:
