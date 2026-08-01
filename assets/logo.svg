@@ -1,111 +1,84 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- Carbon fiber pattern -->
-    <pattern id="carbon" width="8" height="8" patternUnits="userSpaceOnUse">
-      <rect width="8" height="8" fill="#0A0C0E"/>
-      <rect x="0" y="0" width="4" height="4" fill="#0F1317"/>
-      <rect x="4" y="4" width="4" height="4" fill="#0F1317"/>
-    </pattern>
-    <!-- Amber glow -->
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#FF6B00" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#FF6B00" stop-opacity="0"/>
+    <!-- LMU blue gradient (official WEC/LMU deep blue) -->
+    <linearGradient id="lmuBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0066CC"/>
+      <stop offset="100%" stop-color="#003D7A"/>
+    </linearGradient>
+    <!-- Racing orange accent (LMU timing orange) -->
+    <linearGradient id="lmuOrange" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF6600"/>
+      <stop offset="100%" stop-color="#FF9900"/>
+    </linearGradient>
+    <!-- White gradient -->
+    <linearGradient id="whiteGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E0E8F0"/>
+    </linearGradient>
+    <!-- Subtle radial glow -->
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#0066CC" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0066CC" stop-opacity="0"/>
     </radialGradient>
-    <!-- Track gradient -->
-    <linearGradient id="trackGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF6B00"/>
-      <stop offset="100%" stop-color="#FF2200"/>
-    </linearGradient>
-    <!-- Accent gradient -->
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#FF8800"/>
-      <stop offset="100%" stop-color="#FF6B00"/>
-    </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="500" height="500" fill="#070809"/>
-  <rect width="500" height="500" fill="url(#carbon)" opacity="0.5"/>
+  <!-- Dark racing background -->
+  <rect width="512" height="512" rx="24" fill="#0A0E1A"/>
 
-  <!-- Glow behind logo -->
-  <circle cx="250" cy="230" r="160" fill="url(#glow)"/>
+  <!-- Blue glow aura -->
+  <circle cx="256" cy="200" r="160" fill="url(#glow)"/>
 
-  <!-- Circuit track outline (abstract) -->
-  <path d="M120 350 Q120 180 250 160 Q380 140 380 300 Q380 390 250 370 Q150 355 150 280 Q150 220 250 200" 
-        fill="none" stroke="#1E252C" stroke-width="2" stroke-dasharray="8 6" opacity="0.4"/>
+  <!-- Top accent strip (LMU blue) -->
+  <rect x="56" y="56" width="400" height="3" rx="1.5" fill="url(#lmuBlue)"/>
+  <!-- Bottom accent strip (orange) -->
+  <rect x="56" y="453" width="400" height="3" rx="1.5" fill="url(#lmuOrange)"/>
 
-  <!-- Main emblem: Stylized "LMU" -->
-  <!-- L shape -->
-  <rect x="115" y="130" width="18" height="140" rx="2" fill="url(#accentGrad)"/>
-  <rect x="115" y="250" width="75" height="18" rx="2" fill="url(#accentGrad)"/>
+  <!-- Circuit track outline (abstract Le Mans-style esses) -->
+  <path d="M80 380 Q80 220 200 200 Q340 180 340 300 Q340 370 260 370 Q180 370 180 300 Q180 240 260 240"
+        fill="none" stroke="#1A2A4A" stroke-width="2" stroke-dasharray="10 8" opacity="0.5"/>
 
-  <!-- M shape -->
-  <polygon points="220,270 240,130 265,195 290,130 310,270" fill="url(#accentGrad)"/>
-  <!-- M hollow -->
-  <polygon points="232,270 245,145 262,195 279,145 292,270" fill="#070809"/>
-  <!-- M legs inner cut -->
-  <rect x="242" y="190" width="16" height="80" fill="#070809"/>
-  <rect x="253" y="190" width="10" height="80" fill="#070809"/>
+  <!-- Main text block -->
+  <!-- "Le Mans" style — condensed bold uppercase -->
+  <text x="256" y="180" text-anchor="middle"
+        font-family="'Saira Condensed','Saira','Segoe UI',sans-serif"
+        font-size="72" font-weight="900" fill="url(#whiteGrad)"
+        letter-spacing="4">LE MANS</text>
 
-  <!-- U shape -->
-  <path d="M340 130 L340 230 Q340 270 375 270 Q410 270 410 230 L410 130" 
-        fill="none" stroke="url(#accentGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M349 130 L349 230 Q349 261 375 261 Q401 261 401 230 L401 130" 
-        fill="none" stroke="#070809" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- "ULTIMATE" — orange accent, wider spacing -->
+  <text x="256" y="240" text-anchor="middle"
+        font-family="'Saira Condensed','Saira','Segoe UI',sans-serif"
+        font-size="48" font-weight="700" fill="url(#lmuOrange)"
+        letter-spacing="12">ULTIMATE</text>
 
-  <!-- Pit Lane accent line -->
-  <line x1="80" y1="380" x2="420" y2="380" stroke="url(#accentGrad)" stroke-width="3"/>
-  <line x1="80" y1="385" x2="420" y2="385" stroke="url(#accentGrad)" stroke-width="1" opacity="0.5"/>
+  <!-- Divider -->
+  <rect x="206" y="260" width="100" height="2" rx="1" fill="url(#lmuBlue)"/>
 
-  <!-- Chequered flag accent (small, top-right) -->
-  <g transform="translate(380, 100)" opacity="0.6">
-    <rect x="0" y="0" width="60" height="45" fill="#0F1317" rx="2"/>
-    <rect x="0" y="0" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="15" y="0" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="30" y="0" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="45" y="0" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="7.5" y="7.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="22.5" y="7.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="37.5" y="7.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="52.5" y="7.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="0" y="15" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="15" y="15" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="30" y="15" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="45" y="15" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="7.5" y="22.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="22.5" y="22.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="37.5" y="22.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="52.5" y="22.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="0" y="30" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="15" y="30" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="30" y="30" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="45" y="30" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="7.5" y="37.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="22.5" y="37.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="37.5" y="37.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="52.5" y="37.5" width="7.5" height="7.5" fill="#FF6B00"/>
-    <rect x="60" y="0" width="3" height="45" fill="#C8D4E0"/>
-  </g>
-
-  <!-- Text: LarpTimes -->
-  <text x="250" y="340" text-anchor="middle" 
-        font-family="'Rajdhani','Segoe UI',sans-serif" font-size="36" font-weight="700"
-        fill="#F0F4F8" letter-spacing="8">LARPTIMES</text>
+  <!-- "LarpTimes" — app name, condensed -->
+  <text x="256" y="300" text-anchor="middle"
+        font-family="'Saira Condensed','Saira','Segoe UI',sans-serif"
+        font-size="36" font-weight="600" fill="#FFFFFF"
+        letter-spacing="3">LARP<span fill="url(#lmuOrange)">TIMES</span></text>
 
   <!-- Subtitle -->
-  <text x="250" y="370" text-anchor="middle"
-        font-family="'Inter','Segoe UI',sans-serif" font-size="12" font-weight="500"
-        fill="#5A6A7A" letter-spacing="4">PIT STRATEGIST</text>
+  <text x="256" y="330" text-anchor="middle"
+        font-family="'Saira','Segoe UI',sans-serif"
+        font-size="14" font-weight="400" fill="#6080A0"
+        letter-spacing="6">PIT STRATEGIST</text>
 
-  <!-- Bottom accent dots -->
-  <circle cx="200" cy="410" r="3" fill="#FF6B00"/>
-  <circle cx="220" cy="410" r="1.5" fill="#5A6A7A"/>
-  <circle cx="240" cy="410" r="3" fill="#FF6B00"/>
-  <circle cx="260" cy="410" r="1.5" fill="#5A6A7A"/>
-  <circle cx="280" cy="410" r="3" fill="#FF6B00"/>
-  <circle cx="300" cy="410" r="1.5" fill="#5A6A7A"/>
+  <!-- Speedometer-style accent dots -->
+  <g transform="translate(256, 400)">
+    <circle cx="-60" cy="0" r="4" fill="#FF6600"/>
+    <circle cx="-40" cy="0" r="2" fill="#6080A0"/>
+    <circle cx="-20" cy="0" r="4" fill="#FF6600"/>
+    <circle cx="0" cy="0" r="2" fill="#6080A0"/>
+    <circle cx="20" cy="0" r="4" fill="#FF6600"/>
+    <circle cx="40" cy="0" r="2" fill="#6080A0"/>
+    <circle cx="60" cy="0" r="4" fill="#FF6600"/>
+  </g>
 
-  <!-- Speed lines (subtle) -->
-  <line x1="50" y1="440" x2="150" y2="440" stroke="#1E252C" stroke-width="1"/>
-  <line x1="350" y1="440" x2="450" y2="440" stroke="#1E252C" stroke-width="1"/>
+  <!-- Version badge -->
+  <rect x="196" y="420" width="120" height="22" rx="3" fill="#0D1528" stroke="#1A2A4A" stroke-width="1"/>
+  <text x="256" y="436" text-anchor="middle"
+        font-family="'Saira','monospace'" font-size="12" font-weight="600" fill="#FF6600"
+        letter-spacing="2">v0.1.0-beta</text>
 </svg>
