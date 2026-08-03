@@ -25,6 +25,7 @@ import sys
 import ctypes
 import ctypes.wintypes
 import json
+import logging
 import os
 import time
 from typing import Optional, List, Dict, Any
@@ -66,6 +67,8 @@ from overlay.shared import (
     PROFILES_DIR, set_active_profile_name,
     CONFIG_PATH,
 )
+
+logger = logging.getLogger(__name__)
 
 # Default positions per component
 DEFAULT_POSITIONS = {
@@ -178,8 +181,8 @@ class TelemetryWorker(QObject):
         self._running = False
         try:
             self.source.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("TelemetryWorker.stop: errore fermando la sorgente: %s", e)
 
     def _race_started_wrapper(self, session_uuid, car, track):
         """Called from the detector thread when a RACE starts."""
@@ -889,15 +892,15 @@ class OverlayManager(QObject):
             ctypes.windll.user32.RegisterHotKey(
                 None, self._hk_hideall_id, MOD_CONTROL | MOD_SHIFT, VK_H
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Registrazione hotkey globali fallita: %s", e)
 
     def unregister_hotkeys(self):
         for hk_id in (self._hk_modular_id, self._hk_hideall_id):
             try:
                 ctypes.windll.user32.UnregisterHotKey(None, hk_id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Deregistrazione hotkey %s fallita: %s", hk_id, e)
 
     def poll_hotkeys(self):
         """Called periodically by a QTimer. Reacts to global hotkeys."""
@@ -1137,10 +1140,13 @@ class OverlayManager(QObject):
         try:
             re_event = self.race_engineer.update_from_frame(frame)
             if re_event is not None:
-                self.voice_engine.speak(re_event.tts_text)
-                self.race_engineer.mark_spoken(re_event)
+                try:
+                    self.voice_engine.speak(re_event.tts_text)
+                finally:
+                    # mark_spoken deve girare anche se speak() solleva
+                    self.race_engineer.mark_spoken(re_event)
         except Exception:
-            pass
+            logger.exception("update_frame: errore Race Engineer")
 
         # Delta
         delta = frame.delta_best
@@ -1322,7 +1328,7 @@ class OverlayManager(QObject):
             if result["optimal"]:
                 self._pit_plan = [self._current_lap + p - 1 for p in result["optimal"]["pit_laps"]]
         except Exception:
-            pass
+            logger.exception("_refresh_strategy: ricalcolo strategia fallito")
 
     def _run_qualifying_analysis(self):
         """Query qualifying laps from the current car/track and analyse them."""

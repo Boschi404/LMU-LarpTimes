@@ -9,6 +9,78 @@ function escapeHtml(str) {
           .replace(/'/g, '&#39;');
 }
 
+/* ─── Global fetch wrapper (JWT auth) ────────────────────────────── */
+const _origFetch = window.fetch;
+if (!window._origFetch) window._origFetch = _origFetch;
+if (!window.__fetchWrapped) {
+  window.fetch = function(url, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    var token = localStorage.getItem('token');
+    if (token) {
+      opts.headers['Authorization'] = 'Bearer ' + token;
+    }
+    return _origFetch(url, opts).then(function(resp) {
+      if (resp.status === 401 &&
+          String(url).indexOf('/api/auth/login') === -1 &&
+          String(url).indexOf('/api/auth/register') === -1) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      return resp;
+    });
+  };
+  window.__fetchWrapped = true;
+}
+
+/* ─── CSS class / color sanitization (anti-XSS) ──────────────────── */
+function safeCssClass(name) {
+  if (name == null) return '';
+  // Whitelist: solo lettere, numeri, underscore, trattini e spazi (le classi
+  // esistenti come "Full Wet" o "Light Rain" usano token separati da spazio).
+  // Ogni altro carattere (virgolette, <, >, =, ecc.) viene rimpiazzato con '-'.
+  return String(name).replace(/[^a-zA-Z0-9_\s-]/g, '-').replace(/\s+/g, ' ').trim();
+}
+
+function safeColor(value) {
+  if (value == null) return '#888';
+  var v = String(value).trim();
+  // Hex color (#rgb, #rrggbb, #rrggbbaa)
+  if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return v;
+  // CSS variable usata dall'app (es. var(--border))
+  if (/^var\(--[a-zA-Z0-9-]+\)$/.test(v)) return v;
+  // Parole colore CSS note (whitelist)
+  if (/^(red|green|blue|yellow|orange|purple|pink|white|black|gray|grey|brown|cyan|magenta|teal|navy|gold|silver|maroon|olive|lime|violet|indigo|salmon|crimson|khaki|tan|coral|beige|ivory|lavender|turquoise|aqua|fuchsia)$/.test(v)) return v;
+  return '#888';
+}
+
+/* ─── Init: valida il token JWT all'avvio ────────────────────────── */
+function init() {
+  var token = localStorage.getItem('token');
+  if (!token) return;
+  fetch('/api/auth/me')
+    .then(function(resp) {
+      if (resp.status === 401) {
+        // Token scaduto/invalido: pulizia; il redirect a /login è gestito dal wrapper fetch
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.documentElement.removeAttribute('data-auth');
+        return null;
+      }
+      return resp.json();
+    })
+    .then(function(data) {
+      if (data && data.user) {
+        document.documentElement.setAttribute('data-auth', 'authenticated');
+        try { localStorage.setItem('user', JSON.stringify(data.user)); } catch (e) {}
+        var nameEl = document.getElementById('sidebar-username');
+        if (nameEl) nameEl.textContent = data.user.display_name || data.user.email || 'utente';
+      }
+    })
+    .catch(function() { /* server offline: lascia lo stato invariato */ });
+}
+
 /* ─── Navigation ─────────────────────────────────────────────────── */
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -97,6 +169,7 @@ async function populateFilters() {
 
 populateFilters();
 startOfflineDetection();
+init();
 
 let _overlayInGameOnly = false;
 
@@ -161,7 +234,7 @@ function decimatePoints(data, maxPoints) {
   return result;
 }
 
-/* ─── Toast Notifications
+/* ─── Toast Notifications ───────────────────────────────────────── */
 function showToast(message, type) {
   type = type || 'info';
   var container = document.getElementById('toast-container');
@@ -537,11 +610,14 @@ function renderLapsTable() {
     var weatherStr = escapeHtml(l.weather_state || '—');
     if (l.rain_intensity > 0) weatherStr += ' \ud83c\udf27';
 
+    var lapColor = safeColor(l.class_color || 'var(--border)');
+    var lapTextColor = safeColor(l.class_color || 'var(--ink-secondary)');
+
     html += '<tr' + cls + '>' +
       '<td class="num-col">' + l.lap_number + '</td>' +
       '<td>' + escapeHtml(l.track || '—') + '</td>' +
       '<td>' + escapeHtml(l.car || '—') + '</td>' +
-      '<td><span class="class-badge" style="background:' + (l.class_color || 'var(--border)') + '22; color:' + (l.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (l.class_color || 'var(--border)') + '44;">' + escapeHtml(l.class_display || l.car_class || '—') + '</span></td>' +
+      '<td><span class="class-badge" style="background:' + lapColor + '22; color:' + lapTextColor + '; border:1px solid ' + lapColor + '44;">' + escapeHtml(l.class_display || l.car_class || '—') + '</span></td>' +
       '<td>' + escapeHtml(l.session_type || '—') + '</td>' +
       '<td class="num-col">' + (l.stint_id != null ? l.stint_id : '—') + '</td>' +
       '<td class="num-col">' + fmtTime(l.lap_time) + '</td>' +
@@ -615,13 +691,35 @@ function goToPage(page) {
 
 async function deleteLap(id) {
   if (!confirm('Drop this lap from model analysis?')) return;
-  await fetch('/api/laps/' + id + '/delete', { method: 'POST' });
-  loadLaps();
+  try {
+    var res = await fetch('/api/laps/' + id + '/delete', { method: 'POST' });
+    if (!res.ok) {
+      var errData = {};
+      try { errData = await res.json(); } catch (e) {}
+      showToast('Errore eliminazione giro: ' + (errData.error || res.status), 'error');
+      return;
+    }
+    showToast('Giro eliminato.', 'success');
+    loadLaps();
+  } catch (e) {
+    showToast('Errore eliminazione giro: ' + e.message, 'error');
+  }
 }
 
 async function restoreLap(id) {
-  await fetch('/api/laps/' + id + '/restore', { method: 'POST' });
-  loadLaps();
+  try {
+    var res = await fetch('/api/laps/' + id + '/restore', { method: 'POST' });
+    if (!res.ok) {
+      var errData = {};
+      try { errData = await res.json(); } catch (e) {}
+      showToast('Errore ripristino giro: ' + (errData.error || res.status), 'error');
+      return;
+    }
+    showToast('Giro ripristinato.', 'success');
+    loadLaps();
+  } catch (e) {
+    showToast('Errore ripristino giro: ' + e.message, 'error');
+  }
 }
 
 /* ─── CALCOLO STRATEGIA ──────────────────────────────────────────── */
@@ -904,7 +1002,29 @@ async function seedData() {
 }
 
 async function saveOwner() {
-  window.location.href = '/login';
+  var input = document.getElementById('owner-email');
+  var email = input ? input.value.trim() : '';
+  if (!email) {
+    showToast('Inserisci un indirizzo email.', 'warning');
+    return;
+  }
+  try {
+    var res = await fetch('/api/owner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner_email: email, email: email })
+    });
+    var data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) {
+      showToast('Errore salvataggio owner: ' + (data.error || res.status), 'error');
+      return;
+    }
+    showToast('Owner aggiornato: ' + (data.email || email), 'success');
+    if (typeof loadOwner === 'function') loadOwner();
+  } catch (e) {
+    showToast('Errore salvataggio owner: ' + e.message, 'error');
+  }
 }
 
 
@@ -1259,6 +1379,8 @@ function renderLapComparison() {
     var mins = Math.floor((lap.lap_time % 3600) / 60);
     var secs = (lap.lap_time % 60).toFixed(3);
     var timeStr = hours > 0 ? hours + ':' + (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs : (mins > 0 ? mins + ':' + (secs < 10 ? '0' : '') + secs : secs + 's');
+    var lapColor = safeColor(lap.class_color || 'var(--border)');
+    var lapTextColor = safeColor(lap.class_color || 'var(--ink-secondary)');
     return '<div class="comp-card-header">' +
       '<div class="comp-card-title">Lap ' + lap.lap_number + (lap.stint_number ? ' <span style="font-size:0.75rem;color:var(--text-tertiary);font-weight:400;">(Stint ' + lap.stint_number + ')</span>' : '') + '</div>' +
       '<div class="comp-badge ' + cls + '">' + badge + '</div>' +
@@ -1272,7 +1394,7 @@ function renderLapComparison() {
       '<div class="comp-row"><span class="comp-row-label">Fuel Used</span><span class="comp-row-value">' + (lap.fuel_used_l != null ? lap.fuel_used_l.toFixed(1) + ' L' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Tyre Age</span><span class="comp-row-value">' + (lap.tyre_age_laps != null ? lap.tyre_age_laps + ' laps' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Compound</span><span class="comp-row-value">' + escapeHtml(lap.compound_front || '\u2014') + '</span></div>' +
-      '<div class="comp-row"><span class="comp-row-label">Class</span><span class="comp-row-value"><span class="class-badge" style="background:' + (lap.class_color || 'var(--border)') + '22; color:' + (lap.class_color || 'var(--ink-secondary)') + '; border:1px solid ' + (lap.class_color || 'var(--border)') + '44;">' + escapeHtml(lap.class_display || lap.car_class || '\u2014') + '</span></span></div>' +
+      '<div class="comp-row"><span class="comp-row-label">Class</span><span class="comp-row-value"><span class="class-badge" style="background:' + lapColor + '22; color:' + lapTextColor + '; border:1px solid ' + lapColor + '44;">' + escapeHtml(lap.class_display || lap.car_class || '\u2014') + '</span></span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Track Temp</span><span class="comp-row-value">' + (lap.track_temp != null ? lap.track_temp.toFixed(1) + '\u00b0C' : '\u2014') + '</span></div>' +
       '<div class="comp-row"><span class="comp-row-label">Weather</span><span class="comp-row-value">' + escapeHtml(lap.weather_state || '\u2014') + '</span></div>';
   }
@@ -1940,7 +2062,7 @@ function renderRaceTimeline(data) {
   if (data.stints && data.stints.length > 0) {
     stintBars.innerHTML = data.stints.map(function(s) {
       const compound = s.compound || 'Unknown';
-      const cssClass = compound.replace(/\s+/g, ' ').trim();
+      const cssClass = safeCssClass(compound);
       var escCompound = escapeHtml(compound);
       return '<div class="stint-bar ' + cssClass + '" title="Stint ' + s.stint_number + ': Laps ' + s.start_lap + '\u2013' + s.end_lap + ', ' + escCompound + '">' +
         '<span class="stint-lap-count">' + s.laps_in_stint + ' laps</span>' +
@@ -1959,7 +2081,8 @@ function renderRaceTimeline(data) {
   const weatherDiv = document.getElementById('race-weather-timeline');
   if (data.weather_timeline && data.weather_timeline.length > 0) {
     weatherDiv.innerHTML = data.weather_timeline.map(function(w) {
-      const weatherClass = (w.weather || '').replace(/\s+/g, '');
+      // Rimuove gli spazi per matchare le classi CSS esistenti (es. .LightRain)
+      const weatherClass = safeCssClass(w.weather || '').replace(/\s+/g, '');
       return '<div class="weather-marker ' + weatherClass + '">' +
         '<span class="weather-lap">Lap ' + w.lap_number + '</span>' +
         '<span>' + escapeHtml(w.weather || '—') + '</span>' +
@@ -1984,7 +2107,7 @@ function renderRaceTimeline(data) {
         'anomaly': '\u26a0',
       };
       const icon = icons[e.event_type] || '\u25cf';
-      return '<div class="event-item ' + (e.severity || 'info') + '">' +
+      return '<div class="event-item ' + safeCssClass(e.severity || 'info') + '">' +
         '<span class="event-lap">L' + e.lap_number + '</span>' +
         '<span class="event-icon">' + icon + '</span>' +
         '<span class="event-desc">' + escapeHtml(e.description || '') + '</span>' +

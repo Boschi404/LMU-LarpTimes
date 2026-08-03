@@ -297,8 +297,9 @@ class TestFastAPIEndpoints:
     """
     Test FastAPI HTTP endpoints using Starlette TestClient (no network required).
     """
+    @classmethod
     @pytest.fixture(scope="class")
-    def client(self, db_path):
+    def client(cls, db_path):
         """Override database path and create TestClient."""
         import importlib
         import web.server as server_mod
@@ -342,10 +343,17 @@ class TestFastAPIEndpoints:
             assert lap["car"] == CAR
 
     def test_soft_delete_endpoint(self, client, db_path, recorded_laps):
+        # Soft-delete/restore are authenticated mutations — log in first
+        from auth import AuthManager, init_auth_db
+        init_auth_db()
+        AuthManager.register_email("e2e.softdelete@example.com", "Secret1", "E2E")
+        AuthManager.login_email("e2e.softdelete@example.com", "Secret1")
+        headers = {"Authorization": f"Bearer {AuthManager.get_token()}"}
+
         laps = client.get("/api/laps").json()
         lap_id = laps[0]["id"]
 
-        resp = client.post(f"/api/laps/{lap_id}/delete")
+        resp = client.post(f"/api/laps/{lap_id}/delete", headers=headers)
         assert resp.status_code == 200
         assert resp.json()["deleted"] is True
 
@@ -354,7 +362,7 @@ class TestFastAPIEndpoints:
         assert lap_id not in ids_after
 
         # Restore
-        resp2 = client.post(f"/api/laps/{lap_id}/restore")
+        resp2 = client.post(f"/api/laps/{lap_id}/restore", headers=headers)
         assert resp2.status_code == 200
         assert resp2.json()["deleted"] is False
 

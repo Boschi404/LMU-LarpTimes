@@ -35,8 +35,8 @@ def fresh_auth_db(tmp_path, monkeypatch):
     def fake_data_path(*parts):
         return str(tmp_path.joinpath(*parts))
     monkeypatch.setattr(paths, "data_path", fake_data_path)
-    # JWT secret deterministic for test
-    monkeypatch.setenv("JWT_SECRET", "test-secret-do-not-use-in-prod")
+    # JWT secret deterministic for test (>= 32 bytes to avoid InsecureKeyLengthWarning)
+    monkeypatch.setenv("JWT_SECRET", "test-secret-do-not-use-in-prod-1234567890")
     # Clean any cached auth_secret.txt
     secret_file = tmp_path / "auth_secret.txt"
     if secret_file.exists():

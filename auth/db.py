@@ -54,8 +54,9 @@ def _get_dummy_hash() -> str:
 
 # The local users DB lives next to laps DB so a single SQLite file
 # can host both. Default: same file as laps DB.
+# Tests may override with LMU_AUTH_DB_PATH to avoid polluting the real DB.
 def _users_db_path() -> str:
-    return paths.data_path("lmu_pit_strategist.db")
+    return os.environ.get("LMU_AUTH_DB_PATH") or paths.data_path("lmu_pit_strategist.db")
 
 
 @dataclass

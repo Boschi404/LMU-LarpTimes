@@ -67,6 +67,9 @@ _RATE_LIMIT = 200  # max requests per minute per IP
 _login_rate_store: Dict[str, List[float]] = {}
 _LOGIN_RATE_LIMIT = 5  # max login attempts per minute per IP
 
+# Registration rate limiter (S3): same budget as login — 5 requests per minute per IP
+_register_rate_store: Dict[str, List[float]] = {}
+
 # Login lockout tracking (S3): after 5 consecutive failures, lock IP for 15 min
 _login_failures: Dict[str, dict] = {}  # {ip: {"count": int, "locked_until": float}}
 _LOGIN_MAX_FAILURES = 5
@@ -77,6 +80,7 @@ def reset_rate_limit():
     """Clear the rate-limit counter (useful in tests)."""
     _rate_limit_store.clear()
     _login_rate_store.clear()
+    _register_rate_store.clear()
     _login_failures.clear()
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -116,6 +120,22 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                     )
                 _login_rate_store[client_ip].append(now)
 
+            # ── Registration rate limiting (S3): same 5 req/min budget as login ─
+            elif request.url.path == "/api/auth/register":
+                if client_ip in _register_rate_store:
+                    _register_rate_store[client_ip] = [
+                        t for t in _register_rate_store[client_ip]
+                        if now - t < 60
+                    ]
+                else:
+                    _register_rate_store[client_ip] = []
+                if len(_register_rate_store[client_ip]) >= _LOGIN_RATE_LIMIT:
+                    return JSONResponse(
+                        status_code=429,
+                        content={"error": "rate limit exceeded (5 registrations/min)"},
+                    )
+                _register_rate_store[client_ip].append(now)
+
             # General rate limiting
             # Clean old entries
             if client_ip in _rate_limit_store:
@@ -138,6 +158,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
@@ -213,22 +234,16 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 # Global exception handler — prevents HTML 500 pages, always returns JSON
 # ══════════════════════════════════════════════════════════════════════════════
 
-_logger = logging.getLogger("lmuserver")
-
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    _logger.error(
+    # Log the full exception server-side, never leak internals to the client
+    logging.getLogger(__name__).exception(
         "Unhandled exception on %s %s — %s: %s",
         request.method, request.url.path, type(exc).__name__, exc,
-        exc_info=True,
     )
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "Internal server error",
-            "detail": str(exc),
-        },
+        content={"detail": "Errore interno"},
     )
 
 # Serve static files (JS, CSS, images)
@@ -450,7 +465,7 @@ async def get_overlay_settings():
 
 
 @app.post("/api/overlay/settings")
-async def set_overlay_settings(request: Request):
+async def set_overlay_settings(request: Request, current_user: User = Depends(require_user)):
     import json
     import os
     body = await request.json()
@@ -1056,8 +1071,14 @@ async def get_owner(request: Request):
 
 
 @app.post("/api/owner")
-async def set_owner(request: Request):
-    """Set the owner email — only works if already authenticated."""
+async def set_owner(request: Request, current_user: User = Depends(require_user)):
+    """
+    Set the owner email.
+
+    Richiede autenticazione (Bearer token) — la mutazione è consentita
+    solo all'utente attualmente loggato, verificato via require_user.
+    Body: {"email": "<email>"}
+    """
     body = await request.json()
     email = body.get("email")
     try:
@@ -1068,10 +1089,11 @@ async def set_owner(request: Request):
 
 
 @app.post("/api/seed")
-async def seed_sample_data():
+async def seed_sample_data(current_user: User = Depends(require_user)):
     """
     Crea 20 giri di esempio per testare l'app.
     Usa Le Mans/Ferrari se nessun altro dato esiste.
+    Richiede autenticazione (Bearer token).
     """
     import database as _db
     laps = _db.get_all_laps_for_archive()
@@ -1110,15 +1132,15 @@ async def seed_sample_data():
 
 
 @app.post("/api/laps/{lap_id}/delete")
-async def soft_delete_lap(lap_id: int):
-    """Soft-delete di un giro (is_deleted=1)."""
+async def soft_delete_lap(lap_id: int, current_user: User = Depends(require_user)):
+    """Soft-delete di un giro (is_deleted=1). Richiede autenticazione."""
     database.soft_delete_lap(lap_id, is_deleted=True)
     return {"status": "ok", "lap_id": lap_id, "deleted": True}
 
 
 @app.post("/api/laps/{lap_id}/restore")
-async def restore_lap(lap_id: int):
-    """Ripristina un giro soft-eliminato."""
+async def restore_lap(lap_id: int, current_user: User = Depends(require_user)):
+    """Ripristina un giro soft-eliminato. Richiede autenticazione."""
     database.soft_delete_lap(lap_id, is_deleted=False)
     return {"status": "ok", "lap_id": lap_id, "deleted": False}
 

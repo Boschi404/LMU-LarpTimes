@@ -1443,7 +1443,8 @@
       <div id="owner-bar" class="card" style="display:flex;align-items:center;gap:12px;padding:10px 16px;margin-bottom:16px;">
         <span style="color:var(--text-secondary);font-size:12px;text-transform:uppercase;letter-spacing:1px;">User</span>
         <span id="owner-display" style="flex:1;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;">—</span>
-        <button class="btn" id="owner-change-btn" onclick="window.location.href='/login'" style="font-size:11px;">Cambia</button>
+        <input type="email" id="owner-email" placeholder="nuovo email owner" style="flex:1;max-width:260px;min-width:160px;background:var(--surface-elevated);border:1px solid var(--border-subtle);border-radius:6px;color:var(--ink-primary);padding:6px 10px;font-size:12px;font-family:var(--font-mono);">
+        <button class="btn" id="owner-change-btn" onclick="saveOwner()" style="font-size:11px;">Cambia</button>
       </div>
 
       <div id="welcome-banner" class="card" style="display:none;padding:20px;margin-bottom:16px;text-align:center;">
@@ -2159,6 +2160,7 @@
 
   // Override fetch to auto-add Bearer token
   const origFetch = window.fetch;
+  window._origFetch = origFetch;
   window.fetch = function(url, opts) {
     opts = opts || {};
     opts.headers = opts.headers || {};
@@ -2166,7 +2168,9 @@
       opts.headers['Authorization'] = 'Bearer ' + token;
     }
     return origFetch(url, opts).then(function(resp) {
-      if (resp.status === 401) {
+      if (resp.status === 401 &&
+          String(url).indexOf('/api/auth/login') === -1 &&
+          String(url).indexOf('/api/auth/register') === -1) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -2174,6 +2178,7 @@
       return resp;
     });
   };
+  window.__fetchWrapped = true;
 
   // Add user info to the sidebar once DOM is ready
   document.addEventListener('DOMContentLoaded', function() {

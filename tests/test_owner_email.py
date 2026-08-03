@@ -211,13 +211,20 @@ def test_api_owner_get_set(tmp_db, monkeypatch):
     monkeypatch.setattr(database, "DEFAULT_DB_PATH", tmp_db)
     client = TestClient(server_mod.app)
 
+    # POST /api/owner is an authenticated mutation — log in first
+    from auth import AuthManager, init_auth_db
+    init_auth_db()
+    AuthManager.register_email("api.owner1@example.com", "Secret1", "ApiOwner")
+    AuthManager.login_email("api.owner1@example.com", "Secret1")
+    headers = {"Authorization": f"Bearer {AuthManager.get_token()}"}
+
     # GET initial
     r = client.get("/api/owner")
     assert r.status_code == 200
     assert r.json() == {"email": "", "display_name": "", "logged_in": False}
 
     # POST set
-    r = client.post("/api/owner", json={"email": "Test@X.com"})
+    r = client.post("/api/owner", json={"email": "Test@X.com"}, headers=headers)
     assert r.status_code == 200
     assert r.json()["email"] == "test@x.com"
 
@@ -232,7 +239,13 @@ def test_api_owner_invalid_email_rejected(tmp_db, monkeypatch):
     import web.server as server_mod
     monkeypatch.setattr(database, "DEFAULT_DB_PATH", tmp_db)
     client = TestClient(server_mod.app)
-    r = client.post("/api/owner", json={"email": "not-an-email"})
+    # POST /api/owner is an authenticated mutation — log in first
+    from auth import AuthManager, init_auth_db
+    init_auth_db()
+    AuthManager.register_email("api.owner2@example.com", "Secret1", "ApiOwner2")
+    AuthManager.login_email("api.owner2@example.com", "Secret1")
+    headers = {"Authorization": f"Bearer {AuthManager.get_token()}"}
+    r = client.post("/api/owner", json={"email": "not-an-email"}, headers=headers)
     assert r.status_code == 400
     assert "invalid" in r.json()["error"]
 

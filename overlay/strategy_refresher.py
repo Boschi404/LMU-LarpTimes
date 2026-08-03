@@ -37,7 +37,7 @@ from typing import Optional, List, Dict, Any, Set, TYPE_CHECKING
 from PySide6.QtCore import QObject, QTimer, Signal
 
 if TYPE_CHECKING:
-    from overlay.overlay_manager import OverlayManager
+    from overlay.app_new import OverlayManager  # definita in app_new.py, non in overlay_manager.py
 
 logger = logging.getLogger(__name__)
 

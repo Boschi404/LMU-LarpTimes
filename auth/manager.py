@@ -108,11 +108,21 @@ class AuthManager:
         """
         Verify a JWT and return the user. Returns None if invalid.
         Used by the FastAPI server's auth middleware.
+
+        Session revocation: the JWT is correlated to the DB session —
+        ``active_session`` stores the exact token issued at login and
+        ``logout()`` clears it. A token is accepted ONLY if it matches
+        the currently active session token, so logging out invalidates
+        every previously issued token.
         """
         if not token:
             return None
         payload = decode_jwt(token)
         if not payload:
+            return None
+        # Session revocation (S3): token must be the CURRENT active one
+        from .db import get_current_token
+        if get_current_token() != token:
             return None
         from .db import get_user_by_id
         return get_user_by_id(payload.get("sub"))

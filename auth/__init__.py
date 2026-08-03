@@ -50,6 +50,7 @@ __all__ = [
     "authenticate_user",
     "get_user_by_id",
     "get_user_by_email",
+    "get_user_by_google_id",
     "update_last_login",
     "delete_user",
     "list_users",

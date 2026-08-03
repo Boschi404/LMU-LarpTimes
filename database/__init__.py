@@ -171,6 +171,7 @@ def init_db(db_path: Optional[str] = None) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_car_track ON sessions(car, track)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_laps_session_id ON laps(session_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_laps_session_lap ON laps(session_id, lap_number)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_laps_compound_front ON laps(compound_front)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stints_session_id ON stints(session_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stints_session_stint ON stints(session_id, stint_number)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pit_stops_session_id ON pit_stops(session_id)")

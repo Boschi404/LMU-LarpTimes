@@ -5,7 +5,7 @@ Passwords are hashed with bcrypt (work factor 12, ~250ms per hash — slow
 enough to defeat brute force, fast enough for login UX).
 
 JWTs are signed with HS256 using a secret stored in .env (or generated
-once and saved on first run). Tokens expire after 30 days.
+once and saved on first run). Tokens expire after 24 hours.
 """
 
 import os

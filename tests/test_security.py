@@ -268,7 +268,8 @@ def test_env_is_gitignored():
     """.env is in .gitignore so the Turso token is never committed."""
     gitignore = os.path.join(ROOT, ".gitignore")
     assert os.path.exists(gitignore), ".gitignore not found"
-    content = open(gitignore).read()
+    with open(gitignore) as f:
+        content = f.read()
     assert ".env" in content, ".env is NOT in .gitignore — token leak risk"
 
 
@@ -315,7 +316,12 @@ def test_export_does_not_contain_turso_token(client):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_owner_email_rejects_invalid(client):
-    """Email validation prevents bad email formats."""
+    """Email validation prevents bad email formats (auth required)."""
+    from auth import AuthManager, init_auth_db
+    init_auth_db()
+    AuthManager.register_email("security.owner@example.com", "Secret1", "SecOwner")
+    AuthManager.login_email("security.owner@example.com", "Secret1")
+    headers = {"Authorization": f"Bearer {AuthManager.get_token()}"}
     invalid_emails = [
         "not-an-email",
         "@no-user.com",
@@ -324,7 +330,7 @@ def test_owner_email_rejects_invalid(client):
         "a@b",
     ]
     for email in invalid_emails:
-        r = client.post("/api/owner", json={"email": email})
+        r = client.post("/api/owner", json={"email": email}, headers=headers)
         assert r.status_code in (400, 422), f"Should reject {email}"
 
 

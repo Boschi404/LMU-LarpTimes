@@ -4,6 +4,7 @@ Uses edge-tts (Microsoft Edge TTS) for high-quality voice output.
 Caches generated audio to avoid regenerating identical phrases.
 Falls back silently to no-op if edge-tts is unavailable.
 """
+import logging
 import os
 import time
 import hashlib
@@ -11,6 +12,8 @@ import threading
 from typing import Optional
 
 import paths
+
+logger = logging.getLogger(__name__)
 
 # Voice configuration — use the preferred voice
 DEFAULT_VOICE = "en-GB-LewisNeural"  # Male British voice
@@ -56,32 +59,36 @@ class VoiceEngine:
             try:
                 wav_path = self._generate_wav(text)
                 if wav_path and os.path.exists(wav_path):
-                    # winsound is Windows-only — import locally with fallback
-                    try:
-                        import winsound
-                    except ImportError:
-                        # On Linux/macOS: skip audio playback gracefully
-                        with self._lock:
-                            self._last_played = time.time()
-                            self._recent_phrases[phrase_hash] = time.time()
-                        print("[VoiceEngine] winsound not available — skipping playback (non-Windows OS)")
-                        return
-
-                    with self._lock:
-                        winsound.PlaySound(
-                            wav_path,
-                            winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
-                        )
-                        self._last_played = time.time()
-                        self._recent_phrases[phrase_hash] = time.time()
-                    # Cleanup old cache files (keep last 50)
-                    self._cleanup_cache()
+                    self._play_wav(wav_path, phrase_hash)
             except Exception as e:
                 print(f"[VoiceEngine] Playback error: {e}")
 
         thread = threading.Thread(target=_play, daemon=True)
         thread.start()
         return True
+
+    def _play_wav(self, wav_path: str, phrase_hash: str):
+        """Play a generated WAV file (winsound, Windows-only) and update bookkeeping."""
+        # winsound is Windows-only — import locally with fallback
+        try:
+            import winsound
+        except ImportError:
+            # On Linux/macOS: skip audio playback gracefully
+            with self._lock:
+                self._last_played = time.time()
+                self._recent_phrases[phrase_hash] = time.time()
+            print("[VoiceEngine] winsound not available — skipping playback (non-Windows OS)")
+            return
+
+        with self._lock:
+            winsound.PlaySound(
+                wav_path,
+                winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
+            )
+            self._last_played = time.time()
+            self._recent_phrases[phrase_hash] = time.time()
+        # Cleanup old cache files (keep last 50)
+        self._cleanup_cache()
 
     def _generate_wav(self, text: str) -> Optional[str]:
         """Generate WAV from text using edge-tts. Returns path to WAV file."""
@@ -121,11 +128,41 @@ class VoiceEngine:
             for f in files[:-max_files]:
                 os.remove(f)
         except Exception:
-            pass
+            logger.exception("VoiceEngine: pulizia cache TTS fallita")
 
     def play_test(self) -> bool:
-        """Play a test phrase to verify voice engine works."""
-        return self.speak("Audio check. This is your race engineer.")
+        """Play a test phrase. Returns True only if TTS audio was really generated and queued.
+
+        Unlike speak(), this verifies TTS availability synchronously (edge-tts
+        importable and not in retry cooldown) and generates the audio before
+        returning, so callers can fall back to a bundled WAV cue when TTS is
+        unavailable or fails.
+        """
+        if not self.enabled:
+            return False
+
+        # Fail fast when TTS is known to be unavailable (last failure / import error)
+        if time.time() < self._tts_retry_after:
+            logger.warning("VoiceEngine: TTS in retry cooldown — play_test fallisce (fallback WAV)")
+            return False
+
+        try:
+            import edge_tts  # noqa: F401
+        except ImportError:
+            self._tts_retry_after = time.time() + self._tts_retry_interval
+            logger.warning("VoiceEngine: edge-tts non disponibile — play_test fallisce (fallback WAV)")
+            return False
+
+        # Generate synchronously so the return value reflects a real outcome
+        text = "Audio check. This is your race engineer."
+        phrase_hash = hashlib.md5(text.encode()).hexdigest()[:12]
+        wav_path = self._generate_wav(text)
+        if not wav_path or not os.path.exists(wav_path):
+            logger.warning("VoiceEngine: generazione TTS fallita — play_test fallisce (fallback WAV)")
+            return False
+
+        self._play_wav(wav_path, phrase_hash)
+        return True
 
     def set_volume(self, vol: float):
         self.volume = max(0.0, min(1.0, vol))

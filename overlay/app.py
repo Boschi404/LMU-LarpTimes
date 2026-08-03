@@ -50,6 +50,8 @@ from overlay.shared import (
     qcolor_hex, load_config, save_config,
 )
 
+logger = logging.getLogger(__name__)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Telemetry worker
@@ -91,8 +93,8 @@ class TelemetryWorker(QObject):
         self._running = False
         try:
             self.source.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("TelemetryWorker.stop: errore fermando la sorgente: %s", e)
 
     def _race_wrapper(self, session_uuid, car, track):
         self.race_started.emit(session_uuid, car, track)
@@ -559,8 +561,8 @@ class OverlayWidget(QWidget):
             self._hk_timer = QTimer(self)
             self._hk_timer.timeout.connect(self._check_hk)
             self._hk_timer.start(100)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Registrazione hotkey globale fallita: %s", e)
 
     def _check_hk(self):
         msg = ctypes.wintypes.MSG()
@@ -587,8 +589,8 @@ class OverlayWidget(QWidget):
     def closeEvent(self, _event):
         try:
             ctypes.windll.user32.UnregisterHotKey(None, self._hk_toggle)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Deregistrazione hotkey globale fallita: %s", e)
 
     # ── Frame update ────────────────────────────────────────────────────────
 
@@ -609,10 +611,13 @@ class OverlayWidget(QWidget):
         try:
             re_event = self.race_engineer.update_from_frame(frame)
             if re_event is not None:
-                self.voice_engine.speak(re_event.tts_text)
-                self.race_engineer.mark_spoken(re_event)
+                try:
+                    self.voice_engine.speak(re_event.tts_text)
+                finally:
+                    # mark_spoken deve girare anche se speak() solleva
+                    self.race_engineer.mark_spoken(re_event)
         except Exception:
-            pass
+            logger.exception("update_frame: errore Race Engineer")
 
         car_class = detect_class(frame.car_name)
         self._lbl_track_car.setText(f"{frame.track_name} — {frame.car_name}  [{car_class}]")
@@ -630,17 +635,10 @@ class OverlayWidget(QWidget):
         self._lbl_lap_time.setText(f"{lt:.1f}s" if lt > 0 else "\u2014")
 
         # Sectors
-        s1 = frame.last_sector1
-        s2 = frame.last_sector2 - frame.last_sector1
-        s3 = lt - frame.last_sector2 if lt > 0 else 0
+        s1 = frame.last_sector1 if frame.last_sector1 else 0
+        s2 = frame.last_sector2 - frame.last_sector1 if (frame.last_sector2 and frame.last_sector1) else 0
+        s3 = lt - frame.last_sector2 if (lt > 0 and frame.last_sector2) else 0
         self._lbl_sector.setText(f"{s1:.1f} / {s2:.1f} / {s3:.1f}")
-
-        # Fuel
-        fl = frame.fuel
-        self._lbl_fuel.setText(f"{fl:.0f}L")
-        self._lbl_fuel.setStyleSheet(
-            f"color: {qcolor_hex(ACCENT_AMBER) if fl < 10 else qcolor_hex(TEXT_PRIMARY)};"
-        )
 
         # Fuel laps
         f_laps = self._estimate_fuel_laps(frame)
