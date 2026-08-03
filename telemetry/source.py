@@ -107,6 +107,12 @@ class LiveSharedMemorySource(TelemetrySource):
         self.running = False
 
     def start(self) -> None:
+        # Idempotente: run_overlay_live.py avvia il source PRIMA di passarlo
+        # a run_overlay(), e TelemetryWorker.start_source() lo riavvia nel
+        # worker thread. Con LMU attiva il secondo start() riapre l'mmap della
+        # shared memory → access violation nativo → crash senza traceback.
+        if self.running and (self.lmu_info is not None or self.rf2_info is not None):
+            return
         _ensure_vendor_paths()
         self.running = True
         from lmu_data import SimInfo as LMUSimInfo
@@ -517,6 +523,8 @@ class SyntheticReplaySource(TelemetrySource):
         self.sector = 1
 
     def start(self) -> None:
+        if self.running:
+            return  # idempotente (run_overlay_live + TelemetryWorker)
         self.running = True
 
     def get_next_frame(self) -> Optional[TelemetryFrame]:

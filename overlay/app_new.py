@@ -175,12 +175,17 @@ class TelemetryWorker(QObject):
 
         TICK = 0.05  # 20 Hz UI poll
         while self._running:
-            frame = self.source.get_next_frame()
-            if frame is not None:
-                lap_id = self._detector.process_frame(frame)
-                if lap_id is not None:
-                    self.lap_completed.emit(lap_id)
-                self.frame_ready.emit(frame)
+            try:
+                frame = self.source.get_next_frame()
+                if frame is not None:
+                    lap_id = self._detector.process_frame(frame)
+                    if lap_id is not None:
+                        self.lap_completed.emit(lap_id)
+                    self.frame_ready.emit(frame)
+            except Exception:
+                # Mai lasciar morire il worker thread: un errore di lettura
+                # (shared memory, DB) non deve uccidere l'overlay.
+                logger.exception("TelemetryWorker: errore nel loop di telemetria")
             time.sleep(TICK)
 
     def stop(self):

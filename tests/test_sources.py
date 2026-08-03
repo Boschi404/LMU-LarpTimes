@@ -79,6 +79,39 @@ def test_telemetry_frame_race_defaults():
     assert frame.best_lap_time == 0.0
 
 
+def test_synthetic_source_start_idempotent():
+    """Regressione: run_overlay_live.py avvia il source e TelemetryWorker lo
+    riavvia → il secondo start() NON deve resettare lo stato della simulazione
+    (con LMU attiva il doppio start riapriva l'mmap → crash nativo)."""
+    source = SyntheticReplaySource(tick_rate=1.0)
+    source.start()
+    source.start()  # secondo avvio (flusso run_overlay_live + TelemetryWorker)
+    assert source.running is True
+    # La simulazione deve proseguire senza reset: elapsed_time avanza
+    f1 = source.get_next_frame()
+    assert f1 is not None and f1.elapsed_time >= 0.0
+    for _ in range(10):
+        source.get_next_frame()
+    elapsed_before = source.elapsed_time
+    assert elapsed_before > 0.0
+    source.start()  # terzo avvio a metà simulazione — NON deve resettare
+    f_n = source.get_next_frame()
+    assert f_n is not None
+    assert source.elapsed_time >= elapsed_before  # nessun reset a zero
+    source.stop()
+
+
+def test_live_source_start_guard_without_lmu():
+    """LiveSharedMemorySource.start() deve essere chiamabile due volte senza
+    crash quando LMU non è attiva (fallback RF2 assente → nessun mmap)."""
+    from telemetry.source import LiveSharedMemorySource
+    src = LiveSharedMemorySource()
+    src.start()
+    src.start()  # idempotente o fallback innocuo
+    assert src.running is True
+    src.stop()
+
+
 def test_synthetic_source_pit_stop():
     """
     Test that pit stops are simulated correctly.
