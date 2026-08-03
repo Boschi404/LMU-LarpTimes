@@ -204,6 +204,8 @@ def _launch_overlay_subprocess():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",   # il figlio emette utf-8 (vedi run_overlay_live.py)
+            errors="replace",   # mai crashare sulla decodifica della pipe
             bufsize=1,
         )
         print(f"[Launcher] Overlay PID: {proc.pid}")

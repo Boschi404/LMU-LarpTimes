@@ -7,6 +7,15 @@ Usage:
 import sys
 import argparse
 
+# Windows: quando stdout è una pipe (es. spawnato da run_app.py), Python usa
+# la codepage cp1252 → i caratteri non-ASCII (emoji come ✅) crashano i print
+# con UnicodeEncodeError. Forza utf-8 con replace come fallback sicuro.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass  # reconfigure non disponibile / stdout già configurato
+
 print("[Overlay] Starting...")
 
 from telemetry.source import LiveSharedMemorySource

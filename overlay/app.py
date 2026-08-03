@@ -999,6 +999,13 @@ class OverlayWidget(QWidget):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_overlay(source: TelemetrySource, db_path: str = database.DEFAULT_DB_PATH):
+    # Windows: stdout su pipe/redirect usa cp1252 → emoji (✅ ecc.) crashano i
+    # print con UnicodeEncodeError. Forza utf-8 + replace come fallback.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     app = QApplication.instance() or QApplication(sys.argv)
     app.setStyle("Fusion")
 

@@ -472,3 +472,35 @@ def test_pit_overlay_window_zero(tmp_config_path, qt_app):
     assert "WIN 0L" in ov._value.text()
     assert qcolor_hex(ACCENT_RED) in ov._value.styleSheet()
     ov.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Robustezza: stdout cp1252 (Windows pipe) — emoji nei print non devono crashare
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_stdout_emoji_survives_cp1252_pipe():
+    """Regressione: '[Qualy] ✅ ...' crashava con UnicodeEncodeError quando
+    stdout è una pipe in ambiente Windows cp1252 (overlay spawnato da run_app).
+    Il reconfigure utf-8+replace di run_overlay_live.py deve prevenirlo."""
+    import subprocess
+    import sys as _sys
+    import os as _os
+
+    env = {k: v for k, v in _os.environ.items() if k not in ("PYTHONUTF8", "PYTHONIOENCODING")}
+    code = (
+        "import sys\n"
+        "try:\n"
+        "    sys.stdout.reconfigure(encoding='utf-8', errors='replace')\n"
+        "    sys.stderr.reconfigure(encoding='utf-8', errors='replace')\n"
+        "except Exception:\n"
+        "    pass\n"
+        "print('[Qualy] \\u2705 Fuel load looks efficient')\n"
+        "print('OK')\n"
+    )
+    p = subprocess.run(
+        [_sys.executable, "-c", code],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        env=env,
+    )
+    assert p.returncode == 0, f"print emoji su pipe cp1252 ha crashato: {p.stdout[:200]!r}"
+    assert b"OK" in p.stdout
