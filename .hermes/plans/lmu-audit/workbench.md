@@ -35,6 +35,20 @@
 
 **Pulizia file (approvata, eseguita):** `git rm` v2/index.html, BRAND_BOARD.html, UI_STRUCTURE_CLEAN.html; `rm` nul, opencode_models.html. Ripristinato overlay/profiles/last_used.json.
 
-## Costo accumulato
-- Round 1: 8 subagenti · ~240s · ≈ $0.5
-- Round 2: 5 subagenti · in corso
+## Round 3 — Verify ✅ COMPLETATO
+- pytest completo: **325 passed / 0 failed** / 1 skipped (POSIX) / 1 xfailed
+- Smoke test auth reale (scripts/smoke_auth_check.py): 11/11 ✅
+  - GET read-only senza token → 200; mutazioni senza token → 401
+  - register: password corta → 400 policy; rate limit 5/min → 429 ✅
+  - login → token → /api/auth/me 200 → seed 200 → logout 200 → token revocato 401 ✅
+- node --check app.js ✅ · py_compile overlay ✅ · indice DB attivo ✅
+- Diff review (Phase 3g-bis): pulito, nessun fuori-scope
+
+## ✅ BAR RAGGIUNTA 6/6
+1. pytest 0 failure ✅ 2. boot 0 traceback ✅ 3. 0 warning produzione ✅
+4. 0 errori JS (showToast/XSS fixati) ✅ 5. 100% componenti→UI (saveOwner,
+   /api/auth/me collegati) ✅ 6. 0 import rotti / orfani ✅
+
+## Costo totale
+- Round 1: 8 subagenti ~240s ≈ $0.5 · Round 2: 5 subagenti ~490s ≈ $0.8
+- TOTALE ≈ **$1.3** · Commit `d8b1f9f` pushato su origin/main ✅

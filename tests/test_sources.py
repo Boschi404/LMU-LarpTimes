@@ -42,6 +42,40 @@ def test_synthetic_source_basic():
     source.stop()
 
 
+def test_synthetic_source_race_fields():
+    """Race/scoring fields are populated by the synthetic source (Tier A overlay data)."""
+    source = SyntheticReplaySource(total_laps=40, tick_rate=1.0)
+    source.start()
+    frame = source.get_next_frame()
+    assert frame.position > 0
+    assert frame.total_vehicles > 0
+    assert frame.race_total_laps == 40
+    assert frame.vehicle_class
+    assert frame.gap_ahead > 0
+    assert frame.gap_behind > 0
+    assert frame.gap_leader > 0
+    assert frame.session_time_remaining > 0
+    assert frame.flag_state == 0
+    assert frame.under_yellow is False
+    source.stop()
+
+
+def test_telemetry_frame_race_defaults():
+    """TelemetryFrame race fields default to safe zero/empty values."""
+    frame = TelemetryFrame()
+    assert frame.position == 0
+    assert frame.class_position == 0
+    assert frame.vehicle_class == ""
+    assert frame.total_vehicles == 0
+    assert frame.gap_ahead == 0.0
+    assert frame.gap_behind == 0.0
+    assert frame.gap_leader == 0.0
+    assert frame.laps_behind_leader == 0
+    assert frame.race_total_laps == 0
+    assert frame.flag_state == 0
+    assert frame.under_yellow is False
+
+
 def test_synthetic_source_pit_stop():
     """
     Test that pit stops are simulated correctly.

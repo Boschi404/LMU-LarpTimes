@@ -27,7 +27,7 @@ Tool locale per **Le Mans Ultimate (LMU)** che legge telemetria in tempo reale, 
 |---|---|
 | **Telemetria live** | Legge shared memory LMU via `pyLMUSharedMemory` (vendorizzata) |
 | **Dati sintetici** | `SyntheticReplaySource` per sviluppo e test senza gioco |
-| **Overlay live** | PySide6 trasparente always-on-top: modulare (10 finestre) o full (griglia 3×3) |
+| **Overlay live** | PySide6 trasparente always-on-top: modulare (13 finestre) o full (griglia 3×3) |
 | **Race Engineer TTS** | Voce ingegnere di pista con edge-tts + audio cues |
 | **Pit Strategist** | Dynamic Programming per soste ottimali (giri fissi o a tempo) |
 | **Degrado gomme** | Regressione Huber congiunta carburante + età gomma + cliff detection |
@@ -38,6 +38,7 @@ Tool locale per **Le Mans Ultimate (LMU)** che legge telemetria in tempo reale, 
 | **Meteo** | Previsione stint-by-stint + weather radar pioggia |
 | **Anomaly detection** | MAD z-score robusto su passo e consumi |
 | **Micro-sectors** | 9 sub-sectors per giro (3 per settore) + optimal lap assembly |
+| **Race status live** | Posizione overall + classe, giro/totale, tempo di gara, gap avanti/dietro/leader, bandiere (gialla/FCY/rossa) con alert TTS |
 | **Race Director** | Timeline completa gara: stint, pit stop, meteo, eventi |
 | **UI web** | FastAPI locale: Profilo, Archivio, Strategia, Setup, Race Director, Comparatore |
 | **43 API REST** | Filtri, export/import `.lmubundle`, cloud sync opzionale (Turso) |

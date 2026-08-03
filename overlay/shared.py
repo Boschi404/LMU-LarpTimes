@@ -65,6 +65,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "sectors_x": 560, "sectors_y": 120, "sectors_vis": True, "sectors_enabled": True,
     "qualy_x": 50,  "qualy_y": 190, "qualy_vis": True, "qualy_enabled": True,
     "practice_x": 50, "practice_y": 260, "practice_vis": True, "practice_enabled": True,
+    "race_x": 730, "race_y": 50, "race_vis": True, "race_enabled": True,
+    "gap_x": 900, "gap_y": 50, "gap_vis": True, "gap_enabled": True,
+    "flag_x": 730, "flag_y": 120, "flag_vis": True, "flag_enabled": True,
     # Global toggles
     "in_game_only": False,
     # Audio

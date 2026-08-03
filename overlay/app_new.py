@@ -82,9 +82,12 @@ DEFAULT_POSITIONS = {
     "sectors": (560, 120),
     "qualy": (50, 190),
     "practice": (50, 260),
+    "race": (730, 50),
+    "gap": (900, 50),
+    "flag": (730, 120),
 }
 # Logical order of components
-COMPONENT_ORDER = ["delta", "fuel", "cliff", "pit", "weather", "wear", "compound", "sectors", "qualy", "practice"]
+COMPONENT_ORDER = ["delta", "fuel", "cliff", "pit", "weather", "wear", "compound", "sectors", "qualy", "practice", "race", "gap", "flag"]
 COMPONENT_LABELS = {
     "delta": "Delta",
     "fuel":  "Carburante",
@@ -96,6 +99,9 @@ COMPONENT_LABELS = {
     "sectors": "Settori",
     "qualy": "Qualifica",
     "practice": "Pratica",
+    "race": "Gara",
+    "gap": "Gap",
+    "flag": "Bandiere",
 }
 
 
@@ -457,7 +463,7 @@ class PitOverlay(MiniOverlay):
         super().__init__(*args, **kwargs)
         self._value.setFont(QFont(FONT_MONO, 14, QFont.Weight.Bold))
 
-    def update_value(self, pit_plan: Optional[List[int]], current_lap: int, **_unused):
+    def update_value(self, pit_plan: Optional[List[int]], current_lap: int, window_laps: Optional[int] = None, **_unused):
         if not pit_plan:
             text, color = "—", qcolor_hex(TEXT_TERTIARY)
         else:
@@ -469,7 +475,143 @@ class PitOverlay(MiniOverlay):
             else:
                 text = f"L{next_pit} ({next_pit - current_lap}L)"
                 color = qcolor_hex(TEXT_PRIMARY)
+        # Pit window countdown: laps until fuel or tyres force a stop
+        if window_laps is not None and window_laps >= 0 and text != "—":
+            if window_laps == 0:
+                text = f"{text}\nWIN 0L"
+                color = qcolor_hex(ACCENT_RED)
+            elif window_laps <= 3:
+                text = f"{text}\nWIN {window_laps}L"
+                color = qcolor_hex(ACCENT_AMBER)
+            else:
+                text = f"{text}\nWIN {window_laps}L"
         self._value.setText(text)
+        self._value.setStyleSheet(f"color: {color};")
+
+
+class RaceStatusOverlay(MiniOverlay):
+    """Shows overall position, class position, lap counter and race elapsed time."""
+    component_key = "race"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText(COMPONENT_LABELS[self.component_key].upper())
+        self._value.setFont(QFont(FONT_MONO, 12, QFont.Weight.Bold))
+
+    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+        if frame is None or frame.position <= 0:
+            self._value.setText("—")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
+            return
+        pos = frame.position
+        total = frame.total_vehicles or pos
+        cls = frame.vehicle_class or "—"
+        # Race elapsed time H:MM:SS (or M:SS)
+        et = int(frame.elapsed_time or 0)
+        h, rem = divmod(et, 3600)
+        m, s = divmod(rem, 60)
+        if h > 0:
+            elapsed = f"{h}:{m:02d}:{s:02d}"
+        else:
+            elapsed = f"{m}:{s:02d}"
+        # Lap line: L{lap}/{total} or time remaining for timed sessions
+        if frame.race_total_laps > 0:
+            lap_line = f"L{frame.lap_number}/{frame.race_total_laps}"
+        elif frame.session_time_remaining > 0:
+            lap_line = f"L{frame.lap_number} · {int(frame.session_time_remaining // 60)}m"
+        else:
+            lap_line = f"L{frame.lap_number}"
+        if frame.laps_behind_leader > 0:
+            lap_line += f" · -{frame.laps_behind_leader}L"
+        text = f"P{pos}/{total} · {cls}\n{lap_line} · {elapsed}"
+        # Color: leader green, top-3 amber, otherwise primary
+        if pos == 1:
+            color = qcolor_hex(ACCENT_GREEN)
+        elif pos <= 3:
+            color = qcolor_hex(ACCENT_AMBER)
+        else:
+            color = qcolor_hex(TEXT_PRIMARY)
+        self._value.setText(text)
+        self._value.setStyleSheet(f"color: {color};")
+
+
+class GapOverlay(MiniOverlay):
+    """Shows gap to car ahead, car behind and overall leader."""
+    component_key = "gap"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText(COMPONENT_LABELS[self.component_key].upper())
+        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
+
+    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+        if frame is None or frame.position <= 0:
+            self._value.setText("—")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
+            return
+        lines = []
+        color = qcolor_hex(TEXT_PRIMARY)
+        if frame.gap_ahead > 0:
+            lines.append(f"▲ {frame.gap_ahead:+.1f}s")
+        if frame.gap_behind > 0:
+            lines.append(f"▼ {frame.gap_behind:+.1f}s")
+        if frame.laps_behind_leader > 0:
+            lines.append(f"LDR -{frame.laps_behind_leader}L")
+            color = qcolor_hex(ACCENT_RED)
+        elif frame.gap_leader > 0:
+            lines.append(f"LDR {frame.gap_leader:+.1f}s")
+        if not lines:
+            lines.append("—")
+            color = qcolor_hex(TEXT_TERTIARY)
+        # Battle color: close gap to car behind → red, close to car ahead → amber
+        if frame.gap_behind > 0 and frame.gap_behind < 2.0:
+            color = qcolor_hex(ACCENT_RED)
+        elif frame.gap_ahead > 0 and frame.gap_ahead < 2.0:
+            color = qcolor_hex(ACCENT_AMBER)
+        self._value.setText("\n".join(lines))
+        self._value.setStyleSheet(f"color: {color};")
+
+
+class FlagOverlay(MiniOverlay):
+    """Shows the current race flag status (green / yellow / FCY / red / blue...)."""
+    component_key = "flag"
+
+    # rFactor2 / LMU flag_state mapping (best-effort)
+    FLAG_LABELS = {
+        0: "GREEN",
+        1: "YELLOW",
+        2: "BLUE",
+        3: "RED",
+        4: "WHITE",
+        5: "CHECKERED",
+        6: "ORANGE",
+    }
+    FLAG_COLORS = {
+        "GREEN": ACCENT_GREEN,
+        "YELLOW": ACCENT_AMBER,
+        "BLUE": ACCENT_BLUE,
+        "RED": ACCENT_RED,
+        "WHITE": TEXT_PRIMARY,
+        "CHECKERED": TEXT_PRIMARY,
+        "ORANGE": ACCENT_AMBER_BRIGHT,
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._title.setText(COMPONENT_LABELS[self.component_key].upper())
+        self._value.setFont(QFont(FONT_MONO, 14, QFont.Weight.Bold))
+
+    def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
+        if frame is None or frame.position <= 0:
+            self._value.setText("—")
+            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
+            return
+        if frame.under_yellow and frame.flag_state in (0, 1):
+            label = "FCY" if frame.flag_state == 0 else "YELLOW"
+        else:
+            label = self.FLAG_LABELS.get(frame.flag_state, "GREEN")
+        color = qcolor_hex(self.FLAG_COLORS.get(label, TEXT_PRIMARY))
+        self._value.setText(label)
         self._value.setStyleSheet(f"color: {color};")
 
 
@@ -816,6 +958,9 @@ class OverlayManager(QObject):
         self.wear_ov = WearOverlay(self._cfg, db_path)
         self.compound_ov = CompoundOverlay(self._cfg, db_path)
         self.sectors_ov = SectorsOverlay(self._cfg, db_path)
+        self.race_ov = RaceStatusOverlay(self._cfg, db_path)
+        self.gap_ov = GapOverlay(self._cfg, db_path)
+        self.flag_ov = FlagOverlay(self._cfg, db_path)
         self.components: Dict[str, MiniOverlay] = {
             "delta": self.delta_ov,
             "fuel":  self.fuel_ov,
@@ -827,6 +972,9 @@ class OverlayManager(QObject):
             "sectors": self.sectors_ov,
             "qualy": self.qualy_ov,
             "practice": self.practice_ov,
+            "race": self.race_ov,
+            "gap": self.gap_ov,
+            "flag": self.flag_ov,
         }
         self.warning_ov = WarningOverlay(self._cfg)
 
@@ -843,6 +991,9 @@ class OverlayManager(QObject):
         # Tyre age tracking
         self._tyre_age_laps: int = 0
         self._last_stint: int = 0
+        # Flag TTS edge detection
+        self._last_under_yellow: bool = False
+        self._last_flag_state: int = 0
 
         # Audio + adaptive strategy + VoiceEngine + RaceEngineer
         self.audio_engine = AudioEngine(
@@ -1192,7 +1343,22 @@ class OverlayManager(QObject):
         self.sectors_ov.update_value(frame)
 
         # Pit
-        self._update_pit_display()
+        window_laps = None
+        if fuel_laps < 999 and cliff_laps < 999:
+            window_laps = int(min(fuel_laps, cliff_laps))
+        elif fuel_laps < 999:
+            window_laps = int(fuel_laps)
+        elif cliff_laps < 999:
+            window_laps = int(cliff_laps)
+        self._update_pit_display(window_laps=window_laps)
+
+        # Race status / gaps / flags
+        if frame.race_total_laps > 0:
+            self._total_race_laps = frame.race_total_laps
+        self.race_ov.update_value(frame)
+        self.gap_ov.update_value(frame)
+        self.flag_ov.update_value(frame)
+        self._handle_flag_events(frame)
 
         # Qualifying overlay (continually update as laps come in)
         if self._session_type == "QUALIFYING":
@@ -1210,8 +1376,28 @@ class OverlayManager(QObject):
         else:
             self.warning_ov.hide_warning()
 
-    def _update_pit_display(self):
-        self.pit_ov.update_value(self._pit_plan, self._current_lap)
+    def _update_pit_display(self, window_laps: Optional[int] = None):
+        self.pit_ov.update_value(self._pit_plan, self._current_lap, window_laps=window_laps)
+
+    def _handle_flag_events(self, frame: TelemetryFrame) -> None:
+        """Edge-detection TTS for flag changes (yellow/FCY/red → green).
+
+        VoiceEngine already enforces a global 20s cooldown + 3-min dedup,
+        so this only needs to detect transitions.
+        """
+        try:
+            yellow = frame.under_yellow
+            red = frame.flag_state == 3
+            if yellow and not self._last_under_yellow:
+                self.voice_engine.speak("bandiera gialla, attenzione")
+            elif red and self._last_flag_state != 3:
+                self.voice_engine.speak("bandiera rossa, gara sospesa")
+            elif not yellow and not red and (self._last_under_yellow or self._last_flag_state == 3):
+                self.voice_engine.speak("bandiera verde, via libera")
+            self._last_under_yellow = yellow
+            self._last_flag_state = frame.flag_state
+        except Exception:
+            logger.exception("_handle_flag_events")
 
     # ── Strategy refresh (called on each lap) ────────────────────────────────
 

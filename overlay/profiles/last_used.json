@@ -39,6 +39,18 @@
   "practice_y": 260,
   "practice_vis": false,
   "practice_enabled": true,
+  "race_x": 730,
+  "race_y": 50,
+  "race_vis": false,
+  "race_enabled": true,
+  "gap_x": 900,
+  "gap_y": 50,
+  "gap_vis": false,
+  "gap_enabled": true,
+  "flag_x": 730,
+  "flag_y": 120,
+  "flag_vis": false,
+  "flag_enabled": true,
   "in_game_only": false,
   "audio_enabled": true
 }

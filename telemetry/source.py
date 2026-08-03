@@ -55,6 +55,20 @@ class TelemetryFrame:
     brake_temps: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])   # FL, FR, RL, RR
     tyre_temps: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])     # FL, FR, RL, RR
 
+    # ── Race / scoring fields (0/empty when unavailable: synthetic or RF2 fallback)
+    position: int = 0                # overall position (1-based)
+    class_position: int = 0          # position within class (1-based)
+    vehicle_class: str = ""          # class label e.g. "HYP", "LMP2", "GT3"
+    total_vehicles: int = 0          # vehicles in session
+    gap_ahead: float = 0.0           # seconds to car ahead (track position)
+    gap_behind: float = 0.0          # seconds to car behind (track position)
+    gap_leader: float = 0.0          # seconds behind overall leader
+    laps_behind_leader: int = 0      # laps behind overall leader
+    race_total_laps: int = 0         # session max laps (mMaxLaps)
+    session_time_remaining: float = 0.0  # seconds remaining (time-based sessions)
+    flag_state: int = 0              # 0=green, 1=yellow, 2=blue, 3=red, 4=white, 5=checkered
+    under_yellow: bool = False       # FCY / yellow flag active
+
 
 class TelemetrySource(ABC):
     """
@@ -211,6 +225,73 @@ class LiveSharedMemorySource(TelemetrySource):
                 except AttributeError:
                     tyre_temps = [0.0, 0.0, 0.0, 0.0]
 
+                # ── Race / scoring fields (safe fallbacks for older game builds) ──
+                try:
+                    position = int(scoring.mPlace)
+                except (AttributeError, ValueError):
+                    position = 0
+                try:
+                    vehicle_class = clean_str(scoring.mVehicleClass)
+                except AttributeError:
+                    vehicle_class = ""
+                try:
+                    gap_leader = float(scoring.mTimeBehindLeader)
+                except (AttributeError, ValueError):
+                    gap_leader = 0.0
+                try:
+                    laps_behind_leader = int(scoring.mLapsBehindLeader)
+                except (AttributeError, ValueError):
+                    laps_behind_leader = 0
+                try:
+                    flag_state = int(scoring.mFlag)
+                except (AttributeError, ValueError):
+                    flag_state = 0
+                try:
+                    under_yellow = bool(scoring.mUnderYellow)
+                except AttributeError:
+                    under_yellow = False
+                try:
+                    total_vehicles = int(data.scoring.scoringInfo.mNumVehicles)
+                except (AttributeError, ValueError):
+                    total_vehicles = 0
+                try:
+                    race_total_laps = int(data.scoring.scoringInfo.mMaxLaps)
+                except (AttributeError, ValueError):
+                    race_total_laps = 0
+                try:
+                    session_time_remaining = float(data.scoring.scoringInfo.mSessionTimeRemaining)
+                except (AttributeError, ValueError):
+                    session_time_remaining = 0.0
+
+                # Gap to car ahead/behind on track — prefer telemetry gaps, fall back to scoring
+                try:
+                    gap_ahead = float(telem.mTimeGapCarAhead)
+                except (AttributeError, ValueError):
+                    gap_ahead = 0.0
+                try:
+                    gap_behind = float(telem.mTimeGapCarBehind)
+                except (AttributeError, ValueError):
+                    gap_behind = 0.0
+
+                # Position within class: count same-class vehicles placed ahead
+                class_position = 0
+                try:
+                    if position > 0 and vehicle_class:
+                        n_vehicles = int(data.scoring.scoringInfo.mNumVehicles)
+                        same_class_ahead = 0
+                        for i in range(n_vehicles):
+                            try:
+                                veh = data.scoring.vehScoringInfo[i]
+                                if clean_str(veh.mVehicleClass) != vehicle_class:
+                                    continue
+                                if 0 < int(veh.mPlace) < position:
+                                    same_class_ahead += 1
+                            except (AttributeError, ValueError):
+                                continue
+                        class_position = same_class_ahead + 1
+                except Exception:
+                    class_position = 0
+
                 frame = TelemetryFrame(
                     track_name=track,
                     layout_name="",
@@ -242,6 +323,18 @@ class LiveSharedMemorySource(TelemetrySource):
                     brake=brake_val,
                     brake_temps=brake_temps,
                     tyre_temps=tyre_temps,
+                    position=position,
+                    class_position=class_position,
+                    vehicle_class=vehicle_class,
+                    total_vehicles=total_vehicles,
+                    gap_ahead=gap_ahead,
+                    gap_behind=gap_behind,
+                    gap_leader=gap_leader,
+                    laps_behind_leader=laps_behind_leader,
+                    race_total_laps=race_total_laps,
+                    session_time_remaining=session_time_remaining,
+                    flag_state=flag_state,
+                    under_yellow=under_yellow,
                 )
                 return frame
             except Exception:
@@ -320,6 +413,19 @@ class LiveSharedMemorySource(TelemetrySource):
                     brake=getattr(telem, 'mBrake', 0.0),
                     brake_temps=[getattr(w, 'mBrakeTemp', 0.0) for w in telem.mWheels],
                     tyre_temps=[getattr(w, 'mTemperature', 0.0) for w in telem.mWheels],
+                    # Race fields — rF2 fallback uses getattr so older builds never break
+                    position=int(getattr(scoring, 'mPlace', 0) or 0),
+                    class_position=0,
+                    vehicle_class="",
+                    total_vehicles=int(getattr(self.rf2_info.Rf2Scor.mScoringInfo, 'mNumVehicles', 0) or 0),
+                    gap_ahead=float(getattr(scoring, 'mTimeBehindNext', 0.0) or 0.0),
+                    gap_behind=float(getattr(scoring, 'mTimeBehindNext', 0.0) or 0.0),
+                    gap_leader=float(getattr(scoring, 'mTimeBehindLeader', 0.0) or 0.0),
+                    laps_behind_leader=int(getattr(scoring, 'mLapsBehindLeader', 0) or 0),
+                    race_total_laps=int(getattr(self.rf2_info.Rf2Scor.mScoringInfo, 'mMaxLaps', 0) or 0),
+                    session_time_remaining=float(getattr(self.rf2_info.Rf2Scor.mScoringInfo, 'mSessionTimeRemaining', 0.0) or 0.0),
+                    flag_state=int(getattr(scoring, 'mFlag', 0) or 0),
+                    under_yellow=bool(getattr(scoring, 'mUnderYellow', False)),
                 )
                 return frame
             except Exception:
@@ -441,6 +547,19 @@ class SyntheticReplaySource(TelemetrySource):
             brake=random.uniform(0.0, 0.8),
             brake_temps=[random.uniform(100, 800) for _ in range(4)],
             tyre_temps=[random.uniform(60, 120) for _ in range(4)],
+            # ── Race / scoring fields (synthetic simulation) ──
+            position=max(1, 14 - self.lap_number // 3),
+            class_position=max(1, 14 - self.lap_number // 3 - 4),
+            vehicle_class="HYP",
+            total_vehicles=24,
+            gap_ahead=round(random.uniform(0.8, 9.0), 1),
+            gap_behind=round(random.uniform(0.8, 12.0), 1),
+            gap_leader=round(random.uniform(5.0, 180.0), 1),
+            laps_behind_leader=0,
+            race_total_laps=self.total_laps,
+            session_time_remaining=max(0.0, (self.total_laps - self.lap_number) * self.lap_time_base),
+            flag_state=0,
+            under_yellow=False,
         )
 
         # 2. Advance physics/simulation for the next tick

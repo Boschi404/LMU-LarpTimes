@@ -185,7 +185,7 @@ def test_pit_overlay_past_only(tmp_config_path, qt_app):
 def test_overlay_manager_creates_all_components(tmp_config_path, qt_app):
     from overlay.app_new import OverlayManager
     mgr = OverlayManager()
-    expected = {"delta", "fuel", "cliff", "pit", "weather", "wear", "compound", "sectors", "qualy", "practice"}
+    expected = {"delta", "fuel", "cliff", "pit", "weather", "wear", "compound", "sectors", "qualy", "practice", "race", "gap", "flag"}
     assert set(mgr.components.keys()) == expected
     for ov in mgr.components.values():
         assert ov.component_key in expected
@@ -269,3 +269,128 @@ def test_settings_menu_has_4_component_checkboxes(tmp_config_path, qt_app):
     ]
     assert checkboxes == [COMPONENT_LABELS[k] for k in COMPONENT_ORDER]
     mgr.hide_all()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Race status / gaps / flags (Tier A panels)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _race_frame(**overrides):
+    from telemetry.source import TelemetryFrame
+    base = dict(
+        position=12,
+        class_position=5,
+        vehicle_class="HYP",
+        total_vehicles=24,
+        gap_ahead=3.4,
+        gap_behind=1.2,
+        gap_leader=45.6,
+        laps_behind_leader=0,
+        lap_number=23,
+        race_total_laps=40,
+        elapsed_time=5030.0,
+        session_time_remaining=0.0,
+        flag_state=0,
+        under_yellow=False,
+    )
+    base.update(overrides)
+    return TelemetryFrame(**base)
+
+
+def test_race_overlay_rendering(tmp_config_path, qt_app):
+    from overlay.app_new import RaceStatusOverlay, load_config
+    ov = RaceStatusOverlay(load_config())
+    ov.update_value(_race_frame())
+    text = ov._value.text()
+    assert "P12/24" in text
+    assert "HYP" in text
+    assert "L23/40" in text
+    assert "1:23:50" in text  # 5030s = 1h 23m 50s
+    ov.close()
+
+
+def test_race_overlay_unknown(tmp_config_path, qt_app):
+    from overlay.app_new import RaceStatusOverlay, load_config
+    ov = RaceStatusOverlay(load_config())
+    ov.update_value(None)
+    assert ov._value.text() == "—"
+    ov.close()
+
+
+def test_race_overlay_leader_green(tmp_config_path, qt_app):
+    from overlay.app_new import RaceStatusOverlay, load_config, ACCENT_GREEN, qcolor_hex
+    ov = RaceStatusOverlay(load_config())
+    ov.update_value(_race_frame(position=1))
+    assert "P1/" in ov._value.text()
+    assert qcolor_hex(ACCENT_GREEN) in ov._value.styleSheet()
+    ov.close()
+
+
+def test_gap_overlay_rendering(tmp_config_path, qt_app):
+    from overlay.app_new import GapOverlay, load_config
+    ov = GapOverlay(load_config())
+    ov.update_value(_race_frame())
+    text = ov._value.text()
+    assert "+3.4s" in text   # car ahead
+    assert "+1.2s" in text   # car behind (we lead it)
+    assert "+45.6s" in text  # leader gap
+    ov.close()
+
+
+def test_gap_overlay_lapped_red(tmp_config_path, qt_app):
+    from overlay.app_new import GapOverlay, load_config, ACCENT_RED, qcolor_hex
+    ov = GapOverlay(load_config())
+    ov.update_value(_race_frame(laps_behind_leader=1, gap_leader=0.0))
+    assert "-1L" in ov._value.text()
+    assert qcolor_hex(ACCENT_RED) in ov._value.styleSheet()
+    ov.close()
+
+
+def test_flag_overlay_green(tmp_config_path, qt_app):
+    from overlay.app_new import FlagOverlay, load_config
+    ov = FlagOverlay(load_config())
+    ov.update_value(_race_frame(flag_state=0))
+    assert ov._value.text() == "GREEN"
+    ov.close()
+
+
+def test_flag_overlay_yellow(tmp_config_path, qt_app):
+    from overlay.app_new import FlagOverlay, load_config
+    ov = FlagOverlay(load_config())
+    ov.update_value(_race_frame(flag_state=1, under_yellow=True))
+    assert ov._value.text() == "YELLOW"
+    ov.close()
+
+
+def test_flag_overlay_fcy(tmp_config_path, qt_app):
+    from overlay.app_new import FlagOverlay, load_config
+    ov = FlagOverlay(load_config())
+    ov.update_value(_race_frame(flag_state=0, under_yellow=True))
+    assert ov._value.text() == "FCY"
+    ov.close()
+
+
+def test_flag_overlay_red(tmp_config_path, qt_app):
+    from overlay.app_new import FlagOverlay, load_config
+    ov = FlagOverlay(load_config())
+    ov.update_value(_race_frame(flag_state=3))
+    assert ov._value.text() == "RED"
+    ov.close()
+
+
+def test_pit_overlay_window_countdown(tmp_config_path, qt_app):
+    from overlay.app_new import PitOverlay, load_config
+    ov = PitOverlay(load_config())
+    ov.update_value([10, 20], current_lap=5, window_laps=4)
+    assert "L10" in ov._value.text()
+    assert "WIN 4L" in ov._value.text()
+    ov.close()
+
+
+def test_pit_overlay_window_zero(tmp_config_path, qt_app):
+    from overlay.app_new import PitOverlay, load_config, ACCENT_RED, qcolor_hex
+    ov = PitOverlay(load_config())
+    ov.update_value([10], current_lap=9, window_laps=0)
+    assert "WIN 0L" in ov._value.text()
+    assert qcolor_hex(ACCENT_RED) in ov._value.styleSheet()
+    ov.close()
