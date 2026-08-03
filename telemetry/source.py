@@ -69,6 +69,11 @@ class TelemetryFrame:
     flag_state: int = 0              # 0=green, 1=yellow, 2=blue, 3=red, 4=white, 5=checkered
     under_yellow: bool = False       # FCY / yellow flag active
 
+    # ── Personal best sector times (for sector coloring) ──
+    best_sector1: float = 0.0
+    best_sector2: float = 0.0        # cumulative (S1+S2)
+    best_lap_time: float = 0.0
+
 
 class TelemetrySource(ABC):
     """
@@ -335,6 +340,9 @@ class LiveSharedMemorySource(TelemetrySource):
                     session_time_remaining=session_time_remaining,
                     flag_state=flag_state,
                     under_yellow=under_yellow,
+                    best_sector1=float(getattr(scoring, 'mBestSector1', 0.0) or 0.0),
+                    best_sector2=float(getattr(scoring, 'mBestSector2', 0.0) or 0.0),
+                    best_lap_time=float(getattr(scoring, 'mBestLapTime', 0.0) or 0.0),
                 )
                 return frame
             except Exception:
@@ -560,6 +568,10 @@ class SyntheticReplaySource(TelemetrySource):
             session_time_remaining=max(0.0, (self.total_laps - self.lap_number) * self.lap_time_base),
             flag_state=0,
             under_yellow=False,
+            # Personal best sectors — improve slightly every 4 laps
+            best_sector1=round(self.lap_time_base / 3 - min(2.0, self.lap_number // 4 * 0.05), 2),
+            best_sector2=round(2 * self.lap_time_base / 3 - min(4.0, self.lap_number // 4 * 0.1), 2),
+            best_lap_time=round(self.lap_time_base - min(3.0, self.lap_number // 4 * 0.1), 2),
         )
 
         # 2. Advance physics/simulation for the next tick

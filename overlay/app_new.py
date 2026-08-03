@@ -31,7 +31,7 @@ import time
 from typing import Optional, List, Dict, Any
 
 from PySide6.QtCore import (
-    Qt, QPoint, QTimer, Signal, QObject, QThread
+    Qt, QPoint, QRect, QTimer, Signal, QObject, QThread
 )
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QLinearGradient, QPen, QBrush
@@ -422,8 +422,11 @@ class FuelOverlay(MiniOverlay):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._value.setFont(QFont(FONT_MONO, 13, QFont.Weight.Bold))
+        self._fuel_pct: Optional[float] = None   # 0.0-100.0
+        self._bar_color = qcolor_hex(TEXT_PRIMARY)
 
-    def update_value(self, fuel_laps: float, refuel_l: Optional[float] = None, **_unused):
+    def update_value(self, fuel_laps: float, refuel_l: Optional[float] = None,
+                     fuel_pct: Optional[float] = None, **_unused):
         if fuel_laps < 2:
             color = qcolor_hex(ACCENT_RED)
         elif fuel_laps < 3:
@@ -435,11 +438,49 @@ class FuelOverlay(MiniOverlay):
             text = f"{fuel_laps:.1f}L / +{refuel_l:.1f}L"
             self._value.setFont(QFont(FONT_MONO, 10, QFont.Weight.Bold))
         else:
-            text = f"{fuel_laps:.1f}"
+            text = f"{fuel_laps:.1f}L"
             self._value.setFont(QFont(FONT_MONO, 13, QFont.Weight.Bold))
+
+        # Fuel percentage in tank (bar 0-100%)
+        if fuel_pct is not None:
+            pct = max(0.0, min(100.0, fuel_pct))
+            self._fuel_pct = pct
+            self._bar_color = color
+            if fuel_pct < 15:
+                self._bar_color = qcolor_hex(ACCENT_RED)
+            elif fuel_pct < 30:
+                self._bar_color = qcolor_hex(ACCENT_AMBER)
+            else:
+                self._bar_color = qcolor_hex(ACCENT_GREEN)
+            text = f"{text}  {pct:.0f}%"
+        else:
+            self._fuel_pct = None
 
         self._value.setText(text)
         self._value.setStyleSheet(f"color: {color};")
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self._fuel_pct is None:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        margin, bar_h, gap = 14, 8, 6
+        bar_y = h - bar_h - gap
+        bw = w - 2 * margin
+        # Track
+        painter.setBrush(QBrush(BG_INSET))
+        painter.setPen(QPen(BORDER_STRONG, 1))
+        painter.drawRoundedRect(margin, bar_y, bw, bar_h, 3, 3)
+        # Fill (0-100%)
+        pct = max(0.0, min(1.0, self._fuel_pct / 100.0))
+        fill_w = int(bw * pct)
+        if fill_w > 2:
+            painter.setBrush(QBrush(QColor(self._bar_color)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(margin + 1, bar_y + 1, max(2, fill_w - 2), bar_h - 2, 2, 2)
 
 
 class CliffOverlay(MiniOverlay):
@@ -490,7 +531,12 @@ class PitOverlay(MiniOverlay):
 
 
 class RaceStatusOverlay(MiniOverlay):
-    """Shows overall position, class position, lap counter and race elapsed time."""
+    """Shows class position (all session types), lap counter and race elapsed time.
+
+    - Practice / Qualifying: elapsed session time (no lap counter)
+    - Race: L{lap}/{total} + elapsed time
+    Position is always relative to the vehicle CLASS (class_position).
+    """
     component_key = "race"
 
     def __init__(self, *args, **kwargs):
@@ -498,33 +544,39 @@ class RaceStatusOverlay(MiniOverlay):
         self._title.setText(COMPONENT_LABELS[self.component_key].upper())
         self._value.setFont(QFont(FONT_MONO, 12, QFont.Weight.Bold))
 
+    @staticmethod
+    def _format_elapsed(seconds: float) -> str:
+        et = int(seconds or 0)
+        h, rem = divmod(et, 3600)
+        m, s = divmod(rem, 60)
+        if h > 0:
+            return f"{h}:{m:02d}:{s:02d}"
+        return f"{m}:{s:02d}"
+
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None or frame.position <= 0:
             self._value.setText("—")
             self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             return
-        pos = frame.position
-        total = frame.total_vehicles or pos
+        # Position relative to class (fallback to overall if class unknown)
+        pos = frame.class_position if frame.class_position > 0 else frame.position
         cls = frame.vehicle_class or "—"
-        # Race elapsed time H:MM:SS (or M:SS)
-        et = int(frame.elapsed_time or 0)
-        h, rem = divmod(et, 3600)
-        m, s = divmod(rem, 60)
-        if h > 0:
-            elapsed = f"{h}:{m:02d}:{s:02d}"
+        elapsed = self._format_elapsed(frame.elapsed_time)
+        is_race = frame.session_type == "RACE" or frame.race_total_laps > 0
+        if is_race:
+            if frame.race_total_laps > 0:
+                lap_line = f"L{frame.lap_number}/{frame.race_total_laps}"
+            elif frame.session_time_remaining > 0:
+                lap_line = f"L{frame.lap_number} · {int(frame.session_time_remaining // 60)}m"
+            else:
+                lap_line = f"L{frame.lap_number}"
+            if frame.laps_behind_leader > 0:
+                lap_line += f" · -{frame.laps_behind_leader}L"
+            text = f"P{pos} · {cls}\n{lap_line} · {elapsed}"
         else:
-            elapsed = f"{m}:{s:02d}"
-        # Lap line: L{lap}/{total} or time remaining for timed sessions
-        if frame.race_total_laps > 0:
-            lap_line = f"L{frame.lap_number}/{frame.race_total_laps}"
-        elif frame.session_time_remaining > 0:
-            lap_line = f"L{frame.lap_number} · {int(frame.session_time_remaining // 60)}m"
-        else:
-            lap_line = f"L{frame.lap_number}"
-        if frame.laps_behind_leader > 0:
-            lap_line += f" · -{frame.laps_behind_leader}L"
-        text = f"P{pos}/{total} · {cls}\n{lap_line} · {elapsed}"
-        # Color: leader green, top-3 amber, otherwise primary
+            # Practice / qualifying: session time, no lap counter
+            text = f"P{pos} · {cls}\n{elapsed}"
+        # Color: class leader green, top-3 amber, otherwise primary
         if pos == 1:
             color = qcolor_hex(ACCENT_GREEN)
         elif pos <= 3:
@@ -536,44 +588,102 @@ class RaceStatusOverlay(MiniOverlay):
 
 
 class GapOverlay(MiniOverlay):
-    """Shows gap to car ahead, car behind and overall leader."""
+    """Gap to front / gap to back with directional bars (±5s full scale).
+
+    - GAP BACK bar fills LEFT → RIGHT (0 to +5s behind you = 100%)
+    - GAP FRONT bar fills RIGHT → LEFT (0 to -5s ahead of you = 100%)
+    """
     component_key = "gap"
+
+    GAP_FULL_SECONDS = 5.0  # bar full scale
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText(COMPONENT_LABELS[self.component_key].upper())
-        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
+        self._value.hide()  # custom-painted panel
+        self._gap_front: Optional[float] = None
+        self._gap_back: Optional[float] = None
+        self._laps_down: int = 0
+        self.setMinimumSize(170, 120)
 
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None or frame.position <= 0:
-            self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
+            self._gap_front = self._gap_back = None
+            self._laps_down = 0
+            self.update()
             return
-        lines = []
-        color = qcolor_hex(TEXT_PRIMARY)
-        if frame.gap_ahead > 0:
-            lines.append(f"▲ {frame.gap_ahead:+.1f}s")
-        if frame.gap_behind > 0:
-            lines.append(f"▼ {frame.gap_behind:+.1f}s")
-        if frame.laps_behind_leader > 0:
-            lines.append(f"LDR -{frame.laps_behind_leader}L")
-            color = qcolor_hex(ACCENT_RED)
-        elif frame.gap_leader > 0:
-            lines.append(f"LDR {frame.gap_leader:+.1f}s")
-        if not lines:
-            lines.append("—")
-            color = qcolor_hex(TEXT_TERTIARY)
-        # Battle color: close gap to car behind → red, close to car ahead → amber
-        if frame.gap_behind > 0 and frame.gap_behind < 2.0:
-            color = qcolor_hex(ACCENT_RED)
-        elif frame.gap_ahead > 0 and frame.gap_ahead < 2.0:
-            color = qcolor_hex(ACCENT_AMBER)
-        self._value.setText("\n".join(lines))
-        self._value.setStyleSheet(f"color: {color};")
+        self._gap_front = frame.gap_ahead if frame.gap_ahead > 0 else None
+        self._gap_back = frame.gap_behind if frame.gap_behind > 0 else None
+        self._laps_down = frame.laps_behind_leader
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        margin, label_h, bar_h, gap = 12, 14, 10, 18
+        bw = w - 2 * margin
+
+        if self._gap_front is None and self._gap_back is None:
+            painter.setPen(QPen(QColor(TEXT_TERTIARY)))
+            painter.setFont(QFont(FONT_MONO, 10))
+            painter.drawText(QRect(0, 30, w, 20), Qt.AlignmentFlag.AlignCenter, "—")
+            return
+
+        def draw_section(y: int, label: str, value: Optional[float], fill_left_to_right: bool) -> None:
+            painter.setFont(QFont(FONT_MONO, 8, QFont.Weight.Bold))
+            painter.setPen(QPen(QColor(TEXT_SECONDARY)))
+            painter.drawText(margin, y + 10, label)
+            # Value text right-aligned
+            if value is not None:
+                val_text = f"{value:+.1f}s"
+            else:
+                val_text = "—"
+            painter.setFont(QFont(FONT_MONO, 9, QFont.Weight.Bold))
+            painter.drawText(margin, y + 10, bw, label_h, Qt.AlignmentFlag.AlignRight, val_text)
+            # Track
+            track_y = y + label_h + 2
+            painter.setBrush(QBrush(BG_INSET))
+            painter.setPen(QPen(BORDER_STRONG, 1))
+            painter.drawRoundedRect(margin, track_y, bw, bar_h, 3, 3)
+            # Fill
+            if value is None:
+                return
+            pct = max(0.0, min(1.0, abs(value) / self.GAP_FULL_SECONDS))
+            fill_w = int(bw * pct)
+            if fill_w <= 2:
+                return
+            # Bar color: battle < 2s → red when defending (back), amber when attacking (front)
+            if value < 2.0:
+                bar_color = qcolor_hex(ACCENT_RED if fill_left_to_right else ACCENT_AMBER)
+            else:
+                bar_color = qcolor_hex(ACCENT_GREEN)
+            painter.setBrush(QBrush(QColor(bar_color)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            if fill_left_to_right:
+                x = margin + 1
+            else:
+                x = margin + bw - fill_w + 1
+            painter.drawRoundedRect(x, track_y + 1, max(2, fill_w - 2), bar_h - 2, 2, 2)
+
+        y0 = 26
+        draw_section(y0, "GAP BACK", self._gap_back, fill_left_to_right=True)
+        draw_section(y0 + gap + bar_h + label_h, "GAP FRONT", self._gap_front, fill_left_to_right=False)
+
+        # Lapped-down indicator
+        if self._laps_down > 0:
+            painter.setFont(QFont(FONT_MONO, 9, QFont.Weight.Bold))
+            painter.setPen(QPen(QColor(ACCENT_RED)))
+            painter.drawText(margin, h - 10, bw, 12, Qt.AlignmentFlag.AlignCenter, f"LDR -{self._laps_down}L")
 
 
 class FlagOverlay(MiniOverlay):
-    """Shows the current race flag status (green / yellow / FCY / red / blue...)."""
+    """LED flag box — colored squares like real track flag panels (no text).
+
+    LMU flag enum: Green = 0, Blue = 6 (pyLMUSharedMemory LMUPrimaryFlag).
+    Fallback mapping kept for rF2-style values.
+    """
     component_key = "flag"
 
     # rFactor2 / LMU flag_state mapping (best-effort)
@@ -584,70 +694,140 @@ class FlagOverlay(MiniOverlay):
         3: "RED",
         4: "WHITE",
         5: "CHECKERED",
-        6: "ORANGE",
+        6: "BLUE",       # LMU: mFlag=6 is BLUE (LMUPrimaryFlag)
     }
     FLAG_COLORS = {
         "GREEN": ACCENT_GREEN,
         "YELLOW": ACCENT_AMBER,
+        "FCY": ACCENT_AMBER,
         "BLUE": ACCENT_BLUE,
         "RED": ACCENT_RED,
         "WHITE": TEXT_PRIMARY,
         "CHECKERED": TEXT_PRIMARY,
-        "ORANGE": ACCENT_AMBER_BRIGHT,
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText(COMPONENT_LABELS[self.component_key].upper())
-        self._value.setFont(QFont(FONT_MONO, 14, QFont.Weight.Bold))
+        self._value.hide()  # custom-painted LED panel
+        self.setMinimumSize(150, 80)
+        self._flag_label = "GREEN"
+
+    def _resolve_flag(self, frame: TelemetryFrame) -> str:
+        if frame.under_yellow and frame.flag_state in (0, 1):
+            return "FCY" if frame.flag_state == 0 else "YELLOW"
+        return self.FLAG_LABELS.get(frame.flag_state, "GREEN")
 
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None or frame.position <= 0:
-            self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
-            return
-        if frame.under_yellow and frame.flag_state in (0, 1):
-            label = "FCY" if frame.flag_state == 0 else "YELLOW"
+            self._flag_label = ""
         else:
-            label = self.FLAG_LABELS.get(frame.flag_state, "GREEN")
-        color = qcolor_hex(self.FLAG_COLORS.get(label, TEXT_PRIMARY))
-        self._value.setText(label)
-        self._value.setStyleSheet(f"color: {color};")
+            self._flag_label = self._resolve_flag(frame)
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        label = self._flag_label
+        if not label:
+            painter.setPen(QPen(QColor(TEXT_TERTIARY)))
+            painter.setFont(QFont(FONT_MONO, 10))
+            painter.drawText(QRect(0, 30, w, 20), Qt.AlignmentFlag.AlignCenter, "—")
+            return
+
+        base_c = self.FLAG_COLORS.get(label, ACCENT_GREEN)
+        # Pattern of LED squares (like real flag panels)
+        if label == "CHECKERED":
+            pattern = [TEXT_PRIMARY, QColor(15, 15, 15), QColor(15, 15, 15), TEXT_PRIMARY]
+        elif label == "YELLOW":
+            pattern = [base_c, QColor(60, 45, 0), base_c, QColor(60, 45, 0)]  # flashing look
+        else:
+            pattern = [base_c, base_c, base_c, base_c]
+
+        led = 22
+        gap = 8
+        total_w = 4 * led + 3 * gap
+        x0 = (w - total_w) // 2
+        y0 = (h - led) // 2
+        for i, c in enumerate(pattern):
+            x = x0 + i * (led + gap)
+            # LED glow
+            glow = QColor(c)
+            glow.setAlpha(60)
+            painter.setBrush(QBrush(glow))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(x - 3, y0 - 3, led + 6, led + 6, 6, 6)
+            # LED square
+            painter.setBrush(QBrush(c))
+            painter.setPen(QPen(BORDER_STRONG, 1))
+            painter.drawRoundedRect(x, y0, led, led, 4, 4)
 
 
 class WeatherOverlay(MiniOverlay):
-    """Shows weather, track temp, ambient temp."""
+    """Shows weather, track temp, ambient temp — icon + colored values."""
     component_key = "weather"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("METEO".upper())
-        self._value.setFont(QFont(FONT_MONO, 12, QFont.Weight.Bold))
+        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
+        self.setMinimumSize(170, 100)
 
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None or not frame.weather_state:
             self._value.setText("—")
             self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             return
-        w = frame.weather_state or "—"
-        tt = f"{frame.track_temp:.0f}°" if frame.track_temp else "—"
-        at = f"{frame.ambient_temp:.0f}°" if frame.ambient_temp else "—"
-        rain = f"pioggia {frame.rain_intensity:.0%}" if frame.rain_intensity > 0 else ""
-        parts = [w, f"pista {tt}", f"aria {at}"]
-        if rain:
-            parts.append(rain)
-        self._value.setText(" | ".join(parts))
-        self._value.setStyleSheet(f"color: {qcolor_hex(ACCENT_CYAN)}; font-size: 9px;")
+        wet = frame.weather_state == "WET" or frame.rain_intensity > 0.05
+        if wet:
+            icon = "🌧"
+            state_color = qcolor_hex(ACCENT_CYAN)
+            state_txt = "PIOGGIA" if frame.rain_intensity > 0.3 else "UMIDO"
+        else:
+            icon = "☀️"
+            state_color = qcolor_hex(ACCENT_AMBER)
+            state_txt = "ASCIUTTO"
+        tt = frame.track_temp
+        at = frame.ambient_temp
+        # Track temp color: cold < 20° blue, hot > 40° red, else amber/green
+        if tt <= 0:
+            tt_color = qcolor_hex(TEXT_TERTIARY)
+        elif tt < 20:
+            tt_color = qcolor_hex(ACCENT_CYAN)
+        elif tt > 40:
+            tt_color = qcolor_hex(ACCENT_RED)
+        else:
+            tt_color = qcolor_hex(ACCENT_GREEN)
+        rain_pct = f" {frame.rain_intensity * 100:.0f}%" if frame.rain_intensity > 0 else ""
+        text = f"{icon} {state_txt}{rain_pct}\nPISTA {tt:.0f}°  ARIA {at:.0f}°"
+        self._value.setText(text)
+        self._value.setStyleSheet(f"color: {state_color}; font-size: 10px;")
 
 class WearOverlay(MiniOverlay):
-    """Shows tyre wear percentages and live remaining-life prediction."""
+    """Shows tyre wear percentages and live remaining-life prediction.
+
+    Custom-painted: 4 tyre drawings (2×2 grid), each with wear % and
+    temperature next to the correct corner.
+    - Temperature color: light blue = cold, green = optimal, red = overheated
+    - Wear color: green = ok, amber = heavy, red = critical
+    """
     component_key = "wear"
+
+    # Temperature thresholds (°C) — light-blue / green / red
+    TEMP_COLD = 65.0
+    TEMP_HOT = 105.0
+    # Wear thresholds (remaining fraction) — green / amber / red
+    WEAR_AMBER = 0.55
+    WEAR_RED = 0.35
+
+    CORNERS = [("FL", 0), ("FR", 1), ("RL", 2), ("RR", 3)]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("USURA GOMME".upper())
-        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
-        # Status line for tyre prediction
+        self._value.hide()  # custom-painted panel
         self._status = QLabel("")
         self._status.setFont(QFont(FONT_MONO, 7, QFont.Weight.Medium))
         self._status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
@@ -656,7 +836,9 @@ class WearOverlay(MiniOverlay):
         layout = self.layout()
         if layout is not None:
             layout.addWidget(self._status)
-        self.setMinimumSize(160, 110)
+        self.setMinimumSize(200, 130)
+        self._frame: Optional[TelemetryFrame] = None
+        self._tyre_status: Optional[Any] = None
 
     def update_value(
         self,
@@ -664,73 +846,122 @@ class WearOverlay(MiniOverlay):
         tyre_status: Optional[Any] = None,
         **_unused,
     ):
+        self._frame = frame
+        self._tyre_status = tyre_status
         if frame is None:
-            self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
             self._status.setText("")
+        else:
+            # Status line from prediction
+            if tyre_status is not None:
+                remaining = tyre_status.remaining_laps
+                status_parts = []
+                if remaining <= 0:
+                    status_parts.append("CLIFF — pit now!")
+                elif remaining <= 2:
+                    status_parts.append(f"⬇ pit in {remaining}L")
+                elif remaining <= 5:
+                    status_parts.append(f"⬇ ~{remaining}L left")
+                else:
+                    status_parts.append(f"✔ {remaining}L left")
+                ts = tyre_status.temp_status
+                if ts == "cold":
+                    status_parts.append("❄ cold")
+                elif ts == "hot":
+                    status_parts.append("🔥 hot")
+                elif ts == "degraded":
+                    status_parts.append("⚠ overheated")
+                elif ts == "optimal":
+                    status_parts.append("✓ temp OK")
+                self._status.setText("  ".join(status_parts))
+                remaining_color = (
+                    qcolor_hex(ACCENT_RED) if remaining <= 2
+                    else qcolor_hex(ACCENT_AMBER) if remaining <= 5
+                    else qcolor_hex(ACCENT_GREEN)
+                )
+                self._status.setStyleSheet(
+                    f"color: {remaining_color}; font-size: 8px; letter-spacing: 1px;"
+                )
+            else:
+                self._status.setText("")
+                self._status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
+        self.update()
+
+    @staticmethod
+    def _temp_color(temp: float) -> QColor:
+        if temp <= 0:
+            return TEXT_TERTIARY
+        if temp < WearOverlay.TEMP_COLD:
+            return ACCENT_CYAN          # cold → light blue
+        if temp > WearOverlay.TEMP_HOT:
+            return ACCENT_RED           # overheated
+        return ACCENT_GREEN             # optimal
+
+    @staticmethod
+    def _wear_color(fraction: float) -> QColor:
+        if fraction <= 0:
+            return ACCENT_RED
+        if fraction < WearOverlay.WEAR_RED:
+            return ACCENT_RED           # critical wear
+        if fraction < WearOverlay.WEAR_AMBER:
+            return ACCENT_AMBER         # heavy wear
+        return ACCENT_GREEN             # ok
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        frame = self._frame
+        if frame is None:
+            painter.setPen(QPen(QColor(TEXT_TERTIARY)))
+            painter.setFont(QFont(FONT_MONO, 10))
+            painter.drawText(QRect(0, 30, w, 20), Qt.AlignmentFlag.AlignCenter, "—")
             return
 
-        # Wear percentage display
-        w = [(1.0 - w) * 100.0 for w in frame.tyre_wear]
-        text = f"FL {w[0]:.0f}%  FR {w[1]:.0f}%  RL {w[2]:.0f}%  RR {w[3]:.0f}%"
+        wear = frame.tyre_wear if frame.tyre_wear else [1.0, 1.0, 1.0, 1.0]
+        temps = frame.tyre_temps if frame.tyre_temps else [0.0, 0.0, 0.0, 0.0]
 
-        # Colour based on tyre status or fallback to wear level
-        if tyre_status is not None:
-            remaining = tyre_status.remaining_laps
-            if remaining <= 0:
-                value_color = qcolor_hex(ACCENT_RED)
-            elif remaining <= 2:
-                value_color = qcolor_hex(ACCENT_RED)
-            elif remaining <= 5:
-                value_color = qcolor_hex(ACCENT_AMBER)
-            else:
-                value_color = qcolor_hex(ACCENT_GREEN)
+        # 2×2 grid: FL FR / RL RR
+        grid_w = w - 20
+        cell_w = grid_w // 2
+        cell_h = (h - 34) // 2  # leave room for title + status
+        radius = min(16, cell_w // 4)
 
-            # Build status text
-            status_parts = []
-            if remaining <= 0:
-                status_parts.append(f"CLIFF — pit now!")
-            elif remaining <= 2:
-                status_parts.append(f"⬇ pit in {remaining}L")
-            elif remaining <= 5:
-                status_parts.append(f"⬇ ~{remaining}L left")
-            else:
-                status_parts.append(f"✔ {remaining}L left")
+        for idx, (corner, i) in enumerate(self.CORNERS):
+            col = idx % 2
+            row = idx // 2
+            cx = 14 + col * cell_w + cell_w // 3
+            cy = 24 + row * cell_h + cell_h // 2
+            wf = max(0.0, min(1.0, wear[i]))
 
-            # Temp indicator
-            ts = tyre_status.temp_status
-            if ts == "cold":
-                status_parts.append("❄ cold")
-            elif ts == "hot":
-                status_parts.append("🔥 hot")
-            elif ts == "degraded":
-                status_parts.append("⚠ overheated")
-            elif ts == "optimal":
-                status_parts.append("✓ temp OK")
+            # Tyre drawing: outer ring = wear state, fill = temp state
+            temp_c = self._temp_color(temps[i])
+            wear_c = self._wear_color(wf)
+            # Ring (wear)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(wear_c, 3))
+            painter.drawEllipse(QPoint(cx, cy), radius, radius)
+            # Inner fill (temp, subtle)
+            fill_c = QColor(temp_c)
+            fill_c.setAlpha(70)
+            painter.setBrush(QBrush(fill_c))
+            painter.setPen(QPen(QColor(temp_c), 1))
+            painter.drawEllipse(QPoint(cx, cy), radius - 3, radius - 3)
+            # Hub
+            painter.setBrush(QBrush(BG_INSET))
+            painter.setPen(QPen(BORDER_STRONG, 1))
+            painter.drawEllipse(QPoint(cx, cy), 4, 4)
 
-            self._status.setText("  ".join(status_parts))
-
-            # Colour the status line too
-            if remaining <= 0:
-                status_color = qcolor_hex(ACCENT_RED)
-            elif remaining <= 2:
-                status_color = qcolor_hex(ACCENT_RED)
-            elif remaining <= 5:
-                status_color = qcolor_hex(ACCENT_AMBER)
-            else:
-                status_color = qcolor_hex(ACCENT_GREEN)
-
-            self._status.setStyleSheet(
-                f"color: {status_color}; font-size: 8px; letter-spacing: 1px;"
-            )
-        else:
-            # Fallback: colour by wear level
-            value_color = qcolor_hex(ACCENT_AMBER) if min(w) < 40 else qcolor_hex(TEXT_PRIMARY)
-            self._status.setText("")
-            self._status.setStyleSheet(f"color: {qcolor_hex(TEXT_SECONDARY)};")
-
-        self._value.setText(text)
-        self._value.setStyleSheet(f"color: {value_color}; font-size: 9px;")
+            # Text next to the correct tyre: wear % and temperature
+            tx = cx + radius + 8
+            painter.setFont(QFont(FONT_MONO, 8, QFont.Weight.Bold))
+            painter.setPen(QPen(QColor(TEXT_SECONDARY)))
+            painter.drawText(tx, cy - 4, f"{corner}")
+            painter.setFont(QFont(FONT_MONO, 8, QFont.Weight.Bold))
+            painter.setPen(QPen(wear_c))
+            painter.drawText(tx, cy + 8, f"{wf * 100:.0f}%")
+            painter.setPen(QPen(temp_c))
+            painter.drawText(tx, cy + 20, f"{temps[i]:.0f}°C")
 
 
 class CompoundOverlay(MiniOverlay):
@@ -753,24 +984,89 @@ class CompoundOverlay(MiniOverlay):
 
 
 class SectorsOverlay(MiniOverlay):
-    """Shows sector times for the current lap."""
+    """Sector times for the current lap — 3 internal sections.
+
+    Colors (vs personal best):
+    - fuchsia (purple): new personal best sector
+    - green: within +0.5s of best
+    - yellow: slow sector
+    """
     component_key = "sectors"
+
+    SECTOR_BEST_MARGIN = 0.5  # seconds over best → green until this, then yellow
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._title.setText("SETTORI".upper())
-        self._value.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
+        self._value.hide()  # custom-painted panel
+        self.setMinimumSize(210, 90)
+        self._sectors: List[Optional[float]] = [None, None, None]   # S1, S2, S3 times
+        self._bests: List[Optional[float]] = [None, None, None]     # personal bests
 
     def update_value(self, frame: Optional[TelemetryFrame] = None, **_unused):
         if frame is None:
-            self._value.setText("—")
-            self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_TERTIARY)};")
+            self._sectors = [None, None, None]
+            self._bests = [None, None, None]
+            self.update()
             return
-        s1 = frame.last_sector1 if frame.last_sector1 else 0
-        s2 = frame.last_sector2 - frame.last_sector1 if (frame.last_sector2 and frame.last_sector1) else 0
-        s3 = frame.last_lap_time - frame.last_sector2 if (frame.last_lap_time and frame.last_sector2) else 0
-        self._value.setText(f"S1 {s1:.1f}s  S2 {s2:.1f}s  S3 {s3:.1f}s")
-        self._value.setStyleSheet(f"color: {qcolor_hex(TEXT_PRIMARY)}; font-size: 9px;")
+        s1 = frame.last_sector1 if frame.last_sector1 else None
+        s2 = (frame.last_sector2 - frame.last_sector1) if (frame.last_sector2 and frame.last_sector1) else None
+        s3 = (frame.last_lap_time - frame.last_sector2) if (frame.last_lap_time and frame.last_sector2) else None
+        self._sectors = [s1, s2, s3]
+        b1 = frame.best_sector1 or None
+        b2 = (frame.best_sector2 - frame.best_sector1) if (frame.best_sector2 and frame.best_sector1) else None
+        b3 = (frame.best_lap_time - frame.best_sector2) if (frame.best_lap_time and frame.best_sector2) else None
+        self._bests = [b1, b2, b3]
+        self.update()
+
+    def _section_color(self, idx: int) -> QColor:
+        sec = self._sectors[idx]
+        best = self._bests[idx]
+        if sec is None:
+            return TEXT_TERTIARY
+        if best is None or best <= 0:
+            return TEXT_SECONDARY
+        if sec <= best + 0.05:
+            return ACCENT_PURPLE          # new personal best (fuchsia)
+        if sec <= best + self.SECTOR_BEST_MARGIN:
+            return ACCENT_GREEN           # good
+        return ACCENT_AMBER               # slow (yellow)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        if all(s is None for s in self._sectors):
+            painter.setPen(QPen(QColor(TEXT_TERTIARY)))
+            painter.setFont(QFont(FONT_MONO, 10))
+            painter.drawText(QRect(0, 30, w, 20), Qt.AlignmentFlag.AlignCenter, "—")
+            return
+
+        margin, gap = 10, 8
+        box_w = (w - 2 * margin - 2 * gap) // 3
+        box_h = h - 36
+        y0 = 24
+
+        for i in range(3):
+            x = margin + i * (box_w + gap)
+            c = self._section_color(i)
+            # Section background
+            bg = QColor(c)
+            bg.setAlpha(22)
+            painter.setBrush(QBrush(bg))
+            painter.setPen(QPen(c, 1))
+            painter.drawRoundedRect(x, y0, box_w, box_h, 6, 6)
+            # Label
+            painter.setFont(QFont(FONT_MONO, 8, QFont.Weight.Bold))
+            painter.setPen(QPen(QColor(TEXT_SECONDARY)))
+            painter.drawText(QRect(x, y0 + 6, box_w, 12), Qt.AlignmentFlag.AlignCenter, f"S{i + 1}")
+            # Time
+            sec = self._sectors[i]
+            if sec is not None:
+                painter.setFont(QFont(FONT_MONO, 11, QFont.Weight.Bold))
+                painter.setPen(QPen(c))
+                painter.drawText(QRect(x, y0 + 20, box_w, 16), Qt.AlignmentFlag.AlignCenter, f"{sec:.1f}s")
 
 
 class PracticeOverlay(MiniOverlay):
@@ -1306,7 +1602,8 @@ class OverlayManager(QObject):
         # Fuel
         fuel_laps = self._estimate_fuel_laps(frame)
         refuel = self._calculate_refuel(frame)
-        self.fuel_ov.update_value(fuel_laps, refuel_l=refuel)
+        fuel_pct = (frame.fuel / frame.fuel_capacity * 100.0) if frame.fuel_capacity > 0 else None
+        self.fuel_ov.update_value(fuel_laps, refuel_l=refuel, fuel_pct=fuel_pct)
 
         # Cliff
         cliff_laps = self._estimate_cliff_laps(frame)

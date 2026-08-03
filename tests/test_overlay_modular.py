@@ -124,7 +124,7 @@ def test_fuel_overlay_rendering(tmp_config_path, qt_app):
     from overlay.app_new import FuelOverlay, load_config
     ov = FuelOverlay(load_config())
     ov.update_value(5.4)
-    assert ov._value.text() == "5.4"
+    assert ov._value.text() == "5.4L"
     ov.update_value(1.5)  # < 2 → red
     ov.update_value(2.5)  # < 3 → amber
     ov.update_value(7.0)  # primary
@@ -302,10 +302,22 @@ def test_race_overlay_rendering(tmp_config_path, qt_app):
     ov = RaceStatusOverlay(load_config())
     ov.update_value(_race_frame())
     text = ov._value.text()
-    assert "P12/24" in text
+    assert "P5" in text       # class position (class_position=5)
     assert "HYP" in text
     assert "L23/40" in text
     assert "1:23:50" in text  # 5030s = 1h 23m 50s
+    ov.close()
+
+
+def test_race_overlay_practice_shows_time_not_laps(tmp_config_path, qt_app):
+    from overlay.app_new import RaceStatusOverlay, load_config
+    ov = RaceStatusOverlay(load_config())
+    # PRACTICE session: no lap counter, session time only
+    ov.update_value(_race_frame(session_type="PRACTICE", race_total_laps=0, elapsed_time=754.0))
+    text = ov._value.text()
+    assert "P5" in text
+    assert "12:34" in text  # 754s = 12m 34s
+    assert "L" not in text.replace("P5", "")
     ov.close()
 
 
@@ -320,8 +332,8 @@ def test_race_overlay_unknown(tmp_config_path, qt_app):
 def test_race_overlay_leader_green(tmp_config_path, qt_app):
     from overlay.app_new import RaceStatusOverlay, load_config, ACCENT_GREEN, qcolor_hex
     ov = RaceStatusOverlay(load_config())
-    ov.update_value(_race_frame(position=1))
-    assert "P1/" in ov._value.text()
+    ov.update_value(_race_frame(position=1, class_position=1))
+    assert "P1" in ov._value.text()
     assert qcolor_hex(ACCENT_GREEN) in ov._value.styleSheet()
     ov.close()
 
@@ -330,19 +342,24 @@ def test_gap_overlay_rendering(tmp_config_path, qt_app):
     from overlay.app_new import GapOverlay, load_config
     ov = GapOverlay(load_config())
     ov.update_value(_race_frame())
-    text = ov._value.text()
-    assert "+3.4s" in text   # car ahead
-    assert "+1.2s" in text   # car behind (we lead it)
-    assert "+45.6s" in text  # leader gap
+    assert ov._gap_front == 3.4   # gap to car ahead
+    assert ov._gap_back == 1.2    # gap to car behind
+    ov.close()
+
+
+def test_gap_overlay_unknown(tmp_config_path, qt_app):
+    from overlay.app_new import GapOverlay, load_config
+    ov = GapOverlay(load_config())
+    ov.update_value(None)
+    assert ov._gap_front is None and ov._gap_back is None
     ov.close()
 
 
 def test_gap_overlay_lapped_red(tmp_config_path, qt_app):
-    from overlay.app_new import GapOverlay, load_config, ACCENT_RED, qcolor_hex
+    from overlay.app_new import GapOverlay, load_config
     ov = GapOverlay(load_config())
     ov.update_value(_race_frame(laps_behind_leader=1, gap_leader=0.0))
-    assert "-1L" in ov._value.text()
-    assert qcolor_hex(ACCENT_RED) in ov._value.styleSheet()
+    assert ov._laps_down == 1
     ov.close()
 
 
@@ -350,7 +367,7 @@ def test_flag_overlay_green(tmp_config_path, qt_app):
     from overlay.app_new import FlagOverlay, load_config
     ov = FlagOverlay(load_config())
     ov.update_value(_race_frame(flag_state=0))
-    assert ov._value.text() == "GREEN"
+    assert ov._flag_label == "GREEN"
     ov.close()
 
 
@@ -358,7 +375,7 @@ def test_flag_overlay_yellow(tmp_config_path, qt_app):
     from overlay.app_new import FlagOverlay, load_config
     ov = FlagOverlay(load_config())
     ov.update_value(_race_frame(flag_state=1, under_yellow=True))
-    assert ov._value.text() == "YELLOW"
+    assert ov._flag_label == "YELLOW"
     ov.close()
 
 
@@ -366,7 +383,7 @@ def test_flag_overlay_fcy(tmp_config_path, qt_app):
     from overlay.app_new import FlagOverlay, load_config
     ov = FlagOverlay(load_config())
     ov.update_value(_race_frame(flag_state=0, under_yellow=True))
-    assert ov._value.text() == "FCY"
+    assert ov._flag_label == "FCY"
     ov.close()
 
 
@@ -374,7 +391,68 @@ def test_flag_overlay_red(tmp_config_path, qt_app):
     from overlay.app_new import FlagOverlay, load_config
     ov = FlagOverlay(load_config())
     ov.update_value(_race_frame(flag_state=3))
-    assert ov._value.text() == "RED"
+    assert ov._flag_label == "RED"
+    ov.close()
+
+
+def test_flag_overlay_blue_lmu(tmp_config_path, qt_app):
+    """LMU enum: mFlag=6 is BLUE (LMUPrimaryFlag) — must be detected."""
+    from overlay.app_new import FlagOverlay, load_config
+    ov = FlagOverlay(load_config())
+    ov.update_value(_race_frame(flag_state=6))
+    assert ov._flag_label == "BLUE"
+    ov.close()
+
+
+def test_fuel_overlay_percentage_bar(tmp_config_path, qt_app):
+    from overlay.app_new import FuelOverlay, load_config
+    ov = FuelOverlay(load_config())
+    ov.update_value(5.4, fuel_pct=50.0)
+    assert "50%" in ov._value.text()
+    assert ov._fuel_pct == 50.0
+    # Low fuel → red bar
+    ov.update_value(1.5, fuel_pct=10.0)
+    assert "10%" in ov._value.text()
+    assert ov._fuel_pct == 10.0
+    ov.close()
+
+
+def test_wear_overlay_temp_colors(tmp_config_path, qt_app):
+    from overlay.app_new import WearOverlay, load_config
+    from overlay.shared import ACCENT_CYAN, ACCENT_GREEN, ACCENT_RED
+    ov = WearOverlay(load_config())
+    assert WearOverlay._temp_color(50.0) == ACCENT_CYAN    # cold → light blue
+    assert WearOverlay._temp_color(80.0) == ACCENT_GREEN   # optimal
+    assert WearOverlay._temp_color(120.0) == ACCENT_RED    # overheated
+    ov.close()
+
+
+def test_wear_overlay_wear_colors(tmp_config_path, qt_app):
+    from overlay.app_new import WearOverlay, load_config
+    from overlay.shared import ACCENT_GREEN, ACCENT_AMBER, ACCENT_RED
+    ov = WearOverlay(load_config())
+    assert WearOverlay._wear_color(0.9) == ACCENT_GREEN   # ok
+    assert WearOverlay._wear_color(0.5) == ACCENT_AMBER   # heavy
+    assert WearOverlay._wear_color(0.2) == ACCENT_RED     # critical
+    ov.close()
+
+
+def test_sectors_overlay_colors(tmp_config_path, qt_app):
+    from overlay.app_new import SectorsOverlay, load_config
+    from overlay.shared import ACCENT_PURPLE, ACCENT_GREEN, ACCENT_AMBER
+    ov = SectorsOverlay(load_config())
+    # No best → neutral (no crash)
+    ov.update_value(_race_frame(last_sector1=30.0, best_sector1=0.0))
+    assert ov._section_color(0) is not None
+    # New personal best (≤ best + 0.05) → fuchsia
+    ov.update_value(_race_frame(last_sector1=29.9, best_sector1=30.0))
+    assert ov._section_color(0) == ACCENT_PURPLE
+    # Within +0.5s → green
+    ov.update_value(_race_frame(last_sector1=30.3, best_sector1=30.0))
+    assert ov._section_color(0) == ACCENT_GREEN
+    # Slow → yellow
+    ov.update_value(_race_frame(last_sector1=31.5, best_sector1=30.0))
+    assert ov._section_color(0) == ACCENT_AMBER
     ov.close()
 
 

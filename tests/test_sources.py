@@ -74,6 +74,9 @@ def test_telemetry_frame_race_defaults():
     assert frame.race_total_laps == 0
     assert frame.flag_state == 0
     assert frame.under_yellow is False
+    assert frame.best_sector1 == 0.0
+    assert frame.best_sector2 == 0.0
+    assert frame.best_lap_time == 0.0
 
 
 def test_synthetic_source_pit_stop():
