@@ -171,6 +171,22 @@ def _wait_for_server(timeout: float = 10.0) -> bool:
     return False
 
 
+def _port_in_use(host: str = SERVER_HOST, port: int = SERVER_PORT) -> bool:
+    """True se la porta è già occupata (un'altra istanza del launcher è attiva).
+
+    Previene il doppio avvio: la seconda istanza fallirebbe il bind (Errno
+    10048), troverebbe il server VECCHIO con _wait_for_server (falso
+    'Web server ready') e spawnerebbe un SECONDO overlay → crash/stallo.
+    """
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return False  # porta libera — possiamo avviare il nostro server
+        except OSError:
+            return True   # già occupata — altra istanza attiva
+
+
 def _launch_overlay_subprocess():
     """Launch overlay as a separate process, respecting the overlay_mode setting."""
     # Check the overlay config for the desired mode
@@ -251,6 +267,19 @@ def main():
     print("=" * 60)
     print("  LMU Pit Strategist — Launcher")
     print("=" * 60)
+
+    # Doppio avvio? Se la porta è già occupata da un'altra istanza attiva,
+    # NON avviare un secondo server/overlay: apri solo il browser su quella
+    # esistente ed esci. (Altrimenti: bind fallito 10048 + secondo overlay
+    # → crash/stallo.)
+    if _port_in_use():
+        print(f"[Launcher] Porta {SERVER_PORT} già in uso: un'altra istanza di LMU Pit Strategist è già in esecuzione.")
+        print(f"[Launcher] Apro il browser sull'istanza esistente e chiudo questa.")
+        try:
+            webbrowser.open(f"http://{SERVER_HOST}:{SERVER_PORT}/")
+        except Exception:
+            pass
+        return
 
     print(f"[Launcher] Starting web server on http://{SERVER_HOST}:{SERVER_PORT} ...")
     server_thread = threading.Thread(target=_run_server, daemon=True)
