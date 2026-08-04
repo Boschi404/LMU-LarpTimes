@@ -1354,6 +1354,15 @@ class OverlayManager(QObject):
             self._current_profile = "last_used"
             self._cfg["_current_profile"] = "last_used"
 
+        # Avviso se tutti i pannelli sono nascosti (config + profilo applicato):
+        # l'overlay gira ma è invisibile — l'utente lo scambierebbe per un
+        # crash all'avvio. Suggerisce le hotkey per riportarli in vista.
+        if not any(self._cfg.get(f"{key}_vis", True) for key in self.components):
+            print(
+                "[Overlay] ATTENZIONE: tutti i pannelli sono nascosti nel profilo/config. "
+                "Premi Ctrl+Shift+M (mostra tutti) o Ctrl+Shift+H (nascondi tutti)."
+            )
+
     # ── Hotkey handling (Windows) ────────────────────────────────────────────
 
     def _register_hotkeys(self):
