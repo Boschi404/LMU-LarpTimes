@@ -227,12 +227,20 @@ class LiveSharedMemorySource(TelemetrySource):
                 except AttributeError:
                     brake_temps = [0.0, 0.0, 0.0, 0.0]
                 try:
-                    tyre_temps = [
+                    # mTemperature è un vettore 3D (interno/centro/superficie) →
+                    # normalizza a media per il frame
+                    raw_temps = [
                         telem.mWheels[0].mTemperature,
                         telem.mWheels[1].mTemperature,
                         telem.mWheels[2].mTemperature,
                         telem.mWheels[3].mTemperature,
                     ]
+                    tyre_temps = []
+                    for t in raw_temps:
+                        try:
+                            tyre_temps.append(sum(float(x) for x in t) / len(t))
+                        except TypeError:
+                            tyre_temps.append(float(t))
                 except AttributeError:
                     tyre_temps = [0.0, 0.0, 0.0, 0.0]
 

@@ -427,6 +427,72 @@ def test_wear_overlay_temp_colors(tmp_config_path, qt_app):
     ov.close()
 
 
+def test_wear_overlay_temp_color_normalizes_ctypes_vector(tmp_config_path, qt_app):
+    """Regressione crash live: mTemperature LMU è un vettore 3D
+    (c_double_Array_3) — _temp_color deve normalizzarlo, non crashare con
+    TypeError '<=' not supported."""
+    import ctypes
+    from overlay.app_new import WearOverlay, load_config
+    from overlay.shared import ACCENT_CYAN, ACCENT_GREEN, ACCENT_RED
+    ov = WearOverlay(load_config())
+    vec_cold = (ctypes.c_double * 3)(50.0, 52.0, 54.0)     # media 52 → fredda
+    vec_opt = (ctypes.c_double * 3)(80.0, 82.0, 84.0)      # media 82 → ottimale
+    vec_hot = (ctypes.c_double * 3)(110.0, 115.0, 120.0)   # media 115 → calda
+    assert WearOverlay._temp_color(vec_cold) == ACCENT_CYAN
+    assert WearOverlay._temp_color(vec_opt) == ACCENT_GREEN
+    assert WearOverlay._temp_color(vec_hot) == ACCENT_RED
+    # Anche tuple normale
+    assert WearOverlay._temp_color((70.0, 72.0, 74.0)) == ACCENT_GREEN
+    ov.close()
+
+
+def test_wear_overlay_paint_with_ctypes_temps_no_crash(tmp_config_path, qt_app):
+    """Il paintEvent completo con temperature ctypes (frame live) non deve
+    sollevare né lasciare painter orfani."""
+    import ctypes
+    from overlay.app_new import WearOverlay, load_config
+    from telemetry.source import TelemetryFrame
+    ov = WearOverlay(load_config())
+    frame = TelemetryFrame(
+        position=12, tyre_wear=[0.9, 0.6, 0.4, 0.75],
+        tyre_temps=[(ctypes.c_double * 3)(50, 52, 54),
+                    (ctypes.c_double * 3)(80, 82, 84),
+                    (ctypes.c_double * 3)(110, 115, 120),
+                    (ctypes.c_double * 3)(90, 92, 94)],
+    )
+    ov.update_value(frame)
+    img = ov.grab().toImage()  # forza paintEvent
+    assert not img.isNull()
+    ov.close()
+
+
+def test_gap_overlay_paint_no_crash(tmp_config_path, qt_app):
+    from overlay.app_new import GapOverlay, load_config
+    ov = GapOverlay(load_config())
+    ov.update_value(_race_frame())
+    img = ov.grab().toImage()
+    assert not img.isNull()
+    ov.close()
+
+
+def test_flag_overlay_paint_no_crash(tmp_config_path, qt_app):
+    from overlay.app_new import FlagOverlay, load_config
+    ov = FlagOverlay(load_config())
+    ov.update_value(_race_frame(flag_state=6))
+    img = ov.grab().toImage()
+    assert not img.isNull()
+    ov.close()
+
+
+def test_sectors_overlay_paint_no_crash(tmp_config_path, qt_app):
+    from overlay.app_new import SectorsOverlay, load_config
+    ov = SectorsOverlay(load_config())
+    ov.update_value(_race_frame())
+    img = ov.grab().toImage()
+    assert not img.isNull()
+    ov.close()
+
+
 def test_wear_overlay_wear_colors(tmp_config_path, qt_app):
     from overlay.app_new import WearOverlay, load_config
     from overlay.shared import ACCENT_GREEN, ACCENT_AMBER, ACCENT_RED
