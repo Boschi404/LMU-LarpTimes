@@ -1319,6 +1319,11 @@ class OverlayManager(QObject):
         # Flag TTS edge detection
         self._last_under_yellow: bool = False
         self._last_flag_state: int = 0
+        # Cache modelli fuel/degrado: i fit scipy (L-BFGS-B) a ogni frame a 20Hz
+        # congelano il main thread (UI freezata). Ricalcolo max ogni 30s o a
+        # inizio sessione / lap completato.
+        self._model_cache: Dict[str, Any] = {}
+        self._model_cache_ts: float = 0.0
 
         # Audio + adaptive strategy + VoiceEngine + RaceEngineer
         self.audio_engine = AudioEngine(
@@ -1652,14 +1657,12 @@ class OverlayManager(QObject):
 
         # Wear — compute tyre status prediction
         try:
-            # Estimate historical cliff from our model
+            # Estimate historical cliff from our model (cached: fit a ogni
+            # frame a 20Hz congelava il main thread — scipy L-BFGS-B)
             hist_cliff = None
-            if self._car and self._track:
-                laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
-                if len(laps) >= 5:
-                    model = fit_degradation_model(laps)
-                    if model.cliff_lap < 999:
-                        hist_cliff = int(model.cliff_lap)
+            deg_model = self._get_cached_models().get("deg_model")
+            if deg_model is not None and deg_model.cliff_lap < 999:
+                hist_cliff = int(deg_model.cliff_lap)
             tyre_status = estimate_remaining_life(
                 current_wear=frame.tyre_wear,
                 tyre_age_laps=self._tyre_age_laps,
@@ -1737,6 +1740,8 @@ class OverlayManager(QObject):
     # ── Strategy refresh (called on each lap) ────────────────────────────────
 
     def on_lap_completed(self, _lap_id: int):
+        # Nuovo dato disponibile → i modelli si ricalcolano al prossimo frame
+        self._invalidate_models()
         if self._session_type == "QUALIFYING":
             self._run_qualifying_analysis()
         else:
@@ -1761,14 +1766,42 @@ class OverlayManager(QObject):
         self._run_qualifying_analysis()
         self.audio_engine.play("strategy_changed")
 
+    def _get_cached_models(self) -> Dict[str, Any]:
+        """Fit fuel + degradation cached (max 1 ricalcolo ogni 30s).
+
+        I fit scipy (L-BFGS-B) in update_frame a 20Hz congelano il main
+        thread con DB grandi → UI freezata. I modelli non cambiano a ogni
+        frame: si ricalcolano a inizio sessione / lap completato / 30s.
+        """
+        now = time.time()
+        if self._model_cache and (now - self._model_cache_ts) < 30.0:
+            return self._model_cache
+        cache: Dict[str, Any] = {}
+        if self._car and self._track:
+            try:
+                laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
+                if laps:
+                    mean_cons, _ = fit_fuel_model(laps)
+                    cache["fuel"] = mean_cons
+                if len(laps) >= 5:
+                    cache["deg_model"] = fit_degradation_model(laps)
+            except Exception:
+                logger.exception("_get_cached_models: fit fallito")
+        self._model_cache = cache
+        self._model_cache_ts = now
+        return cache
+
+    def _invalidate_models(self) -> None:
+        """Forza il ricalcolo dei modelli (nuova sessione o lap completato)."""
+        self._model_cache = {}
+        self._model_cache_ts = 0.0
+
     def _estimate_fuel_laps(self, frame: TelemetryFrame) -> float:
         fuel = frame.fuel
-        if self._car and self._track:
-            laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
-            if laps:
-                mean_cons, _ = fit_fuel_model(laps)
-                if mean_cons > 0:
-                    return fuel / mean_cons
+        models = self._get_cached_models()
+        mean_cons = models.get("fuel") or 3.2
+        if mean_cons > 0:
+            return fuel / mean_cons
         return fuel / 3.2
 
     def _calculate_refuel(self, frame: TelemetryFrame) -> Optional[float]:
@@ -1776,10 +1809,7 @@ class OverlayManager(QObject):
         if not self._car or not self._track:
             return None
         try:
-            laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
-            if not laps:
-                return None
-            _, mean_cons = fit_fuel_model(laps)
+            mean_cons = self._get_cached_models().get("fuel") or 0.0
             if mean_cons <= 0:
                 return None
 
@@ -1812,12 +1842,9 @@ class OverlayManager(QObject):
             return None
 
     def _estimate_cliff_laps(self, frame: TelemetryFrame) -> int:
-        if self._car and self._track:
-            laps = database.get_laps_for_analysis(self._car, self._track, db_path=self.db_path)
-            if len(laps) >= 5:
-                model = fit_degradation_model(laps)
-                if model.cliff_lap < 999:
-                    return max(0, int(model.cliff_lap) - frame.lap_number)
+        deg_model = self._get_cached_models().get("deg_model")
+        if deg_model is not None and deg_model.cliff_lap < 999:
+            return max(0, int(deg_model.cliff_lap) - frame.lap_number)
         return 999
 
     def _refresh_strategy(self):
@@ -1892,6 +1919,7 @@ class OverlayManager(QObject):
         self._car = car
         self._track = track
         self._total_race_laps = total_laps
+        self._invalidate_models()  # nuova sessione → nuovi dati → ricalcola
 
     def set_pit_plan(self, pit_laps: List[int]):
         self._pit_plan = pit_laps

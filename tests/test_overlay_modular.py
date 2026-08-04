@@ -540,6 +540,43 @@ def test_pit_overlay_window_zero(tmp_config_path, qt_app):
     ov.close()
 
 
+def test_model_cache_avoids_repeated_fits(tmp_config_path, qt_app, monkeypatch):
+    """Regressione freeze UI: i fit scipy (L-BFGS-B) a ogni frame a 20Hz
+    congelavano il main thread. _get_cached_models deve rifare il fit solo
+    ogni 30s o dopo invalidazione — non a ogni chiamata."""
+    import overlay.app_new as mod
+    from overlay.app_new import OverlayManager
+
+    calls = {"fuel": 0, "deg": 0}
+
+    def fake_fuel(laps):
+        calls["fuel"] += 1
+        return (3.2, None)
+
+    def fake_deg(laps):
+        calls["deg"] += 1
+        return mod.fit_degradation_model(laps)
+
+    monkeypatch.setattr(mod, "fit_fuel_model", fake_fuel)
+    monkeypatch.setattr(mod, "fit_degradation_model", fake_deg)
+
+    mgr = OverlayManager()
+    mgr._car, mgr._track = "Ferrari 499P", "Le Mans"
+
+    # Prima chiamata → fit eseguito
+    m1 = mgr._get_cached_models()
+    assert calls["fuel"] == 1 and calls["deg"] >= 1
+    # Chiamate ravvicinate → nessun nuovo fit (cache 30s)
+    for _ in range(10):
+        mgr._get_cached_models()
+    assert calls["fuel"] == 1, f"fuel fit ripetuto: {calls['fuel']}"
+    # Invalidazione → ricalcolo
+    mgr._invalidate_models()
+    mgr._get_cached_models()
+    assert calls["fuel"] == 2
+    mgr.hide_all()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Robustezza: stdout cp1252 (Windows pipe) — emoji nei print non devono crashare
 # ──────────────────────────────────────────────────────────────────────────────
